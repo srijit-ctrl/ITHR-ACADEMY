@@ -27,6 +27,8 @@
         --brand-hover: 174 100% 27%;
         --brand-ink: 220 60% 22%;          /* ITHR navy */
         --brand-blue: 210 76% 53%;         /* ITHR bright blue */
+        --brand-gold: 41 80% 52%;          /* ITHR ceremonial gold — for seals & credentials */
+        --brand-gold-deep: 36 70% 40%;
         --destructive: 356 63% 44%;
         --destructive-foreground: 0 0% 100%;
         --success: 154 61% 34%;
@@ -154,6 +156,80 @@
     .fine-rule::before {
         content: '';
         @apply absolute -left-4 top-1/2 h-px w-3 bg-brand;
+    }
+
+    /* ITHR brand marks & lockups */
+    .brand-lockup {
+        @apply inline-flex items-center gap-3;
+    }
+    .brand-mark {
+        @apply relative overflow-hidden;
+        background:
+            radial-gradient(circle at 30% 20%, hsl(var(--brand)) 0%, transparent 40%),
+            linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(220 60% 8%) 100%);
+    }
+    .brand-wordmark {
+        font-family: 'Cormorant Garamond', serif;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+    .brand-tag {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 9px;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: hsl(var(--brand));
+    }
+    .ithr-seal {
+        --ring-color: hsl(var(--brand-gold));
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 1 / 1;
+        border-radius: 9999px;
+        background: radial-gradient(circle at 30% 25%, hsl(var(--foreground)) 0%, hsl(220 60% 6%) 100%);
+        color: white;
+        box-shadow:
+            0 0 0 1px hsl(var(--border)),
+            0 0 0 6px hsl(var(--background)),
+            0 0 0 7px hsl(var(--brand-gold) / 0.55),
+            0 20px 40px -20px hsl(var(--foreground) / 0.4);
+    }
+    .ithr-seal::before {
+        content: '';
+        position: absolute;
+        inset: 8px;
+        border-radius: 9999px;
+        border: 1px dashed hsl(var(--brand-gold) / 0.5);
+    }
+    .ithr-seal-text {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        animation: seal-spin 40s linear infinite;
+    }
+    @keyframes seal-spin {
+        to { transform: rotate(360deg); }
+    }
+    .badge-gold {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-none text-[10px] font-mono uppercase tracking-[0.15em];
+        background: linear-gradient(90deg, hsl(var(--brand-gold) / 0.15), hsl(var(--brand-gold) / 0.05));
+        border: 1px solid hsl(var(--brand-gold) / 0.6);
+        color: hsl(var(--brand-gold-deep));
+    }
+    .dark .badge-gold {
+        color: hsl(var(--brand-gold));
+    }
+    .divider-gold {
+        @apply relative flex items-center gap-3 my-6;
+    }
+    .divider-gold::before,
+    .divider-gold::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, hsl(var(--brand-gold) / 0.5), transparent);
     }
 }
 

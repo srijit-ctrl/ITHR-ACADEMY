@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api, API_BASE } from "@/lib/api";
 import { Award, ShieldCheck, ExternalLink, Clock, Loader2, Compass, Linkedin, Copy, Check, Building2 } from "lucide-react";
+import { ITHRSeal } from "@/components/brand/ITHRBrand";
 
 export default function Passport() {
     const { slug: paramSlug } = useParams();
@@ -42,10 +43,17 @@ export default function Passport() {
         <div className="container-page py-14">
             {/* Hero */}
             <div className="cert-beam mb-10" data-testid="passport-hero">
-                <div className="bg-surface p-10 md:p-14">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                <div className="bg-surface p-10 md:p-14 relative overflow-hidden">
+                    <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-brand-gold to-transparent" />
+                    <div className="absolute -top-8 -right-8 opacity-10 pointer-events-none hidden md:block">
+                        <ITHRSeal size={280} label="AI Skills Passport" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start relative">
                         <div className="md:col-span-8">
-                            <div className="overline mb-4">AI Skills Passport · ITHR Technologies</div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="badge-gold">ITHR Technologies</span>
+                                <span className="overline">AI Skills Passport</span>
+                            </div>
                             <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none mb-4" data-testid="passport-name">
                                 {data.full_name}
                             </h1>
@@ -92,7 +100,7 @@ export default function Passport() {
                     <button onClick={copyLink} data-testid="passport-copy-link" className="btn-outline">
                         {copied ? <><Check className="w-4 h-4" /> Copied</> : <><Copy className="w-4 h-4" /> Copy public URL</>}
                     </button>
-                    <Link to="/mentor" className="btn-outline"><Compass className="w-4 h-4" /> Ask Solon what's next</Link>
+                    <Link to="/mentor" className="btn-outline"><Compass className="w-4 h-4" /> Ask Solon what&apos;s next</Link>
                 </div>
             )}
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ArrowRight, ShieldCheck, Trophy, Users, Building2, GraduationCap, Sparkles, Radio, Zap } from "lucide-react";
 import CourseCard from "@/components/CourseCard";
-import { ITHR_LOGO_URL } from "@/components/layout/Header";
+import { ITHRSeal } from "@/components/brand/ITHRBrand";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1526314114033-349ef6f72220?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmFsJTIwbGlicmFyeXxlbnwwfHx8fDE3ODMxNTI1NTV8MA&ixlib=rb-4.1.0&q=85";
 const ENTERPRISE_IMG = "https://images.pexels.com/photos/7698712/pexels-photo-7698712.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -32,25 +32,30 @@ export default function Landing() {
             <section className="relative border-b border-border overflow-hidden">
                 <div className="absolute inset-0">
                     <img src={HERO_IMG} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-background/90 dark:bg-background/85" />
+                    <div className="absolute inset-0 bg-background/92 dark:bg-background/88" />
                 </div>
-                <div className="relative container-page pt-24 pb-32 md:pt-32 md:pb-40">
+                {/* Giant ITHR watermark — subtle brand statement */}
+                <div className="absolute -right-8 top-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.035] hidden lg:block">
+                    <div className="font-serif text-[380px] leading-none tracking-tighter text-foreground">ITHR</div>
+                </div>
+
+                <div className="relative container-page pt-16 pb-24 md:pt-20 md:pb-32">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
                         <div className="md:col-span-8">
                             <div className="animate-fade-in">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-8 h-8 bg-foreground p-1 rounded-sm">
-                                        <img src={ITHR_LOGO_URL} alt="ITHR" className="w-full h-full object-contain" />
-                                    </div>
-                                    <div className="overline">An ITHR Technologies Value Proposition</div>
+                                <div className="inline-flex items-center gap-3 mb-8 border-t border-b border-brand-gold/40 py-2 px-4 bg-brand-gold/5">
+                                    <span className="badge-gold border-0 !px-0 !bg-transparent">
+                                        Est. 2026 · A Certification Authority
+                                    </span>
+                                    <span className="text-muted-foreground text-[10px] font-mono uppercase tracking-[0.2em]">By ITHR Technologies</span>
                                 </div>
                                 <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl tracking-tighter leading-[1.02] font-medium">
-                                    Where the world's<br />
+                                    Where the world&apos;s<br />
                                     workforce learns to<br />
                                     <span className="italic text-brand">command</span> AI.
                                 </h1>
                                 <p className="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
-                                    Enterprise Agentic AI Academy is the credentialing platform ITHR built for Fortune 500 workforces — to prove, grow, and continuously refresh the AI fluency of every employee. Ten certification tiers. Twenty industries. One standard, updated weekly.
+                                    The <span className="text-foreground font-medium">ITHR Enterprise Agentic AI Academy</span> is the credentialing platform built for Fortune 500 workforces — to prove, grow, and continuously refresh the AI fluency of every employee. Ten certification tiers. Twenty industries. One standard, updated weekly.
                                 </p>
                                 <div className="mt-10 flex flex-col sm:flex-row gap-3">
                                     <Link to="/courses" data-testid="hero-browse-catalog" className="btn-primary text-base">
@@ -58,30 +63,36 @@ export default function Landing() {
                                         <ArrowRight className="w-4 h-4" />
                                     </Link>
                                     <Link to="/intelligence" data-testid="hero-see-intelligence" className="btn-outline text-base">
-                                        <Radio className="w-4 h-4" /> See today's intelligence
+                                        <Radio className="w-4 h-4" /> See today&apos;s intelligence
                                     </Link>
                                 </div>
                             </div>
                         </div>
 
                         <div className="md:col-span-4">
-                            <div className="card-flat p-8 space-y-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-brand text-white flex items-center justify-center">
-                                        <Trophy className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Cohort · Q1 2026</div>
-                                        <div className="font-serif text-xl leading-none mt-1">128,400 certified</div>
-                                    </div>
+                            <div className="relative">
+                                <div className="absolute -top-8 -right-4 z-20 hidden md:block">
+                                    <ITHRSeal size={120} label="Certification Authority" />
                                 </div>
-                                <div className="h-px bg-border" />
-                                <ul className="space-y-3 text-sm">
-                                    <li className="flex items-start gap-3"><ShieldCheck className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Blockchain-verified digital credentials</span></li>
-                                    <li className="flex items-start gap-3"><Users className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>AI Tutor pairing for every learner</span></li>
-                                    <li className="flex items-start gap-3"><GraduationCap className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Aligned to EU AI Act & ISO 42001</span></li>
-                                    <li className="flex items-start gap-3"><Building2 className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Deployed across 400+ enterprises</span></li>
-                                </ul>
+                                <div className="card-flat p-8 space-y-6 relative overflow-hidden">
+                                    <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-brand-gold to-transparent" />
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-brand text-white flex items-center justify-center">
+                                            <Trophy className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Cohort · Q1 2026</div>
+                                            <div className="font-serif text-xl leading-none mt-1">128,400 certified</div>
+                                        </div>
+                                    </div>
+                                    <div className="h-px bg-border" />
+                                    <ul className="space-y-3 text-sm">
+                                        <li className="flex items-start gap-3"><ShieldCheck className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Blockchain-verified digital credentials</span></li>
+                                        <li className="flex items-start gap-3"><Users className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>AI Tutor pairing for every learner</span></li>
+                                        <li className="flex items-start gap-3"><GraduationCap className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Aligned to EU AI Act & ISO 42001</span></li>
+                                        <li className="flex items-start gap-3"><Building2 className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Deployed across 400+ enterprises</span></li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -223,11 +234,11 @@ export default function Landing() {
                             Curriculum that <span className="italic text-brand">refreshes itself.</span>
                         </h2>
                         <p className="text-lg opacity-80 leading-relaxed mb-8 max-w-xl">
-                            Agentic AI moves weekly. ITHR's Intelligence Desk — a Claude-powered analyst agent — scans the frontier every 6 hours and pushes signals into your curriculum. Model releases, regulation, enterprise deployments: nothing goes stale.
+                            Agentic AI moves weekly. ITHR&apos;s Intelligence Desk — a Claude-powered analyst agent — scans the frontier every 6 hours and pushes signals into your curriculum. Model releases, regulation, enterprise deployments: nothing goes stale.
                         </p>
                         <div className="flex gap-3">
                             <Link to="/intelligence" data-testid="landing-intel-cta" className="btn-primary">
-                                See today's briefing <ArrowRight className="w-4 h-4" />
+                                See today&apos;s briefing <ArrowRight className="w-4 h-4" />
                             </Link>
                             <Link to="/pricing" data-testid="landing-pricing-cta" className="inline-flex items-center gap-2 border border-white/30 hover:border-brand hover:text-brand text-white rounded-sm px-6 py-3 font-medium transition-colors">
                                 See pricing

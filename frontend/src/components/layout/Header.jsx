@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Sparkles, LogOut, User as UserIcon } from "lucide-react";
+import { ITHRLockup } from "@/components/brand/ITHRBrand";
 
 export const ITHR_LOGO_URL = "https://customer-assets.emergentagent.com/job_enterprise-ai-learn-2/artifacts/8f0fkfxa_ITHR_Logo_FullColor_1500px.png";
 
@@ -24,26 +25,21 @@ export default function Header() {
     };
 
     return (
-        <header className="glass-header sticky top-0 z-40">
-            <div className="container-page flex items-center justify-between h-16">
-                <Link to="/" className="flex items-center gap-3" data-testid="brand-home-link">
-                    <div className="w-10 h-10 bg-foreground p-1 flex items-center justify-center rounded-sm">
-                        <img src={ITHR_LOGO_URL} alt="ITHR" className="w-full h-full object-contain" />
-                    </div>
-                    <div className="flex flex-col leading-none">
-                        <span className="font-serif text-lg tracking-tight">Agentic AI Academy</span>
-                        <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-0.5">By ITHR Technologies</span>
-                    </div>
+        <header className="glass-header sticky top-0 z-40 border-b-2 border-b-transparent" style={{ borderImage: "linear-gradient(90deg, transparent, hsl(var(--brand-gold) / 0.4), transparent) 1" }}>
+            <div className="container-page flex items-center justify-between h-20 gap-6">
+                <Link to="/" className="shrink-0" data-testid="brand-home-link">
+                    <ITHRLockup size={44} className="hidden md:inline-flex" />
+                    <ITHRLockup size={38} variant="compact" className="md:hidden" />
                 </Link>
 
-                <nav className="hidden lg:flex items-center gap-6">
+                <nav className="hidden lg:flex items-center gap-5 flex-1 justify-center min-w-0">
                     {navItems.map((item) => (
                         <NavLink
                             key={item.to}
                             to={item.to}
                             data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                             className={({ isActive }) =>
-                                `text-sm font-medium transition-colors ${
+                                `text-[13px] font-medium whitespace-nowrap transition-colors ${
                                     isActive ? "text-brand" : "text-foreground hover:text-brand"
                                 }`
                             }
@@ -53,7 +49,7 @@ export default function Header() {
                     ))}
                 </nav>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0 lg:pl-6 lg:border-l lg:border-border">
                     {user ? (
                         <>
                             <Link

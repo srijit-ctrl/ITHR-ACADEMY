@@ -29,6 +29,8 @@ module.exports = {
                     hover: 'hsl(var(--brand-hover))',
                     ink: 'hsl(var(--brand-ink))',
                     blue: 'hsl(var(--brand-blue))',
+                    gold: 'hsl(var(--brand-gold))',
+                    'gold-deep': 'hsl(var(--brand-gold-deep))',
                 },
                 card: {
                     DEFAULT: 'hsl(var(--card))',

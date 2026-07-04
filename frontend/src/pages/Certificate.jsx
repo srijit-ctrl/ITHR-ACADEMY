@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, API_BASE } from "@/lib/api";
 import { Award, ShieldCheck, Share2, Download, Loader2, Linkedin, Copy, Check } from "lucide-react";
+import { ITHRSeal } from "@/components/brand/ITHRBrand";
 
 export default function Certificate() {
     const { certId } = useParams();
@@ -37,21 +38,26 @@ export default function Certificate() {
                 <div className="overline mb-4 text-center">Digital Credential</div>
 
                 <div className="cert-beam mb-8">
-                    <div className="bg-surface p-12 md:p-16">
+                    <div className="bg-surface p-12 md:p-16 relative overflow-hidden">
+                        {/* Ceremonial ornaments */}
+                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-brand-gold to-transparent" />
+                        <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-brand-gold to-transparent" />
+
                         <div className="flex items-start justify-between mb-10 gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center">
-                                    <span className="font-serif text-xl">A</span>
-                                </div>
+                            <div className="flex items-center gap-4">
+                                <ITHRSeal size={72} label="Certification Authority" />
                                 <div>
-                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Enterprise Agentic AI Academy</div>
-                                    <div className="font-serif text-sm">Issued by ITHR Technologies</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-gold-deep">ITHR Technologies</div>
+                                    <div className="font-serif text-2xl leading-none mt-1">Enterprise Agentic AI Academy</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-1">Est. 2026 · A Certification Authority</div>
                                 </div>
                             </div>
-                            <Award className="w-12 h-12 text-brand" />
+                            <Award className="w-12 h-12 text-brand hidden md:block" />
                         </div>
 
-                        <div className="text-center py-6">
+                        <div className="divider-gold"><span className="text-[10px] font-mono uppercase tracking-[0.25em] text-brand-gold-deep">Certificate</span></div>
+
+                        <div className="text-center py-4">
                             <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground mb-6">This is to certify that</p>
                             <h1 className="font-serif text-5xl md:text-6xl tracking-tighter mb-8" data-testid="cert-holder-name">{cert.user_name}</h1>
                             <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">has successfully completed the program</p>
@@ -63,7 +69,9 @@ export default function Certificate() {
                             </p>
                         </div>
 
-                        <div className="mt-10 pt-8 border-t border-border grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                        <div className="divider-gold" />
+
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                             <div className="text-center md:text-left">
                                 <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-1">Credential ID</div>
                                 <div className="font-mono text-sm" data-testid="cert-id">{cert.certificate_id}</div>
@@ -79,7 +87,7 @@ export default function Certificate() {
                                 </div>
                             </div>
                             <div className="flex md:justify-end justify-center">
-                                <div className="bg-white p-2 border border-border" data-testid="cert-qr">
+                                <div className="bg-white p-2 border-2 border-brand-gold/40" data-testid="cert-qr">
                                     <img src={qrUrl} alt="QR verify" className="w-24 h-24 block" />
                                 </div>
                             </div>
