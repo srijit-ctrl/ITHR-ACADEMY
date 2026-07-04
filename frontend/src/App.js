@@ -26,6 +26,7 @@ import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import EnterprisePortal from "@/pages/EnterprisePortal";
 import EnterpriseSetup from "@/pages/EnterpriseSetup";
 import EnterpriseJoin from "@/pages/EnterpriseJoin";
+import Mentor from "@/pages/Mentor";
 
 function AppShell() {
     const location = useLocation();
@@ -59,6 +60,7 @@ function AppShell() {
                     <Route path="/verify/:certId" element={<Verify />} />
 
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
                     <Route path="/learn/:slug/:moduleId/:lessonId" element={<ProtectedRoute><LessonViewer /></ProtectedRoute>} />
                     <Route path="/quiz/:slug" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
                     <Route path="/certificate/:certId" element={<ProtectedRoute><Certificate /></ProtectedRoute>} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 import { ShieldCheck, XCircle, Search, Loader2 } from "lucide-react";
 
 export default function Verify() {
@@ -68,30 +68,37 @@ export default function Verify() {
                             <ShieldCheck className="w-8 h-8 text-success" />
                             <div>
                                 <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-success">Verified Credential</div>
-                                <div className="font-serif text-xl">Authentic · Issued by Agentic AI Academy</div>
+                                <div className="font-serif text-xl">Authentic · Issued by ITHR Technologies</div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-                            <div>
-                                <div className="overline mb-2">Awarded to</div>
-                                <div className="font-serif text-2xl">{result.user_name}</div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm items-start">
+                            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div>
+                                    <div className="overline mb-2">Awarded to</div>
+                                    <div className="font-serif text-2xl">{result.user_name}</div>
+                                </div>
+                                <div>
+                                    <div className="overline mb-2">Credential</div>
+                                    <div className="font-serif text-2xl">{result.course_title}</div>
+                                </div>
+                                <div>
+                                    <div className="overline mb-2">Score</div>
+                                    <div className="font-mono text-lg">{result.score}%</div>
+                                </div>
+                                <div>
+                                    <div className="overline mb-2">Issued</div>
+                                    <div className="font-mono text-lg">{new Date(result.issued_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <div className="overline mb-2">Credential ID</div>
+                                    <div className="font-mono text-lg">{result.certificate_id}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="overline mb-2">Credential</div>
-                                <div className="font-serif text-2xl">{result.course_title}</div>
-                            </div>
-                            <div>
-                                <div className="overline mb-2">Score</div>
-                                <div className="font-mono text-lg">{result.score}%</div>
-                            </div>
-                            <div>
-                                <div className="overline mb-2">Issued</div>
-                                <div className="font-mono text-lg">{new Date(result.issued_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
-                            </div>
-                            <div className="md:col-span-2">
-                                <div className="overline mb-2">Credential ID</div>
-                                <div className="font-mono text-lg">{result.certificate_id}</div>
+                            <div className="flex md:justify-end justify-center">
+                                <div className="bg-white p-3 border border-border" data-testid="verify-qr">
+                                    <img src={`${API_BASE}/certificates/${result.certificate_id}/qr.svg`} alt="QR" className="w-32 h-32 block" />
+                                </div>
                             </div>
                         </div>
                     </div>

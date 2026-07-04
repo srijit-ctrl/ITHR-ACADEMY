@@ -7,6 +7,7 @@ export const ITHR_LOGO_URL = "https://customer-assets.emergentagent.com/job_ente
 const navItems = [
     { to: "/courses", label: "Catalog" },
     { to: "/intelligence", label: "Intelligence" },
+    { to: "/mentor", label: "Mentor" },
     { to: "/industries", label: "Industries" },
     { to: "/certifications", label: "Certifications" },
     { to: "/pricing", label: "Pricing" },

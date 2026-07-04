@@ -1,30 +1,51 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { Timer, Award, CheckCircle2, XCircle, Loader2, ArrowRight } from "lucide-react";
+import { Timer, Award, XCircle, Loader2, ArrowRight, Shuffle } from "lucide-react";
+
+const DEFAULT_COUNT = 15;
 
 export default function Quiz() {
     const { slug } = useParams();
     const navigate = useNavigate();
-    const [course, setCourse] = useState(null);
+    const [session, setSession] = useState(null);   // {course_id, questions, passing_score, total, bank_size}
+    const [courseTitle, setCourseTitle] = useState("");
     const [loading, setLoading] = useState(true);
-    const [answers, setAnswers] = useState({}); // { qid: [indices] }
+    const [error, setError] = useState("");
+    const [answers, setAnswers] = useState({});
     const [submitted, setSubmitted] = useState(null);
     const [submitting, setSubmitting] = useState(false);
-    const [startedAt] = useState(Date.now());
-    const [remaining, setRemaining] = useState(30 * 60); // 30 minutes
+    const [startedAt, setStartedAt] = useState(Date.now());
+    const [remaining, setRemaining] = useState(30 * 60);
 
-    useEffect(() => {
-        api.get(`/courses/${slug}`).then((r) => { setCourse(r.data); setLoading(false); });
-    }, [slug]);
+    const loadSession = async () => {
+        setLoading(true);
+        setError("");
+        setAnswers({});
+        setSubmitted(null);
+        try {
+            const [s, c] = await Promise.all([
+                api.get(`/courses/${slug}/assessment/session?count=${DEFAULT_COUNT}`),
+                api.get(`/courses/${slug}`),
+            ]);
+            setSession(s.data);
+            setCourseTitle(c.data.title);
+            setStartedAt(Date.now());
+            setRemaining(30 * 60);
+        } catch (e) {
+            setError(e?.response?.data?.detail || "Unable to start assessment");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { loadSession(); }, [slug]);
 
     useEffect(() => {
         if (submitted) return;
         const t = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
         return () => clearInterval(t);
     }, [submitted]);
-
-    const questions = useMemo(() => course?.quiz || [], [course]);
 
     const toggle = (qid, idx, isMulti) => {
         setAnswers((prev) => {
@@ -40,9 +61,11 @@ export default function Quiz() {
         setSubmitting(true);
         try {
             const duration = Math.round((Date.now() - startedAt) / 1000);
+            const perms = {};
+            for (const q of session.questions) perms[q.id] = q.permutation;
             const res = await api.post(`/courses/${slug}/quiz/submit`, {
-                course_id: course.id,
-                answers,
+                course_id: session.course_id,
+                answers: { ...answers, __perm__: perms },
                 duration_seconds: duration,
             });
             setSubmitted(res.data);
@@ -50,31 +73,39 @@ export default function Quiz() {
     };
 
     if (loading) return <div className="container-page py-24"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
-    if (!course || questions.length === 0) return (
+
+    if (error || !session || !session.questions?.length) return (
         <div className="container-page py-24 text-center">
-            <p className="text-muted-foreground mb-6">No quiz available for this course yet.</p>
+            <p className="text-muted-foreground mb-6">{error || "No assessment available for this course yet."}</p>
             <Link to={`/courses/${slug}`} className="btn-outline">Back to course</Link>
         </div>
     );
 
-    if (submitted) return <QuizResults result={submitted} slug={slug} navigate={navigate} />;
+    if (submitted) return <QuizResults result={submitted} slug={slug} navigate={navigate} onRetry={loadSession} />;
 
     const mins = String(Math.floor(remaining / 60)).padStart(2, "0");
     const secs = String(remaining % 60).padStart(2, "0");
+    const answeredCount = Object.keys(answers).length;
+    const questions = session.questions;
 
     return (
         <div className="container-narrow py-12">
-            <div className="flex items-start justify-between mb-10 gap-6">
+            <div className="flex items-start justify-between mb-10 gap-6 flex-wrap">
                 <div>
-                    <div className="overline mb-3 fine-rule pl-4">Certification Exam</div>
-                    <h1 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">{course.title}</h1>
-                    <p className="mt-3 text-muted-foreground">Passing score: {course.passing_score}% · {questions.length} questions</p>
+                    <div className="overline mb-3 fine-rule pl-4">Certification Exam · Randomized</div>
+                    <h1 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">{courseTitle}</h1>
+                    <p className="mt-3 text-muted-foreground flex items-center gap-2 flex-wrap">
+                        <span>Passing score: <b className="text-foreground">{session.passing_score}%</b></span>
+                        <span className="text-muted-foreground">·</span>
+                        <span>{session.total} of {session.bank_size} questions</span>
+                        <span className="badge-brand"><Shuffle className="w-3 h-3 mr-1" />Randomized</span>
+                    </p>
                 </div>
                 <div className="card-flat p-4 flex items-center gap-3 shrink-0">
                     <Timer className="w-5 h-5 text-brand" />
                     <div>
                         <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Time remaining</div>
-                        <div className="font-mono text-xl">{mins}:{secs}</div>
+                        <div className="font-mono text-xl" data-testid="quiz-timer">{mins}:{secs}</div>
                     </div>
                 </div>
             </div>
@@ -88,10 +119,11 @@ export default function Quiz() {
                                 <span className="font-mono text-xs text-brand">{String(qi + 1).padStart(2, "0")}</span>
                                 <div>
                                     <div className="font-serif text-lg leading-tight mb-1">{q.question}</div>
-                                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{q.type === "multi" ? "Multiple select" : q.type === "true_false" ? "True/False" : q.type === "scenario" ? "Scenario" : "Single answer"}</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                                        {q.type === "multi" ? "Multiple select" : q.type === "true_false" ? "True/False" : q.type === "scenario" ? "Scenario" : "Single answer"}
+                                    </div>
                                 </div>
                             </div>
-
                             <div className="space-y-2 pl-8">
                                 {q.options.map((opt, oi) => {
                                     const selected = (answers[q.id] || []).includes(oi);
@@ -117,13 +149,13 @@ export default function Quiz() {
                 })}
             </div>
 
-            <div className="mt-10 flex justify-between items-center">
+            <div className="mt-10 flex justify-between items-center flex-wrap gap-3">
                 <div className="text-sm text-muted-foreground">
-                    Answered: <b className="text-foreground">{Object.keys(answers).length}</b> / {questions.length}
+                    Answered: <b className="text-foreground">{answeredCount}</b> / {questions.length}
                 </div>
                 <button
                     onClick={submit}
-                    disabled={submitting || Object.keys(answers).length === 0}
+                    disabled={submitting || answeredCount === 0}
                     data-testid="submit-quiz"
                     className="btn-primary"
                 >
@@ -134,7 +166,7 @@ export default function Quiz() {
     );
 }
 
-function QuizResults({ result, slug, navigate }) {
+function QuizResults({ result, slug, navigate, onRetry }) {
     return (
         <div className="container-narrow py-20 text-center">
             <div className={`w-16 h-16 mx-auto mb-8 flex items-center justify-center ${result.passed ? "bg-success text-white" : "bg-surface-alt text-muted-foreground border border-border"}`}>
@@ -162,9 +194,9 @@ function QuizResults({ result, slug, navigate }) {
                 </div>
             )}
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
                 {!result.passed && (
-                    <button onClick={() => window.location.reload()} data-testid="retry-quiz" className="btn-outline">Retake exam</button>
+                    <button onClick={onRetry} data-testid="retry-quiz" className="btn-outline">Retake with new questions</button>
                 )}
                 <Link to="/dashboard" data-testid="quiz-back-dashboard" className="btn-outline">Back to dashboard</Link>
             </div>

@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2 } from "lucide-react";
+import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight } from "lucide-react";
 
 export default function Dashboard() {
     const { user } = useAuth();
     const [stats, setStats] = useState(null);
     const [enrollments, setEnrollments] = useState([]);
     const [certificates, setCertificates] = useState([]);
+    const [nextBest, setNextBest] = useState(null);
+    const [recs, setRecs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -16,10 +18,14 @@ export default function Dashboard() {
             api.get("/dashboard/stats"),
             api.get("/enrollments"),
             api.get("/certificates"),
-        ]).then(([s, e, c]) => {
+            api.get("/recommendations").catch(() => ({ data: { recommendations: [] } })),
+            api.get("/recommendations/next-best").catch(() => ({ data: { recommendation: null } })),
+        ]).then(([s, e, c, r, nb]) => {
             setStats(s.data);
             setEnrollments(e.data);
             setCertificates(c.data);
+            setRecs(r.data.recommendations || []);
+            setNextBest(nb.data.recommendation || null);
         }).finally(() => setLoading(false));
     }, []);
 
@@ -55,8 +61,54 @@ export default function Dashboard() {
                         </div>
                         <ExternalLink className="w-4 h-4 text-muted-foreground" />
                     </Link>
+                    <Link to="/mentor" data-testid="dashboard-mentor-link" className="card-flat p-4 col-span-2 flex items-center justify-between hover:border-brand transition-colors">
+                        <div className="flex items-center gap-3">
+                            <Compass className="w-4 h-4 text-brand" />
+                            <div>
+                                <div className="font-serif text-sm leading-none">Meet Solon · Career Mentor</div>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Personalized credential roadmap</div>
+                            </div>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                    </Link>
                 </div>
             </div>
+
+            {/* Next-best recommendation banner */}
+            {nextBest && (
+                <section className="mb-14" data-testid="dashboard-nextbest">
+                    <div className="cert-beam">
+                        <div className="bg-surface p-8 md:p-10 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                            <div className="md:col-span-2 flex md:justify-start">
+                                <div className="w-14 h-14 bg-foreground text-background flex items-center justify-center">
+                                    <Sparkles className="w-6 h-6" />
+                                </div>
+                            </div>
+                            <div className="md:col-span-7">
+                                <div className="overline mb-2">Solon recommends · Next best step</div>
+                                <div className="font-serif text-2xl md:text-3xl tracking-tight leading-tight mb-3">
+                                    {nextBest.course.title}
+                                </div>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    {nextBest.rationale}
+                                </p>
+                            </div>
+                            <div className="md:col-span-3 md:text-right space-y-2">
+                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                                    {nextBest.course.difficulty} · {nextBest.course.duration_hours}h
+                                </div>
+                                <Link
+                                    to={`/courses/${nextBest.course.slug}`}
+                                    data-testid="nextbest-cta"
+                                    className="btn-primary inline-flex"
+                                >
+                                    Explore <ArrowRight className="w-4 h-4" />
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Enrollments */}
             <section className="mb-16">
@@ -103,7 +155,7 @@ export default function Dashboard() {
 
             {/* Certificates */}
             {certificates.length > 0 && (
-                <section>
+                <section className="mb-14">
                     <h2 className="font-serif text-3xl tracking-tight mb-6">Your certificates</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {certificates.map((c) => (
@@ -118,6 +170,40 @@ export default function Dashboard() {
                                     </Link>
                                 </div>
                             </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* Broader recommendations */}
+            {recs.length > 1 && (
+                <section data-testid="dashboard-recs">
+                    <div className="flex items-end justify-between mb-6">
+                        <div>
+                            <div className="overline mb-2">Recommended for you</div>
+                            <h2 className="font-serif text-3xl tracking-tight">More courses tuned to your posture</h2>
+                        </div>
+                        <Link to="/courses" className="text-sm text-brand hover:underline">All courses →</Link>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {recs.slice(1, 7).map((r) => (
+                            <Link
+                                key={r.course.id}
+                                to={`/courses/${r.course.slug}`}
+                                data-testid={`rec-${r.course.slug}`}
+                                className="card-sharp p-5 group"
+                            >
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="badge-mono">{r.course.category}</span>
+                                    <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand">Match {Math.round(r.score)}</span>
+                                </div>
+                                <div className="font-serif text-lg leading-tight mb-2 line-clamp-2">{r.course.title}</div>
+                                <p className="text-sm text-muted-foreground line-clamp-2">{r.course.subtitle}</p>
+                                <div className="mt-4 flex items-center justify-between text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                                    <span>{r.course.difficulty} · {r.course.duration_hours}h</span>
+                                    <span className="text-brand opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1">Open <ArrowRight className="w-3 h-3" /></span>
+                                </div>
+                            </Link>
                         ))}
                     </div>
                 </section>

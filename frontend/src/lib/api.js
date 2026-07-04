@@ -28,19 +28,24 @@ api.interceptors.response.use(
 
 // SSE streaming helper for AI Tutor
 export async function streamTutor({ message, sessionId, courseContext, onDelta, onDone, onError }) {
+    return _streamSSE("/ai/tutor", { message, session_id: sessionId || null, course_context: courseContext || null }, { onDelta, onDone, onError });
+}
+
+// SSE streaming helper for AI Mentor (career coach)
+export async function streamMentor({ message, sessionId, context, onDelta, onDone, onError }) {
+    return _streamSSE("/mentor/chat", { message, session_id: sessionId || null, context: context || null }, { onDelta, onDone, onError });
+}
+
+async function _streamSSE(path, body, { onDelta, onDone, onError }) {
     const token = localStorage.getItem("eaia_token");
     try {
-        const res = await fetch(`${API_BASE}/ai/tutor`, {
+        const res = await fetch(`${API_BASE}${path}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-                message,
-                session_id: sessionId || null,
-                course_context: courseContext || null,
-            }),
+            body: JSON.stringify(body),
         });
 
         if (!res.ok || !res.body) {

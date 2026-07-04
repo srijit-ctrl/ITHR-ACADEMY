@@ -12,7 +12,8 @@ from starlette.middleware.cors import CORSMiddleware
 from core import db, logger, mongo_client, now_iso
 from routers import (
     assessment_router, auth_router, catalog_router, checkout_router,
-    dashboard_router, enterprise_router, intelligence_router, tutor_router,
+    dashboard_router, enterprise_router, intelligence_router,
+    mentor_router, recommendation_router, tutor_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
 
@@ -94,6 +95,15 @@ async def seed_database():
     await db.organizations.create_index("slug", unique=True)
     await db.organizations.create_index("invite_code", unique=True)
     await db.org_members.create_index([("org_id", 1), ("user_id", 1)], unique=True)
+    await db.rec_rationales.create_index("key", unique=True)
+
+    # Seed randomized assessment banks (idempotent)
+    from seed_assessments import seed_all as seed_assessment_banks
+    try:
+        await seed_assessment_banks()
+    except Exception:
+        logger.exception("Assessment bank seed failed (non-fatal)")
+
     total = await db.courses.count_documents({})
     logger.info(f"Seed complete. Total courses: {total}.")
 
@@ -105,6 +115,8 @@ for r in (
     catalog_router.router,
     assessment_router.router,
     tutor_router.router,
+    mentor_router.router,
+    recommendation_router.router,
     intelligence_router.router,
     checkout_router.router,
     enterprise_router.router,
