@@ -6,37 +6,43 @@
 
 @layer base {
     :root {
-        /* ITHR Technologies — Light theme */
-        --background: 210 20% 98%;         /* off-white with slight cool tint */
-        --foreground: 220 60% 12%;         /* ITHR deep navy */
+        /* ITHR Academy — aiilm-inspired palette */
+        --background: 0 0% 100%;              /* pure white main */
+        --foreground: 224 22% 15%;            /* deep navy (aiilm rgb(31,36,48)) */
         --surface: 0 0% 100%;
-        --surface-alt: 210 25% 94%;        /* pale blue-tinted */
+        --surface-alt: 213 40% 96%;           /* aiilm section tint rgb(245,248,253) */
         --card: 0 0% 100%;
-        --card-foreground: 220 60% 12%;
+        --card-foreground: 224 22% 15%;
         --popover: 0 0% 100%;
-        --popover-foreground: 220 60% 12%;
-        --primary: 220 60% 22%;            /* ITHR navy */
-        --primary-foreground: 210 20% 98%;
-        --secondary: 210 25% 94%;
-        --secondary-foreground: 220 60% 12%;
-        --muted: 210 25% 94%;
-        --muted-foreground: 220 20% 40%;
-        --accent: 174 100% 33%;            /* ITHR teal #00A896 */
+        --popover-foreground: 224 22% 15%;
+        --primary: 224 22% 15%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 213 40% 96%;
+        --secondary-foreground: 224 22% 15%;
+        --muted: 213 40% 96%;
+        --muted-foreground: 218 15% 42%;
+        --accent: 217 58% 43%;                /* aiilm blue rgb(46,90,172) */
         --accent-foreground: 0 0% 100%;
-        --brand: 174 100% 33%;             /* ITHR teal — primary CTA */
-        --brand-hover: 174 100% 27%;
-        --brand-ink: 220 60% 22%;          /* ITHR navy */
-        --brand-blue: 210 76% 53%;         /* ITHR bright blue */
-        --brand-gold: 41 80% 52%;          /* ITHR ceremonial gold — for seals & credentials */
+        --brand: 217 58% 43%;                 /* primary blue */
+        --brand-hover: 217 58% 35%;
+        --brand-ink: 224 22% 15%;
+        --brand-purple: 273 43% 44%;          /* aiilm purple rgb(107,63,160) */
+        --brand-purple-light: 273 60% 88%;
+        --brand-blue: 217 58% 43%;
+        --brand-blue-light: 213 100% 92%;
+        --brand-orange: 22 76% 47%;
+        --brand-orange-light: 22 100% 92%;
+        --brand-teal: 174 100% 33%;
+        --brand-gold: 41 80% 52%;
         --brand-gold-deep: 36 70% 40%;
         --destructive: 356 63% 44%;
         --destructive-foreground: 0 0% 100%;
         --success: 154 61% 34%;
         --warning: 38 92% 50%;
-        --border: 210 20% 86%;
-        --input: 210 20% 86%;
-        --ring: 174 100% 33%;
-        --radius: 0.125rem;
+        --border: 213 25% 90%;
+        --input: 213 25% 90%;
+        --ring: 217 58% 43%;
+        --radius: 1rem;                        /* 16px — aiilm-like rounded */
     }
     .dark {
         /* ITHR Technologies — Dark theme (matches logo's black canvas) */
@@ -100,28 +106,28 @@
         @apply text-xs tracking-[0.2em] uppercase font-semibold text-brand font-sans;
     }
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 bg-brand text-white hover:bg-brand-hover rounded-sm px-6 py-3 font-medium transition-all duration-200 border border-transparent;
+        @apply inline-flex items-center justify-center gap-2 bg-brand text-white hover:bg-brand-hover rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-transparent shadow-sm hover:shadow-md;
     }
     .btn-ink {
-        @apply inline-flex items-center justify-center gap-2 bg-foreground text-background hover:opacity-90 rounded-sm px-6 py-3 font-medium transition-all duration-200 border border-foreground;
+        @apply inline-flex items-center justify-center gap-2 bg-foreground text-background hover:opacity-90 rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-foreground shadow-sm;
     }
     .btn-outline {
-        @apply inline-flex items-center justify-center gap-2 border border-border hover:border-brand hover:text-brand text-foreground rounded-sm px-6 py-3 font-medium transition-all duration-200 bg-transparent;
+        @apply inline-flex items-center justify-center gap-2 border-2 border-border hover:border-brand hover:text-brand text-foreground rounded-full px-6 py-2.5 font-semibold transition-all duration-200 bg-white;
     }
     .card-sharp {
-        @apply bg-surface border border-border rounded-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_-20px_rgba(13,19,33,0.15)];
+        @apply bg-surface border border-border rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_48px_-24px_rgba(31,36,48,0.2)];
     }
     .card-flat {
-        @apply bg-surface border border-border rounded-sm;
+        @apply bg-surface border border-border rounded-2xl;
     }
     .badge-mono {
-        @apply inline-flex items-center px-2.5 py-0.5 rounded-none border border-border text-[10px] font-mono uppercase tracking-[0.15em] bg-surface-alt text-foreground;
+        @apply inline-flex items-center px-3 py-1 rounded-full border border-border text-[11px] font-mono uppercase tracking-[0.15em] bg-surface-alt text-foreground;
     }
     .badge-crimson {
-        @apply inline-flex items-center px-2.5 py-0.5 rounded-none border border-brand text-[10px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
+        @apply inline-flex items-center px-3 py-1 rounded-full border border-brand text-[11px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
     }
     .badge-brand {
-        @apply inline-flex items-center px-2.5 py-0.5 rounded-none border border-brand text-[10px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
+        @apply inline-flex items-center px-3 py-1 rounded-full border border-brand text-[11px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
     }
     .glass-header {
         @apply backdrop-blur-xl bg-background/80 border-b border-border;
@@ -253,13 +259,13 @@
     position: relative;
     background: hsl(var(--surface));
     border: 1px solid hsl(var(--border));
-    border-radius: 16px;
+    border-radius: 20px;
     padding: 32px;
     transition: transform 0.3s, box-shadow 0.3s;
 }
 .step-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 20px 40px -20px hsl(var(--foreground) / 0.15);
+    box-shadow: 0 24px 48px -24px hsl(var(--foreground) / 0.2);
 }
 .step-card .step-num {
     position: absolute;
@@ -272,15 +278,79 @@
 }
 .section-kicker {
     display: inline-block;
-    padding: 6px 14px;
+    padding: 6px 16px;
     border-radius: 999px;
-    background: hsl(var(--brand) / 0.1);
-    color: hsl(var(--brand));
+    background: hsl(var(--brand-purple-light));
+    color: hsl(var(--brand-purple));
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 3px;
     text-transform: uppercase;
     margin-bottom: 20px;
+    font-weight: 600;
+}
+
+/* Soft floating blob decorations for hero (aiilm signature) */
+.blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+    animation: blob-float 12s ease-in-out infinite;
+}
+.blob-blue   { background: hsl(213 100% 82%); }
+.blob-pink   { background: hsl(330 100% 88%); }
+.blob-yellow { background: hsl(41 100% 78%); }
+.blob-purple { background: hsl(273 80% 85%); }
+@keyframes blob-float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(20px, -30px) scale(1.08); }
+}
+
+/* aiilm-style colored full-block cards (like Foundation/Builder/Innovator tri-band) */
+.color-card {
+    position: relative;
+    border-radius: 20px;
+    padding: 32px;
+    color: white;
+    overflow: hidden;
+    min-height: 260px;
+    display: flex; flex-direction: column;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.color-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g stroke='white' stroke-opacity='0.12' fill='none' stroke-width='1'><path d='M60 5l55 55-55 55L5 60z'/><path d='M60 25l35 35-35 35-35-35z'/></g></svg>");
+    opacity: 0.7;
+    pointer-events: none;
+}
+.color-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 30px 60px -20px rgba(31, 36, 48, 0.3);
+}
+.color-card > * { position: relative; z-index: 1; }
+.color-card-blue   { background: linear-gradient(135deg, hsl(217 58% 47%) 0%, hsl(217 68% 38%) 100%); }
+.color-card-purple { background: linear-gradient(135deg, hsl(273 55% 52%) 0%, hsl(273 60% 40%) 100%); }
+.color-card-orange { background: linear-gradient(135deg, hsl(22 82% 55%) 0%, hsl(22 76% 44%) 100%); }
+.color-card-teal   { background: linear-gradient(135deg, hsl(174 76% 42%) 0%, hsl(174 100% 30%) 100%); }
+.color-card-gold   { background: linear-gradient(135deg, hsl(41 82% 55%) 0%, hsl(36 76% 44%) 100%); }
+.color-card-navy   { background: linear-gradient(135deg, hsl(224 40% 25%) 0%, hsl(224 45% 15%) 100%); }
+.color-card-kicker {
+    display: inline-block;
+    padding: 3px 12px;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(8px);
+    border-radius: 999px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: white;
+    margin-bottom: 12px;
+    font-weight: 600;
 }
 .grain {
     position: relative;
