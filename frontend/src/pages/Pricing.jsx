@@ -1,5 +1,8 @@
-import { Link } from "react-router-dom";
-import { Check, ArrowRight, Building2, Users, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { Check, ArrowRight, Building2, User, Loader2 } from "lucide-react";
 
 const INDIVIDUAL = [
     {
@@ -14,7 +17,7 @@ const INDIVIDUAL = [
             "Community access",
         ],
         cta: "Start free",
-        ctaHref: "/register",
+        packageId: null,
         testId: "plan-explorer",
     },
     {
@@ -31,8 +34,10 @@ const INDIVIDUAL = [
             "Downloadable digital badges",
             "Priority email support",
         ],
-        cta: "Start 7-day trial",
-        ctaHref: "/register",
+        cta: "Subscribe monthly",
+        packageId: "practitioner_monthly",
+        secondaryCta: "Save 17% — pay annual",
+        secondaryPackageId: "practitioner_annual",
         testId: "plan-practitioner",
     },
     {
@@ -47,8 +52,8 @@ const INDIVIDUAL = [
             "AI Career Advisor sessions",
             "Alumni network access",
         ],
-        cta: "Enroll",
-        ctaHref: "/register",
+        cta: "Enroll for $499",
+        packageId: "professional_track",
         testId: "plan-professional",
     },
 ];
@@ -67,6 +72,8 @@ const ENTERPRISE = [
             "Quarterly business reviews",
             "Standard support (48h SLA)",
         ],
+        packageId: "team_monthly_per_seat",
+        variableQuantity: true,
         testId: "plan-team",
     },
     {
@@ -87,6 +94,7 @@ const ENTERPRISE = [
             "Priority support (8h SLA)",
         ],
         testId: "plan-enterprise",
+        contact: true,
     },
     {
         name: "Global",
@@ -104,10 +112,46 @@ const ENTERPRISE = [
             "Custom integrations & API tier",
         ],
         testId: "plan-global",
+        contact: true,
     },
 ];
 
 export default function Pricing() {
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    const [processingId, setProcessingId] = useState(null);
+    const [teamSeats, setTeamSeats] = useState(25);
+    const [error, setError] = useState("");
+
+    const handleCheckout = async (packageId, quantity = 1) => {
+        setError("");
+        if (!user) {
+            navigate("/login", { state: { from: "/pricing" } });
+            return;
+        }
+        if (!packageId) {
+            navigate("/register");
+            return;
+        }
+        setProcessingId(packageId);
+        try {
+            const res = await api.post("/checkout/session", {
+                package_id: packageId,
+                origin_url: window.location.origin,
+                quantity,
+            });
+            if (res.data.url) {
+                window.location.href = res.data.url;
+            } else {
+                setError("No checkout URL returned");
+                setProcessingId(null);
+            }
+        } catch (e) {
+            setError(e.response?.data?.detail || "Checkout failed. Please try again.");
+            setProcessingId(null);
+        }
+    };
+
     return (
         <div>
             {/* Hero */}
@@ -122,6 +166,12 @@ export default function Pricing() {
                     </p>
                 </div>
             </section>
+
+            {error && (
+                <div className="container-page pt-6">
+                    <div className="card-flat p-4 border-destructive text-destructive text-sm" data-testid="pricing-error">{error}</div>
+                </div>
+            )}
 
             {/* Individual */}
             <section className="container-page py-20">
@@ -140,7 +190,7 @@ export default function Pricing() {
                             data-testid={p.testId}
                             className={`card-flat p-8 relative flex flex-col ${p.featured ? "border-brand border-2 md:-my-2 md:py-10" : ""}`}
                         >
-                            {p.featured && <div className="absolute -top-3 left-8 badge-crimson bg-background">Most popular</div>}
+                            {p.featured && <div className="absolute -top-3 left-8 badge-brand bg-background">Most popular</div>}
                             <div className="font-serif text-3xl leading-none mb-2">{p.name}</div>
                             <p className="text-sm text-muted-foreground mb-6">{p.description}</p>
                             <div className="mb-2">
@@ -156,9 +206,29 @@ export default function Pricing() {
                                 ))}
                             </ul>
 
-                            <Link to={p.ctaHref} data-testid={`${p.testId}-cta`} className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}>
-                                {p.cta} <ArrowRight className="w-4 h-4" />
-                            </Link>
+                            <button
+                                onClick={() => handleCheckout(p.packageId)}
+                                disabled={processingId === p.packageId}
+                                data-testid={`${p.testId}-cta`}
+                                className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}
+                            >
+                                {processingId === p.packageId ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <>{p.cta} <ArrowRight className="w-4 h-4" /></>
+                                )}
+                            </button>
+
+                            {p.secondaryPackageId && (
+                                <button
+                                    onClick={() => handleCheckout(p.secondaryPackageId)}
+                                    disabled={processingId === p.secondaryPackageId}
+                                    data-testid={`${p.testId}-annual-cta`}
+                                    className="mt-3 text-xs font-mono uppercase tracking-[0.15em] text-brand hover:text-brand-hover"
+                                >
+                                    {processingId === p.secondaryPackageId ? "…" : p.secondaryCta}
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -182,7 +252,7 @@ export default function Pricing() {
                                 data-testid={p.testId}
                                 className={`card-flat p-8 relative flex flex-col ${p.featured ? "border-brand border-2" : ""}`}
                             >
-                                {p.featured && <div className="absolute -top-3 left-8 badge-crimson bg-background">Recommended</div>}
+                                {p.featured && <div className="absolute -top-3 left-8 badge-brand bg-background">Recommended</div>}
                                 <div className="font-serif text-3xl leading-none mb-1">{p.name}</div>
                                 <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mb-4">{p.seats}</div>
                                 <p className="text-sm text-muted-foreground mb-6">{p.description}</p>
@@ -191,54 +261,50 @@ export default function Pricing() {
                                     <span className="text-muted-foreground text-sm ml-2">{p.period}</span>
                                 </div>
 
+                                {p.variableQuantity && (
+                                    <div className="mb-6">
+                                        <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-2">Team size (seats)</label>
+                                        <input
+                                            type="number"
+                                            min={10}
+                                            max={100}
+                                            value={teamSeats}
+                                            onChange={(e) => setTeamSeats(Math.max(10, Math.min(100, parseInt(e.target.value) || 10)))}
+                                            data-testid="team-seats-input"
+                                            className="w-full px-3 py-2 bg-surface border border-border rounded-sm text-sm focus:outline-none focus:border-brand"
+                                        />
+                                        <div className="text-xs text-muted-foreground mt-2">
+                                            First month: <b className="text-foreground">${(teamSeats * 18).toFixed(2)}</b>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <ul className="space-y-2 text-sm mb-8 flex-1">
                                     {p.features.map((f) => (
                                         <li key={f} className="flex gap-2"><Check className="w-4 h-4 text-brand mt-0.5 shrink-0" />{f}</li>
                                     ))}
                                 </ul>
 
-                                <a href="mailto:enterprise@ithr.tech" data-testid={`${p.testId}-cta`} className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}>
-                                    Contact ITHR <ArrowRight className="w-4 h-4" />
-                                </a>
+                                {p.contact ? (
+                                    <a href="mailto:enterprise@ithr.tech" data-testid={`${p.testId}-cta`} className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}>
+                                        Contact ITHR <ArrowRight className="w-4 h-4" />
+                                    </a>
+                                ) : (
+                                    <button
+                                        onClick={() => handleCheckout(p.packageId, teamSeats)}
+                                        disabled={processingId === p.packageId}
+                                        data-testid={`${p.testId}-cta`}
+                                        className="btn-primary w-full"
+                                    >
+                                        {processingId === p.packageId ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <>Start team subscription <ArrowRight className="w-4 h-4" /></>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Real-time Intelligence value prop */}
-            <section className="container-page py-20">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                    <div className="lg:col-span-6">
-                        <div className="overline mb-4 fine-rule pl-4">Every plan includes</div>
-                        <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-tight mb-6">
-                            Real-time Course<br />
-                            <span className="italic text-brand">Intelligence.</span>
-                        </h2>
-                        <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                            Agentic AI moves weekly. Every ITHR course carries a live freshness score and is monitored by our AI Intelligence Desk — a Claude-powered agent that scans model releases, regulation, and enterprise deployments to keep your curriculum current.
-                        </p>
-                        <ul className="space-y-3 mb-8">
-                            <li className="flex gap-3 text-sm"><Check className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span><b>6-hour signal briefings</b> — auto-generated intelligence on the industry.</span></li>
-                            <li className="flex gap-3 text-sm"><Check className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span><b>Course freshness scores</b> — every course rated for currency, monthly.</span></li>
-                            <li className="flex gap-3 text-sm"><Check className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span><b>AI-suggested lesson updates</b> — Aletheia proposes new modules as the field evolves.</span></li>
-                        </ul>
-                        <Link to="/intelligence" data-testid="pricing-see-intelligence" className="btn-primary">
-                            See today's briefing <ArrowRight className="w-4 h-4" />
-                        </Link>
-                    </div>
-                    <div className="lg:col-span-6">
-                        <div className="card-flat p-8 space-y-4 bg-foreground text-background">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 bg-brand rounded-full animate-pulse" />
-                                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand">Live · ITHR Intelligence Desk</span>
-                            </div>
-                            <div className="font-serif text-2xl leading-tight">Anthropic ships MCP 2.0 with signed capability manifests</div>
-                            <div className="text-sm opacity-80">Recommendation: Refresh Module 3 ("The Agent Development Stack") within 30 days. Update MCP tool-signature lessons.</div>
-                            <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.15em] opacity-60">
-                                <span>Impact: High</span><span>·</span><span>Category: Framework</span><span>·</span><span>Generated 2h ago</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </section>

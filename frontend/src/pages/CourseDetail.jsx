@@ -67,6 +67,19 @@ export default function CourseDetail() {
                             <span className="flex items-center gap-2"><Users className="w-4 h-4" /><b className="text-foreground">{course.enrolled_count.toLocaleString()}</b> enrolled</span>
                             <span className="flex items-center gap-2"><Clock className="w-4 h-4" /><b className="text-foreground">{course.duration_hours}h</b> total</span>
                             <span className="flex items-center gap-2"><BookOpen className="w-4 h-4" />{course.modules?.length || 15} modules</span>
+                            <span className="flex items-center gap-2" data-testid="course-detail-freshness">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-brand bg-brand/5 text-brand text-[10px] font-mono uppercase tracking-[0.15em]">
+                                    <span className="w-1.5 h-1.5 bg-brand rounded-full animate-pulse" />
+                                    Freshness {course.freshness_score ?? 100}
+                                </span>
+                                <span className="text-xs">
+                                    {course.days_since_review === 0
+                                        ? "Refreshed today"
+                                        : course.days_since_review == null || course.days_since_review > 500
+                                        ? "New"
+                                        : `Refreshed ${course.days_since_review}d ago`}
+                                </span>
+                            </span>
                         </div>
                     </div>
 

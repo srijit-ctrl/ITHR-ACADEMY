@@ -22,6 +22,7 @@ import Enterprise from "@/pages/Enterprise";
 import Certifications from "@/pages/Certifications";
 import Pricing from "@/pages/Pricing";
 import Intelligence from "@/pages/Intelligence";
+import CheckoutSuccess from "@/pages/CheckoutSuccess";
 
 function AppShell() {
     const location = useLocation();
@@ -48,6 +49,7 @@ function AppShell() {
                     <Route path="/industries" element={<Industries />} />
                     <Route path="/certifications" element={<Certifications />} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/pricing/success" element={<ProtectedRoute><CheckoutSuccess /></ProtectedRoute>} />
                     <Route path="/intelligence" element={<Intelligence />} />
                     <Route path="/enterprise" element={<Enterprise />} />
                     <Route path="/verify" element={<Verify />} />

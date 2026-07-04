@@ -1,7 +1,25 @@
 import { Link } from "react-router-dom";
-import { BookOpen, Clock, Star, Users } from "lucide-react";
+import { BookOpen, Star, Users, Radio } from "lucide-react";
+
+function freshnessColor(score) {
+    if (score >= 90) return "text-brand border-brand bg-brand/5";
+    if (score >= 75) return "text-brand-blue border-brand-blue bg-brand-blue/5";
+    if (score >= 65) return "text-warning border-warning bg-warning/5";
+    return "text-muted-foreground border-border bg-surface-alt";
+}
+
+function freshnessLabel(days) {
+    if (days == null || days > 500) return "New";
+    if (days === 0) return "Refreshed today";
+    if (days === 1) return "Refreshed 1d ago";
+    if (days < 7) return `Refreshed ${days}d ago`;
+    if (days < 30) return `Refreshed ${Math.floor(days / 7)}w ago`;
+    if (days < 90) return `Refreshed ${Math.floor(days / 30)}mo ago`;
+    return "Review scheduled";
+}
 
 export default function CourseCard({ course, testIdPrefix = "course" }) {
+    const score = course.freshness_score ?? 100;
     return (
         <Link
             to={`/courses/${course.slug}`}
@@ -18,9 +36,19 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
                 <div className="absolute top-3 left-3 flex gap-1.5">
                     <span className="badge-mono bg-background/95 backdrop-blur">{course.category}</span>
                 </div>
-                {course.has_full_content && (
-                    <span className="absolute top-3 right-3 badge-crimson bg-background/95 backdrop-blur">Full curriculum</span>
-                )}
+                <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+                    {course.has_full_content && (
+                        <span className="badge-mono bg-background/95 backdrop-blur border-brand text-brand">Full curriculum</span>
+                    )}
+                    <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-mono uppercase tracking-[0.15em] backdrop-blur border ${freshnessColor(score)} bg-background/90`}
+                        data-testid={`freshness-badge-${course.slug}`}
+                        title={freshnessLabel(course.days_since_review)}
+                    >
+                        <Radio className="w-2.5 h-2.5" />
+                        {score}
+                    </span>
+                </div>
             </div>
 
             <div className="p-6 flex flex-col flex-1">
@@ -42,6 +70,9 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{course.enrolled_count.toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{course.module_count || 15} modules</div>
+                </div>
+                <div className="mt-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                    {freshnessLabel(course.days_since_review)}
                 </div>
             </div>
         </Link>

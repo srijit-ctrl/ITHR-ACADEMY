@@ -7,7 +7,7 @@ import os
 import random
 import string
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional
 
@@ -33,6 +33,8 @@ from seed_data import (  # noqa: E402
 )
 from ai_service import stream_tutor_response, generate_course_outline, generate_intelligence_briefing, generate_course_refresh  # noqa: E402
 import httpx  # noqa: E402
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest  # noqa: E402
+from fastapi import Request  # noqa: E402
 
 
 # -------------------- DB --------------------
@@ -52,53 +54,83 @@ api = APIRouter(prefix="/api")
 
 # ==================== SEEDING ====================
 async def seed_database():
-    """Seed catalog + full course. Idempotent."""
+    """Seed catalog + full courses. Idempotent (upserts full courses to replace metadata stubs)."""
+    from seed_more_courses import (
+        build_prompt_engineering_course, build_rag_course,
+        build_multi_agent_course, build_ai_governance_course,
+    )
+
     course_count = await db.courses.count_documents({})
-    if course_count > 0:
-        logger.info(f"Courses already seeded ({course_count} present).")
-        return
+    full_builders = [
+        build_full_course,
+        build_prompt_engineering_course,
+        build_rag_course,
+        build_multi_agent_course,
+        build_ai_governance_course,
+    ]
+    full_slugs = set()
 
-    logger.info("Seeding full course...")
-    full = build_full_course()
-    doc = full.model_dump()
-    doc["has_full_content"] = True
-    await db.courses.insert_one(doc)
+    # Upsert each full course (replaces metadata stubs if they exist)
+    for builder in full_builders:
+        full = builder()
+        doc = full.model_dump()
+        doc["has_full_content"] = True
+        # Assign a plausible last_reviewed_at within past 45 days (deterministic per slug for stability)
+        import hashlib
+        seed_hash = int(hashlib.md5(full.slug.encode()).hexdigest()[:8], 16)
+        days_ago = seed_hash % 45  # 0-44 days
+        reviewed_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        doc["last_reviewed_at"] = reviewed_at.isoformat()
+        await db.courses.update_one({"slug": full.slug}, {"$set": doc}, upsert=True)
+        full_slugs.add(full.slug)
 
-    logger.info("Seeding catalog metadata...")
-    for meta in CATALOG_COURSES:
-        catalog_doc = {
-            "id": str(uuid.uuid4()),
-            "slug": meta["slug"],
-            "title": meta["title"],
-            "subtitle": meta["subtitle"],
-            "description": f"{meta['subtitle']}. Full curriculum in preparation — enroll now to secure early access.",
-            "category": meta["category"],
-            "industries": meta.get("industries", []),
-            "difficulty": meta["difficulty"],
-            "duration_hours": meta["duration_hours"],
-            "thumbnail_url": meta["thumbnail_url"],
-            "hero_url": None,
-            "instructor": meta["instructor"],
-            "prerequisites": [],
-            "learning_objectives": [],
-            "skills_gained": [],
-            "business_value": "",
-            "is_certification_track": True,
-            "modules": [],
-            "quiz": [],
-            "passing_score": 65,
-            "enrolled_count": meta["enrolled_count"],
-            "rating": meta["rating"],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "has_full_content": False,
-        }
-        await db.courses.insert_one(catalog_doc)
+    logger.info(f"Upserted {len(full_slugs)} full courses.")
+
+    # Seed catalog metadata for slugs not already present as full
+    if course_count == 0:
+        logger.info("Seeding catalog metadata...")
+        for meta in CATALOG_COURSES:
+            if meta["slug"] in full_slugs:
+                continue
+            import hashlib
+            seed_hash = int(hashlib.md5(meta["slug"].encode()).hexdigest()[:8], 16)
+            days_ago = seed_hash % 90
+            reviewed_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
+            catalog_doc = {
+                "id": str(uuid.uuid4()),
+                "slug": meta["slug"],
+                "title": meta["title"],
+                "subtitle": meta["subtitle"],
+                "description": f"{meta['subtitle']}. Full curriculum in preparation — enroll now to secure early access.",
+                "category": meta["category"],
+                "industries": meta.get("industries", []),
+                "difficulty": meta["difficulty"],
+                "duration_hours": meta["duration_hours"],
+                "thumbnail_url": meta["thumbnail_url"],
+                "hero_url": None,
+                "instructor": meta["instructor"],
+                "prerequisites": [],
+                "learning_objectives": [],
+                "skills_gained": [],
+                "business_value": "",
+                "is_certification_track": True,
+                "modules": [],
+                "quiz": [],
+                "passing_score": 65,
+                "enrolled_count": meta["enrolled_count"],
+                "rating": meta["rating"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_reviewed_at": reviewed_at.isoformat(),
+                "has_full_content": False,
+            }
+            await db.courses.update_one({"slug": meta["slug"]}, {"$setOnInsert": catalog_doc}, upsert=True)
 
     await db.courses.create_index("slug", unique=True)
     await db.users.create_index("email", unique=True)
     await db.enrollments.create_index([("user_id", 1), ("course_id", 1)], unique=True)
     await db.certificates.create_index("certificate_id", unique=True)
-    logger.info(f"Seeded {1 + len(CATALOG_COURSES)} courses.")
+    total = await db.courses.count_documents({})
+    logger.info(f"Seed complete. Total courses: {total}.")
 
 
 # ==================== HEALTH ====================
@@ -236,6 +268,23 @@ async def get_certification_paths():
     return {"paths": CERTIFICATION_PATHS}
 
 
+def _compute_freshness(doc: dict) -> tuple[int, int]:
+    """Return (freshness_score, days_since_review) for a course doc."""
+    reviewed = doc.get("last_reviewed_at")
+    if not reviewed:
+        return 60, 999
+    try:
+        rev_dt = datetime.fromisoformat(reviewed)
+        if rev_dt.tzinfo is None:
+            rev_dt = rev_dt.replace(tzinfo=timezone.utc)
+        days = (datetime.now(timezone.utc) - rev_dt).days
+        # freshness formula: 100 at 0 days, decays to 60 at 90 days, floors at 55
+        score = max(55, min(100, 100 - int(days * 0.45)))
+        return score, days
+    except Exception:
+        return 70, 999
+
+
 @api.get("/courses", response_model=List[CourseSummary])
 async def list_courses(
     category: Optional[str] = None,
@@ -258,8 +307,10 @@ async def list_courses(
         ]
 
     docs = await db.courses.find(query, {"_id": 0}).to_list(200)
-    return [
-        CourseSummary(
+    summaries = []
+    for d in docs:
+        score, days = _compute_freshness(d)
+        summaries.append(CourseSummary(
             id=d["id"], slug=d["slug"], title=d["title"], subtitle=d["subtitle"],
             category=d["category"], industries=d.get("industries", []),
             difficulty=d["difficulty"], duration_hours=d["duration_hours"],
@@ -267,9 +318,11 @@ async def list_courses(
             enrolled_count=d.get("enrolled_count", 0), rating=d.get("rating", 4.7),
             module_count=len(d.get("modules", [])),
             has_full_content=d.get("has_full_content", False),
-        )
-        for d in docs
-    ]
+            last_reviewed_at=d.get("last_reviewed_at"),
+            freshness_score=score,
+            days_since_review=days,
+        ))
+    return summaries
 
 
 @api.get("/courses/{slug}", response_model=Course)
@@ -277,6 +330,9 @@ async def get_course(slug: str):
     doc = await db.courses.find_one({"slug": slug}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Course not found")
+    score, days = _compute_freshness(doc)
+    doc["freshness_score"] = score
+    doc["days_since_review"] = days
     return Course(**doc)
 
 
@@ -634,6 +690,197 @@ async def course_refresh(slug: str, user_id: str = Depends(get_current_user_id))
         upsert=True,
     )
     return {**parsed, "cache_age_hours": 0, "from_cache": False}
+
+
+# ==================== STRIPE PAYMENTS ====================
+# Fixed pricing packages — amounts defined server-side ONLY to prevent frontend manipulation
+PAYMENT_PACKAGES = {
+    "practitioner_monthly": {"amount": 29.00, "currency": "usd", "label": "Practitioner — Monthly", "duration_days": 30, "tier": "practitioner"},
+    "practitioner_annual": {"amount": 290.00, "currency": "usd", "label": "Practitioner — Annual", "duration_days": 365, "tier": "practitioner"},
+    "professional_track": {"amount": 499.00, "currency": "usd", "label": "Professional Track (12 mo)", "duration_days": 365, "tier": "professional"},
+    "team_monthly_per_seat": {"amount": 18.00, "currency": "usd", "label": "Team — Per seat / month", "duration_days": 30, "tier": "team"},
+}
+
+
+def _get_stripe(request: Request) -> StripeCheckout:
+    api_key = os.environ.get("STRIPE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    host_url = str(request.base_url).rstrip("/")
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    return StripeCheckout(api_key=api_key, webhook_url=webhook_url)
+
+
+@api.get("/checkout/packages")
+async def list_packages():
+    """Public — list available packages (frontend uses this to render buttons)."""
+    return {"packages": {k: {"label": v["label"], "amount": v["amount"], "currency": v["currency"], "tier": v["tier"]} for k, v in PAYMENT_PACKAGES.items()}}
+
+
+@api.post("/checkout/session")
+async def create_checkout(payload: dict, request: Request, user_id: str = Depends(get_current_user_id)):
+    """Create a Stripe checkout session for a fixed package."""
+    package_id = payload.get("package_id")
+    origin_url = payload.get("origin_url", "").rstrip("/")
+    quantity = int(payload.get("quantity") or 1)
+
+    if package_id not in PAYMENT_PACKAGES:
+        raise HTTPException(status_code=400, detail="Invalid package_id")
+    if not origin_url:
+        raise HTTPException(status_code=400, detail="origin_url required")
+
+    pkg = PAYMENT_PACKAGES[package_id]
+    if package_id == "team_monthly_per_seat":
+        # variable seats — enforce 10-100 range
+        quantity = max(10, min(100, quantity))
+    else:
+        quantity = 1
+
+    amount = float(pkg["amount"]) * quantity  # total charge
+
+    success_url = f"{origin_url}/pricing/success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/pricing"
+
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    metadata = {
+        "user_id": user_id,
+        "email": user["email"],
+        "package_id": package_id,
+        "quantity": str(quantity),
+        "tier": pkg["tier"],
+    }
+
+    stripe = _get_stripe(request)
+    session_req = CheckoutSessionRequest(
+        amount=amount,
+        currency=pkg["currency"],
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata,
+    )
+    try:
+        session = await stripe.create_checkout_session(session_req)
+    except Exception as e:
+        logger.exception("Stripe session creation failed")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
+
+    # Record transaction as INITIATED
+    txn = {
+        "session_id": session.session_id,
+        "user_id": user_id,
+        "email": user["email"],
+        "package_id": package_id,
+        "tier": pkg["tier"],
+        "quantity": quantity,
+        "amount": amount,
+        "currency": pkg["currency"],
+        "payment_status": "initiated",
+        "status": "pending",
+        "metadata": metadata,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.payment_transactions.insert_one(txn)
+
+    return {"url": session.url, "session_id": session.session_id}
+
+
+@api.get("/checkout/status/{session_id}")
+async def checkout_status(session_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
+    """Poll Stripe for the current status of a session. Updates the transaction record idempotently."""
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if txn["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not your transaction")
+
+    # If already terminal, return cached
+    if txn.get("payment_status") == "paid" and txn.get("status") == "complete":
+        return {"payment_status": "paid", "status": "complete", "package_id": txn["package_id"], "tier": txn["tier"], "amount": txn["amount"], "currency": txn["currency"]}
+
+    stripe = _get_stripe(request)
+    try:
+        status_resp = await stripe.get_checkout_status(session_id)
+    except Exception as e:
+        logger.exception("Stripe status fetch failed")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
+
+    updates = {
+        "payment_status": status_resp.payment_status,
+        "status": status_resp.status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Idempotently grant benefit on first paid transition
+    if status_resp.payment_status == "paid" and txn.get("payment_status") != "paid":
+        pkg = PAYMENT_PACKAGES.get(txn["package_id"])
+        if pkg:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=pkg["duration_days"])
+            await db.users.update_one(
+                {"id": txn["user_id"]},
+                {"$set": {
+                    "subscription_tier": pkg["tier"],
+                    "subscription_expires_at": expires_at.isoformat(),
+                    "subscription_package": txn["package_id"],
+                }},
+            )
+            updates["fulfilled_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.payment_transactions.update_one({"session_id": session_id}, {"$set": updates})
+
+    return {
+        "payment_status": status_resp.payment_status,
+        "status": status_resp.status,
+        "package_id": txn["package_id"],
+        "tier": txn["tier"],
+        "amount": txn["amount"],
+        "currency": txn["currency"],
+        "amount_total_cents": status_resp.amount_total,
+    }
+
+
+@api.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhooks for redundant status updates."""
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature", "")
+    stripe = _get_stripe(request)
+    try:
+        webhook_resp = await stripe.handle_webhook(body, signature)
+    except Exception as e:
+        logger.exception("Stripe webhook parse failed")
+        raise HTTPException(status_code=400, detail=f"Webhook error: {e}")
+
+    if not webhook_resp.session_id:
+        return {"received": True}
+
+    txn = await db.payment_transactions.find_one({"session_id": webhook_resp.session_id}, {"_id": 0})
+    if not txn:
+        return {"received": True, "known": False}
+
+    updates = {
+        "payment_status": webhook_resp.payment_status,
+        "webhook_event_id": webhook_resp.event_id,
+        "webhook_event_type": webhook_resp.event_type,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Idempotent fulfillment
+    if webhook_resp.payment_status == "paid" and txn.get("payment_status") != "paid":
+        pkg = PAYMENT_PACKAGES.get(txn["package_id"])
+        if pkg:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=pkg["duration_days"])
+            await db.users.update_one(
+                {"id": txn["user_id"]},
+                {"$set": {
+                    "subscription_tier": pkg["tier"],
+                    "subscription_expires_at": expires_at.isoformat(),
+                    "subscription_package": txn["package_id"],
+                }},
+            )
+            updates["fulfilled_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.payment_transactions.update_one({"session_id": webhook_resp.session_id}, {"$set": updates})
+    return {"received": True, "session_id": webhook_resp.session_id}
 
 
 # -------------------- register + middleware --------------------

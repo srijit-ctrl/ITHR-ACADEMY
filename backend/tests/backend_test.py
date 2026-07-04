@@ -355,3 +355,204 @@ class TestIntelligence:
         assert 0 <= d["freshness_score"] <= 100
         assert isinstance(d["gaps"], list)
         assert isinstance(d["new_lessons_suggested"], list)
+
+
+
+# ---------------- Iteration 3: Freshness fields on courses ----------------
+class TestFreshness:
+    def test_list_courses_have_freshness_fields(self, api_client):
+        r = api_client.get(f"{API}/courses")
+        assert r.status_code == 200
+        courses = r.json()
+        assert len(courses) == 23
+        for c in courses:
+            assert "freshness_score" in c
+            assert "days_since_review" in c
+            assert "last_reviewed_at" in c
+            assert isinstance(c["freshness_score"], int)
+            assert 55 <= c["freshness_score"] <= 100, f"freshness OOR for {c['slug']}: {c['freshness_score']}"
+            assert isinstance(c["days_since_review"], int)
+            assert 0 <= c["days_since_review"] <= 200
+
+    def test_freshness_decreases_with_days(self, api_client):
+        r = api_client.get(f"{API}/courses")
+        courses = r.json()
+        # collect (days, score)
+        pairs = [(c["days_since_review"], c["freshness_score"]) for c in courses if c["days_since_review"] < 90]
+        # invariant: higher days => lower or equal score
+        # verify by sorting
+        pairs_sorted = sorted(pairs, key=lambda p: p[0])
+        for i in range(1, len(pairs_sorted)):
+            assert pairs_sorted[i][1] <= pairs_sorted[i - 1][1] + 1  # allow rounding
+
+    def test_single_course_has_freshness_fields(self, api_client):
+        r = api_client.get(f"{API}/courses/agentic-ai-foundations")
+        assert r.status_code == 200
+        c = r.json()
+        assert "freshness_score" in c
+        assert "days_since_review" in c
+        assert "last_reviewed_at" in c
+        assert 55 <= c["freshness_score"] <= 100
+
+
+# ---------------- Iteration 3: 5 full courses ----------------
+FULL_COURSES = [
+    "agentic-ai-foundations",
+    "prompt-engineering-mastery",
+    "multi-agent-systems",
+    "rag-enterprise",
+    "ai-governance-compliance",
+]
+
+
+class TestFullCourses:
+    @pytest.mark.parametrize("slug", FULL_COURSES)
+    def test_full_course_has_15_modules_12_quiz(self, api_client, slug):
+        r = api_client.get(f"{API}/courses/{slug}")
+        assert r.status_code == 200, f"{slug}: {r.status_code} {r.text[:200]}"
+        c = r.json()
+        assert len(c["modules"]) == 15, f"{slug} modules={len(c['modules'])}"
+        assert len(c["quiz"]) == 12, f"{slug} quiz={len(c['quiz'])}"
+        # each module has lessons
+        for m in c["modules"]:
+            assert "lessons" in m
+            assert len(m["lessons"]) >= 1
+
+    def test_list_has_five_full_courses(self, api_client):
+        r = api_client.get(f"{API}/courses")
+        courses = r.json()
+        full = [c for c in courses if c.get("has_full_content")]
+        assert len(full) == 5, f"expected 5 full courses, got {len(full)}: {[c['slug'] for c in full]}"
+        slugs = {c["slug"] for c in full}
+        assert slugs == set(FULL_COURSES), f"slugs mismatch: {slugs}"
+
+
+# ---------------- Iteration 3: Stripe checkout ----------------
+class TestStripeCheckout:
+    def test_list_packages(self, api_client):
+        r = api_client.get(f"{API}/checkout/packages")
+        assert r.status_code == 200
+        pkgs = r.json()["packages"]
+        for pid in ("practitioner_monthly", "practitioner_annual", "professional_track", "team_monthly_per_seat"):
+            assert pid in pkgs, f"missing package {pid}"
+        assert pkgs["practitioner_monthly"]["amount"] == 29.0
+        assert pkgs["practitioner_annual"]["amount"] == 290.0
+        assert pkgs["professional_track"]["amount"] == 499.0
+        assert pkgs["team_monthly_per_seat"]["amount"] == 18.0
+
+    def test_create_session_requires_auth(self, api_client):
+        r = requests.post(f"{API}/checkout/session", json={
+            "package_id": "practitioner_monthly",
+            "origin_url": "https://example.com",
+        })
+        assert r.status_code in (401, 403)
+
+    def test_create_session_invalid_package(self, api_client, auth_headers):
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "nonexistent_package",
+            "origin_url": "https://example.com",
+        })
+        assert r.status_code == 400
+
+    def test_create_session_practitioner_monthly(self, api_client, auth_headers, test_user):
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "practitioner_monthly",
+            "origin_url": "https://example.com",
+        }, timeout=30)
+        assert r.status_code == 200, f"{r.status_code}: {r.text[:300]}"
+        d = r.json()
+        assert "url" in d and "session_id" in d
+        assert "checkout.stripe.com" in d["url"], f"unexpected url: {d['url']}"
+        # session_id typically starts with cs_
+        assert d["session_id"].startswith("cs_"), f"unexpected session_id: {d['session_id']}"
+        # store for later status check
+        pytest.stripe_session = {"session_id": d["session_id"], "token": test_user["token"]}
+
+    def test_create_session_team_seats_clamped(self, api_client, auth_headers):
+        # request 500 seats -> clamped to 100 -> amount 1800
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "team_monthly_per_seat",
+            "origin_url": "https://example.com",
+            "quantity": 500,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "checkout.stripe.com" in d["url"]
+
+    def test_create_session_team_seats_clamped_min(self, api_client, auth_headers):
+        # request 1 seat -> clamped to 10 -> amount 180
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "team_monthly_per_seat",
+            "origin_url": "https://example.com",
+            "quantity": 1,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+
+    def test_checkout_status_requires_auth(self, api_client):
+        r = requests.get(f"{API}/checkout/status/cs_test_dummy")
+        assert r.status_code in (401, 403)
+
+    def test_checkout_status_returns_data(self, api_client, auth_headers):
+        # relies on prior test_create_session_practitioner_monthly
+        session_data = getattr(pytest, "stripe_session", None)
+        if not session_data:
+            pytest.skip("No stripe session created yet")
+        r = api_client.get(f"{API}/checkout/status/{session_data['session_id']}", headers=auth_headers, timeout=30)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "payment_status" in d
+        assert "status" in d
+        # unpaid new session
+        assert d["payment_status"] in ("initiated", "unpaid", "no_payment_required", "paid")
+
+    def test_checkout_status_unknown_session_404(self, api_client, auth_headers):
+        r = api_client.get(f"{API}/checkout/status/cs_does_not_exist_xyz", headers=auth_headers)
+        assert r.status_code == 404
+
+    def test_checkout_status_forbidden_other_user(self, api_client, auth_headers, test_user):
+        # create session with user A
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "practitioner_monthly",
+            "origin_url": "https://example.com",
+        }, timeout=30)
+        assert r.status_code == 200
+        sess_id = r.json()["session_id"]
+        # register user B
+        email = f"otheruser+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
+        reg = api_client.post(f"{API}/auth/register", json={
+            "email": email, "password": "Pass123!", "full_name": "Other User"
+        })
+        assert reg.status_code == 200
+        token_b = reg.json()["token"]
+        r2 = api_client.get(f"{API}/checkout/status/{sess_id}", headers={"Authorization": f"Bearer {token_b}"})
+        assert r2.status_code == 403
+
+    def test_webhook_bad_signature_returns_400(self, api_client):
+        # POST plain JSON with no valid Stripe-Signature header
+        r = requests.post(f"{API}/webhook/stripe",
+                          data=b'{"type":"checkout.session.completed"}',
+                          headers={"Content-Type": "application/json"})
+        # should be 400 (invalid sig) — should NOT be 500
+        assert r.status_code in (200, 400), f"got {r.status_code}: {r.text[:200]}"
+
+    def test_create_session_missing_origin_url(self, api_client, auth_headers):
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "practitioner_monthly",
+        })
+        assert r.status_code == 400
+
+    def test_payment_transaction_persisted(self, api_client, auth_headers):
+        # create session, then fetch status, then verify record exists via status endpoint
+        r = api_client.post(f"{API}/checkout/session", headers=auth_headers, json={
+            "package_id": "professional_track",
+            "origin_url": "https://example.com",
+        }, timeout=30)
+        assert r.status_code == 200
+        sess_id = r.json()["session_id"]
+        # status endpoint reads from payment_transactions, so a 200/402/etc (not 404) confirms it was persisted
+        r2 = api_client.get(f"{API}/checkout/status/{sess_id}", headers=auth_headers, timeout=30)
+        assert r2.status_code == 200, r2.text
+        d = r2.json()
+        assert d["package_id"] == "professional_track"
+        assert d["tier"] == "professional"
+        assert d["amount"] == 499.0

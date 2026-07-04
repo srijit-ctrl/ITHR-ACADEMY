@@ -103,6 +103,9 @@ class Course(BaseModel):
     enrolled_count: int = 0
     rating: float = 4.8
     created_at: str = Field(default_factory=now_iso)
+    last_reviewed_at: Optional[str] = None
+    freshness_score: int = 100
+    days_since_review: int = 0
 
 
 class CourseSummary(BaseModel):
@@ -120,6 +123,9 @@ class CourseSummary(BaseModel):
     rating: float
     module_count: int
     has_full_content: bool = False
+    last_reviewed_at: Optional[str] = None
+    freshness_score: int = 100
+    days_since_review: int = 0
 
 
 # -------------------- Enrollment / Progress --------------------
