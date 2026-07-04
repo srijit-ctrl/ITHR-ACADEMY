@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { ArrowRight, ShieldCheck, Trophy, Users, Building2, GraduationCap, Sparkles, Radio, Zap } from "lucide-react";
 import CourseCard from "@/components/CourseCard";
+import TryALesson from "@/components/TryALesson";
 import { ITHRSeal } from "@/components/brand/ITHRBrand";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1526314114033-349ef6f72220?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmFsJTIwbGlicmFyeXxlbnwwfHx8fDE3ODMxNTI1NTV8MA&ixlib=rb-4.1.0&q=85";
@@ -149,6 +150,9 @@ export default function Landing() {
                     </div>
                 </div>
             </section>
+
+            {/* TRY-A-LESSON — anonymous streaming demo */}
+            <TryALesson />
 
             {/* FEATURED COURSES */}
             <section className="container-page py-24">
