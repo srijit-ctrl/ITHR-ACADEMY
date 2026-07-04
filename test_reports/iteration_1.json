@@ -1,0 +1,40 @@
+{
+  "summary": "End-to-end backend + frontend testing of Enterprise Agentic AI Academy MVP. Backend: 27/27 pytest tests pass covering health, auth (register/login/me/duplicate/google callback missing+invalid session), catalog (22 industries, 8 cert tiers), 23 courses with filters/search, full course (15 modules + 12 quiz), enrollment lifecycle, lesson completion, quiz pass+cert issuance, quiz fail, public cert verify, dashboard stats, and AI tutor SSE (24+ delta events, done:true + session_id). Frontend: registration, login, dashboard, catalog with filters/search, course detail with 15 modules, lesson viewer with 75 lessons in TOC + mark-complete + prev/next nav, quiz with 12 questions submitted with result screen, AI Tutor floating panel streams tokens progressively, Enterprise/Industries/Certifications pages render, public verify page shows 'Credential not found' for invalid IDs. One critical UI overlay bug: 'Made with Emergent' badge overlaps and intercepts pointer events on the 'Ask Aletheia' floating button (bottom-right corner).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/courses/{slug}/quiz/submit", "issue": "QuizSubmitRequest requires both URL slug and body.course_id — redundant. Server never validates that body.course_id matches slug. Consider dropping course_id from request body since slug is authoritative."},
+      {"endpoint": "POST /api/courses/{slug}/quiz/submit", "issue": "In server.py:404, a second random cert id is generated for the initial verification_url only to be overwritten on the next line — dead code but harmless."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AITutorPanel floating button", "issue": "'Made with Emergent' badge (anchored bottom-right) visually and functionally overlaps the fixed 'Ask Aletheia' launcher button — pointer events are intercepted by the badge, real users cannot open the tutor via normal click. Playwright confirmed 'subtree intercepts pointer events'. Move the tutor FAB up (e.g., bottom-20 right-6) or to bottom-left.", "selector": "[data-testid=\"open-ai-tutor\"]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "LessonViewer", "issues": ["Header remains visible on lesson pages while the code only hides the Footer via isLesson; this is likely intentional for context but consider verifying design intent"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "HIGH: Reposition the 'Ask Aletheia' floating button so the Emergent watermark does not overlap it (e.g., bottom-24 right-6, or bottom-6 right-24). Right now the tutor entry point is effectively blocked for end users on the deployed URL.",
+    "LOW: Remove redundant course_id from QuizSubmitRequest body (slug in URL is sufficient) OR validate that body.course_id equals course fetched by slug.",
+    "LOW: Remove dead random cert-id generation on server.py:404 (immediately overwritten on next line)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~578 lines — approaching the 700-line threshold; consider splitting into routers (auth/, courses/, quiz/, ai/, dashboard/).",
+    "server.py:404 generates _gen_cert_id() twice — once inside Certificate(...) constructor arg for verification_url and then overwrites on next line. Cosmetic waste.",
+    "Certificate verification_url initially stores '/verify/<different_id>' before overwrite; if anything ever reads it between those two lines you'd have a bug. Safe today but brittle.",
+    "google_callback logs full exception details in the raised HTTPException detail (`f\"OAuth verification failed: {e}\"`) — could leak internal info; consider generic message.",
+    "AI Tutor SSE endpoint has no rate limiting — cost/abuse risk in production.",
+    "LessonViewer parses lesson.content with a regex-based markdown-lite renderer using dangerouslySetInnerHTML — XSS-safe today because content is server-seeded, but if instructor-authored lessons are ever accepted this becomes a vector."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "100% functional pass; 1 UX overlay bug documented"},
+  "test_credentials": "Registered on the fly: see /tmp/test_creds.txt (email pattern e2e.tester+<ts>@example.com / TestPass123!). Credentials are ephemeral per test run.",
+  "seed_data_creation": "None — used the app's auto-seeded 23 courses. Test users registered via /api/auth/register on the fly.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend suite in /app/backend/tests/backend_test.py runs against REACT_APP_BACKEND_URL and passes cleanly. If retesting the AI tutor UI fix, note that the 'Made with Emergent' badge sits at bottom-6 right-6; the AI tutor button also sits at bottom-6 right-6 — they collide. Testing agents must use force=True or page.evaluate JS click to bypass the overlay until fixed. The verify-page 'Credential not found' state is confirmed working. Cormorant Garamond font loads correctly on landing (hero renders 'Where the world's workforce learns to command AI.')."
+}

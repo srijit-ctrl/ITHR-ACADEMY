@@ -1,56 +1,76 @@
-import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
+import AITutorPanel from "@/components/AITutorPanel";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import AuthCallback from "@/pages/AuthCallback";
+import CourseCatalog from "@/pages/CourseCatalog";
+import CourseDetail from "@/pages/CourseDetail";
+import LessonViewer from "@/pages/LessonViewer";
+import Dashboard from "@/pages/Dashboard";
+import Quiz from "@/pages/Quiz";
+import Certificate from "@/pages/Certificate";
+import Verify from "@/pages/Verify";
+import Industries from "@/pages/Industries";
+import Enterprise from "@/pages/Enterprise";
+import Certifications from "@/pages/Certifications";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
+function AppShell() {
+    const location = useLocation();
+    const { user } = useAuth();
+
+    // Detect OAuth callback synchronously
+    if (location.hash?.includes("session_id=")) {
+        return <AuthCallback />;
     }
-  };
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+    // Hide chrome on lesson viewer for immersive reading
+    const isLesson = location.pathname.startsWith("/learn/");
 
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+    return (
+        <div className="min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-1">
+                <Routes>
+                    <Route path="/" element={<Landing />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/courses" element={<CourseCatalog />} />
+                    <Route path="/courses/:slug" element={<CourseDetail />} />
+                    <Route path="/industries" element={<Industries />} />
+                    <Route path="/certifications" element={<Certifications />} />
+                    <Route path="/enterprise" element={<Enterprise />} />
+                    <Route path="/verify" element={<Verify />} />
+                    <Route path="/verify/:certId" element={<Verify />} />
+
+                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                    <Route path="/learn/:slug/:moduleId/:lessonId" element={<ProtectedRoute><LessonViewer /></ProtectedRoute>} />
+                    <Route path="/quiz/:slug" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
+                    <Route path="/certificate/:certId" element={<ProtectedRoute><Certificate /></ProtectedRoute>} />
+                </Routes>
+            </main>
+            {!isLesson && <Footer />}
+            {user && <AITutorPanel courseSlug={location.pathname.startsWith("/learn/") ? location.pathname.split("/")[2] : null} />}
+        </div>
+    );
+}
 
 function App() {
-  return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </div>
-  );
+    return (
+        <div className="App">
+            <BrowserRouter>
+                <AuthProvider>
+                    <AppShell />
+                </AuthProvider>
+            </BrowserRouter>
+        </div>
+    );
 }
 
 export default App;
