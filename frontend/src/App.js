@@ -20,6 +20,8 @@ import Verify from "@/pages/Verify";
 import Industries from "@/pages/Industries";
 import Enterprise from "@/pages/Enterprise";
 import Certifications from "@/pages/Certifications";
+import Pricing from "@/pages/Pricing";
+import Intelligence from "@/pages/Intelligence";
 
 function AppShell() {
     const location = useLocation();
@@ -45,6 +47,8 @@ function AppShell() {
                     <Route path="/courses/:slug" element={<CourseDetail />} />
                     <Route path="/industries" element={<Industries />} />
                     <Route path="/certifications" element={<Certifications />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/intelligence" element={<Intelligence />} />
                     <Route path="/enterprise" element={<Enterprise />} />
                     <Route path="/verify" element={<Verify />} />
                     <Route path="/verify/:certId" element={<Verify />} />

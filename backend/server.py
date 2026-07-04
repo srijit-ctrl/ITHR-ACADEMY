@@ -31,7 +31,7 @@ from auth import (  # noqa: E402
 from seed_data import (  # noqa: E402
     build_full_course, CATALOG_COURSES, INDUSTRIES, CATEGORIES, CERTIFICATION_PATHS,
 )
-from ai_service import stream_tutor_response, generate_course_outline  # noqa: E402
+from ai_service import stream_tutor_response, generate_course_outline, generate_intelligence_briefing, generate_course_refresh  # noqa: E402
 import httpx  # noqa: E402
 
 
@@ -553,6 +553,87 @@ async def dashboard_stats(user_id: str = Depends(get_current_user_id)):
         "xp": user.get("xp", 0),
         "streak_days": user.get("streak_days", 0),
     }
+
+
+# ==================== REAL-TIME INTELLIGENCE ====================
+INTELLIGENCE_CACHE_KEY = "current_briefing"
+INTELLIGENCE_CACHE_HOURS = 6  # regenerate at most every 6 hours
+
+
+def _extract_json(raw: str):
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("```")[1]
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+    cleaned = cleaned.strip().strip("`").strip()
+    return json.loads(cleaned)
+
+
+@api.get("/intelligence/briefing")
+async def intelligence_briefing(force: bool = False):
+    """Public: latest agentic AI intelligence briefing. Cached for 6h."""
+    cached = await db.intelligence_cache.find_one({"key": INTELLIGENCE_CACHE_KEY}, {"_id": 0})
+    if cached and not force:
+        cached_at = datetime.fromisoformat(cached["cached_at"])
+        age_hours = (datetime.now(timezone.utc) - cached_at).total_seconds() / 3600
+        if age_hours < INTELLIGENCE_CACHE_HOURS:
+            return {**cached["payload"], "cache_age_hours": round(age_hours, 1), "from_cache": True}
+
+    # Fetch catalog slugs to inform the model
+    course_docs = await db.courses.find({}, {"_id": 0, "slug": 1}).to_list(200)
+    slugs = [c["slug"] for c in course_docs]
+
+    try:
+        raw = await generate_intelligence_briefing(slugs)
+        parsed = _extract_json(raw)
+    except Exception as e:
+        logger.exception("Intelligence generation failed")
+        if cached:
+            return {**cached["payload"], "cache_age_hours": 999, "from_cache": True, "stale": True}
+        raise HTTPException(status_code=502, detail=f"Intelligence generation failed: {e}")
+
+    now_iso_str = datetime.now(timezone.utc).isoformat()
+    payload = {**parsed, "generated_at": parsed.get("generated_at") or now_iso_str}
+
+    await db.intelligence_cache.update_one(
+        {"key": INTELLIGENCE_CACHE_KEY},
+        {"$set": {"key": INTELLIGENCE_CACHE_KEY, "payload": payload, "cached_at": now_iso_str}},
+        upsert=True,
+    )
+    return {**payload, "cache_age_hours": 0, "from_cache": False}
+
+
+@api.get("/intelligence/course/{slug}/refresh")
+async def course_refresh(slug: str, user_id: str = Depends(get_current_user_id)):
+    """Authenticated: AI-generated curriculum refresh recommendations for a specific course."""
+    course = await db.courses.find_one({"slug": slug}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # cache per course for 12h
+    cache_key = f"course_refresh_{slug}"
+    cached = await db.intelligence_cache.find_one({"key": cache_key}, {"_id": 0})
+    if cached:
+        cached_at = datetime.fromisoformat(cached["cached_at"])
+        age_hours = (datetime.now(timezone.utc) - cached_at).total_seconds() / 3600
+        if age_hours < 12:
+            return {**cached["payload"], "cache_age_hours": round(age_hours, 1), "from_cache": True}
+
+    try:
+        raw = await generate_course_refresh(course)
+        parsed = _extract_json(raw)
+    except Exception as e:
+        logger.exception("Course refresh generation failed")
+        raise HTTPException(status_code=502, detail=f"Course refresh failed: {e}")
+
+    now_iso_str = datetime.now(timezone.utc).isoformat()
+    await db.intelligence_cache.update_one(
+        {"key": cache_key},
+        {"$set": {"key": cache_key, "payload": parsed, "cached_at": now_iso_str}},
+        upsert=True,
+    )
+    return {**parsed, "cache_age_hours": 0, "from_cache": False}
 
 
 # -------------------- register + middleware --------------------

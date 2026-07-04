@@ -91,3 +91,97 @@ async def generate_course_outline(topic: str, audience: str = "enterprise profes
         elif isinstance(event, StreamDone):
             break
     return "".join(result_chunks)
+
+
+INTELLIGENCE_SYSTEM_PROMPT = """You are the ITHR Intelligence Desk — a senior analyst tracking the fast-moving agentic AI industry. Your output is used by curriculum authors, enterprise buyers, and learners to stay current.
+
+Return STRICTLY valid JSON matching this schema (no markdown fences, no prose):
+{
+  "generated_at": ISO date-time string,
+  "briefing_title": string (concise, editorial),
+  "executive_summary": string (2-3 sentences, punchy),
+  "signals": [
+    {
+      "id": string (kebab-case),
+      "category": one of ["Model Release", "Framework", "Regulation", "Enterprise Deployment", "Research", "Security", "Standards"],
+      "title": string,
+      "summary": string (2-3 sentences),
+      "impact": one of ["Low", "Medium", "High", "Critical"],
+      "affected_courses": array of course-slug strings (choose from the provided catalog),
+      "source_type": one of ["Vendor Announcement", "Peer-Reviewed", "Regulatory Body", "Industry Analyst", "Practitioner Report"],
+      "recommended_action": string (1 sentence — what a curriculum author should do)
+    }
+  ],
+  "course_refresh_priorities": [
+    { "course_slug": string, "reason": string, "priority": one of ["Now", "This Quarter", "Watch"] }
+  ]
+}
+
+Constraints:
+- Generate 6-8 signals, weighted toward Model Release + Enterprise Deployment + Regulation.
+- Every signal must feel plausibly current (Q1 2026). Do not invent proper nouns for regulations that don't exist; you may reference the EU AI Act, NIST AI RMF, ISO 42001, Colorado AI Act, NY LL 144, and generic vendor moves.
+- Impact assignments must be defensible — Critical only for regulation-in-force or safety incidents.
+- The output is JSON only. No commentary, no fences.
+"""
+
+
+COURSE_REFRESH_SYSTEM_PROMPT = """You are the ITHR Curriculum Intelligence agent. Given a course outline (title, subtitle, modules) and the current agentic AI landscape, propose targeted refreshes.
+
+Return STRICTLY JSON:
+{
+  "course_slug": string,
+  "freshness_score": integer 0-100 (higher = more current),
+  "last_reviewed": ISO date,
+  "gaps": [ { "topic": string, "urgency": "Low"|"Medium"|"High", "recommended_module": integer 1-15 } ],
+  "new_lessons_suggested": [ { "module": integer 1-15, "title": string, "rationale": string } ],
+  "deprecations": [ { "module": integer, "note": string } ],
+  "executive_note": string (1-2 sentences for stakeholders)
+}
+
+No markdown fences, no prose outside JSON.
+"""
+
+
+async def generate_intelligence_briefing(catalog_slugs: list) -> str:
+    chat = _build_chat(
+        session_id=f"intel-{datetime_now_hash()}",
+        system_message=INTELLIGENCE_SYSTEM_PROMPT,
+    )
+    prompt = f"Produce today's briefing. Available course catalog slugs to reference: {', '.join(catalog_slugs)}. Focus on developments from the last 30-60 days that materially affect enterprise agentic AI adoption."
+    chunks = []
+    async for event in chat.stream_message(UserMessage(text=prompt)):
+        if isinstance(event, TextDelta):
+            chunks.append(event.content)
+        elif isinstance(event, StreamDone):
+            break
+    return "".join(chunks)
+
+
+async def generate_course_refresh(course_dict: dict) -> str:
+    chat = _build_chat(
+        session_id=f"refresh-{course_dict.get('slug','x')}-{datetime_now_hash()}",
+        system_message=COURSE_REFRESH_SYSTEM_PROMPT,
+    )
+    modules_brief = [
+        {"number": m.get("number"), "title": m.get("title"), "summary": m.get("summary", "")[:120]}
+        for m in course_dict.get("modules", [])
+    ]
+    prompt = (
+        f"Course: {course_dict.get('title')} — {course_dict.get('subtitle')}\n"
+        f"Category: {course_dict.get('category')}\n"
+        f"Modules:\n{modules_brief}\n\n"
+        f"Return the refresh assessment JSON."
+    )
+    chunks = []
+    async for event in chat.stream_message(UserMessage(text=prompt)):
+        if isinstance(event, TextDelta):
+            chunks.append(event.content)
+        elif isinstance(event, StreamDone):
+            break
+    return "".join(chunks)
+
+
+def datetime_now_hash() -> str:
+    import time
+    # cache-bust per hour so a fresh generation happens hourly at most for the same request
+    return str(int(time.time() // 3600))

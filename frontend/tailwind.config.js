@@ -28,6 +28,7 @@ module.exports = {
                     DEFAULT: 'hsl(var(--brand))',
                     hover: 'hsl(var(--brand-hover))',
                     ink: 'hsl(var(--brand-ink))',
+                    blue: 'hsl(var(--brand-blue))',
                 },
                 card: {
                     DEFAULT: 'hsl(var(--card))',

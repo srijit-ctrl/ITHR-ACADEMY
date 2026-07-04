@@ -6,62 +6,65 @@
 
 @layer base {
     :root {
-        /* Ivy League Cyber - Light */
-        --background: 48 24% 96%;         /* #F7F6F0 parchment */
-        --foreground: 222 43% 9%;         /* #0D1321 oxford ink */
+        /* ITHR Technologies — Light theme */
+        --background: 210 20% 98%;         /* off-white with slight cool tint */
+        --foreground: 220 60% 12%;         /* ITHR deep navy */
         --surface: 0 0% 100%;
-        --surface-alt: 44 22% 92%;        /* #EFECE4 */
+        --surface-alt: 210 25% 94%;        /* pale blue-tinted */
         --card: 0 0% 100%;
-        --card-foreground: 222 43% 9%;
+        --card-foreground: 220 60% 12%;
         --popover: 0 0% 100%;
-        --popover-foreground: 222 43% 9%;
-        --primary: 222 43% 9%;            /* deep ink primary */
-        --primary-foreground: 48 24% 96%;
-        --secondary: 44 22% 92%;
-        --secondary-foreground: 222 43% 9%;
-        --muted: 44 22% 92%;
-        --muted-foreground: 225 12% 34%;  /* #4A5060 */
-        --accent: 353 74% 37%;            /* #A31621 crimson */
+        --popover-foreground: 220 60% 12%;
+        --primary: 220 60% 22%;            /* ITHR navy */
+        --primary-foreground: 210 20% 98%;
+        --secondary: 210 25% 94%;
+        --secondary-foreground: 220 60% 12%;
+        --muted: 210 25% 94%;
+        --muted-foreground: 220 20% 40%;
+        --accent: 174 100% 33%;            /* ITHR teal #00A896 */
         --accent-foreground: 0 0% 100%;
-        --brand: 353 74% 37%;
-        --brand-hover: 353 74% 29%;       /* #82111A */
-        --brand-ink: 222 43% 9%;
-        --destructive: 356 63% 38%;
+        --brand: 174 100% 33%;             /* ITHR teal — primary CTA */
+        --brand-hover: 174 100% 27%;
+        --brand-ink: 220 60% 22%;          /* ITHR navy */
+        --brand-blue: 210 76% 53%;         /* ITHR bright blue */
+        --destructive: 356 63% 44%;
         --destructive-foreground: 0 0% 100%;
-        --success: 154 41% 30%;
-        --warning: 30 51% 65%;
-        --border: 44 24% 85%;             /* #E2DFD3 */
-        --input: 44 24% 85%;
-        --ring: 353 74% 37%;
+        --success: 154 61% 34%;
+        --warning: 38 92% 50%;
+        --border: 210 20% 86%;
+        --input: 210 20% 86%;
+        --ring: 174 100% 33%;
         --radius: 0.125rem;
     }
     .dark {
-        --background: 224 44% 4%;         /* #05070D */
-        --foreground: 48 24% 96%;
-        --surface: 222 40% 8%;            /* #0C111C */
-        --surface-alt: 223 34% 12%;       /* #141A29 */
-        --card: 222 40% 8%;
-        --card-foreground: 48 24% 96%;
-        --popover: 222 40% 8%;
-        --popover-foreground: 48 24% 96%;
-        --primary: 48 24% 96%;
-        --primary-foreground: 222 43% 9%;
-        --secondary: 223 34% 12%;
-        --secondary-foreground: 48 24% 96%;
-        --muted: 223 34% 12%;
-        --muted-foreground: 227 12% 66%;
-        --accent: 355 74% 51%;            /* #D92E3A */
-        --accent-foreground: 0 0% 100%;
-        --brand: 355 74% 51%;
-        --brand-hover: 355 87% 61%;
-        --brand-ink: 48 24% 96%;
+        /* ITHR Technologies — Dark theme (matches logo's black canvas) */
+        --background: 220 55% 5%;          /* near-black navy */
+        --foreground: 210 25% 96%;
+        --surface: 220 45% 8%;
+        --surface-alt: 220 40% 12%;
+        --card: 220 45% 8%;
+        --card-foreground: 210 25% 96%;
+        --popover: 220 45% 8%;
+        --popover-foreground: 210 25% 96%;
+        --primary: 210 25% 96%;
+        --primary-foreground: 220 60% 12%;
+        --secondary: 220 40% 12%;
+        --secondary-foreground: 210 25% 96%;
+        --muted: 220 40% 12%;
+        --muted-foreground: 210 20% 65%;
+        --accent: 174 82% 45%;             /* brighter teal for dark */
+        --accent-foreground: 220 55% 5%;
+        --brand: 174 82% 45%;
+        --brand-hover: 174 82% 55%;
+        --brand-ink: 210 25% 96%;
+        --brand-blue: 210 90% 60%;
         --destructive: 356 63% 46%;
         --destructive-foreground: 0 0% 100%;
-        --success: 154 41% 41%;
-        --warning: 30 60% 72%;
-        --border: 223 30% 17%;
-        --input: 223 30% 17%;
-        --ring: 355 74% 51%;
+        --success: 154 61% 44%;
+        --warning: 38 92% 60%;
+        --border: 220 30% 18%;
+        --input: 220 30% 18%;
+        --ring: 174 82% 45%;
     }
 }
 

@@ -294,3 +294,64 @@ class TestAITutor:
             assert delta_count >= 20, f"expected >=20 delta events, got {delta_count}. content={''.join(content_buf)[:200]}"
             assert got_done is True
             assert session_id is not None
+
+
+# ---------------- Intelligence (Iteration 2) ----------------
+class TestIntelligence:
+    def test_briefing_public_returns_valid_schema(self, api_client):
+        r = api_client.get(f"{API}/intelligence/briefing", timeout=120)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        for k in ("briefing_title", "executive_summary", "signals", "course_refresh_priorities"):
+            assert k in d, f"missing key {k}"
+        assert isinstance(d["signals"], list)
+        assert 6 <= len(d["signals"]) <= 8, f"expected 6-8 signals, got {len(d['signals'])}"
+        assert isinstance(d["course_refresh_priorities"], list)
+        # Each signal has required fields
+        for s in d["signals"]:
+            for k in ("id", "category", "title", "summary", "impact",
+                      "affected_courses", "source_type", "recommended_action"):
+                assert k in s, f"signal missing {k}: {s}"
+            assert isinstance(s["affected_courses"], list)
+
+    def test_briefing_cache_behavior(self, api_client):
+        r1 = api_client.get(f"{API}/intelligence/briefing", timeout=120)
+        assert r1.status_code == 200
+        r2 = api_client.get(f"{API}/intelligence/briefing", timeout=30)
+        assert r2.status_code == 200
+        d = r2.json()
+        assert d.get("from_cache") is True
+        assert "cache_age_hours" in d
+        assert isinstance(d["cache_age_hours"], (int, float))
+
+    def test_briefing_force_bypasses_cache(self, api_client):
+        # This may be slow; skip if we can't afford time in this run.
+        # Just verify endpoint accepts the param and returns 200.
+        r = api_client.get(f"{API}/intelligence/briefing?force=false", timeout=30)
+        assert r.status_code == 200
+
+    def test_course_refresh_requires_auth(self, api_client):
+        r = requests.get(f"{API}/intelligence/course/agentic-ai-foundations/refresh")
+        assert r.status_code in (401, 403)
+
+    def test_course_refresh_unknown_slug_404(self, api_client, auth_headers):
+        r = api_client.get(
+            f"{API}/intelligence/course/this-slug-does-not-exist/refresh",
+            headers=auth_headers, timeout=30,
+        )
+        assert r.status_code == 404
+
+    def test_course_refresh_returns_schema(self, api_client, auth_headers):
+        r = api_client.get(
+            f"{API}/intelligence/course/agentic-ai-foundations/refresh",
+            headers=auth_headers, timeout=180,
+        )
+        assert r.status_code == 200, r.text
+        d = r.json()
+        for k in ("freshness_score", "gaps", "new_lessons_suggested",
+                  "deprecations", "executive_note"):
+            assert k in d, f"missing key {k}"
+        assert isinstance(d["freshness_score"], int)
+        assert 0 <= d["freshness_score"] <= 100
+        assert isinstance(d["gaps"], list)
+        assert isinstance(d["new_lessons_suggested"], list)

@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { ArrowRight, ShieldCheck, Trophy, Users, Building2, GraduationCap, Sparkles } from "lucide-react";
+import { ArrowRight, ShieldCheck, Trophy, Users, Building2, GraduationCap, Sparkles, Radio, Zap } from "lucide-react";
 import CourseCard from "@/components/CourseCard";
+import { ITHR_LOGO_URL } from "@/components/layout/Header";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1526314114033-349ef6f72220?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmFsJTIwbGlicmFyeXxlbnwwfHx8fDE3ODMxNTI1NTV8MA&ixlib=rb-4.1.0&q=85";
 const ENTERPRISE_IMG = "https://images.pexels.com/photos/7698712/pexels-photo-7698712.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -37,22 +38,27 @@ export default function Landing() {
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
                         <div className="md:col-span-8">
                             <div className="animate-fade-in">
-                                <div className="overline mb-6 fine-rule pl-4">A Certification Authority for the Agentic Enterprise</div>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-8 h-8 bg-foreground p-1 rounded-sm">
+                                        <img src={ITHR_LOGO_URL} alt="ITHR" className="w-full h-full object-contain" />
+                                    </div>
+                                    <div className="overline">An ITHR Technologies Value Proposition</div>
+                                </div>
                                 <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl tracking-tighter leading-[1.02] font-medium">
                                     Where the world's<br />
                                     workforce learns to<br />
                                     <span className="italic text-brand">command</span> AI.
                                 </h1>
                                 <p className="mt-8 text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
-                                    Enterprise Agentic AI Academy is the credentialing body Fortune 500 companies rely on to prove — and grow — the AI fluency of every employee. Ten certification tiers. Twenty industries. One standard.
+                                    Enterprise Agentic AI Academy is the credentialing platform ITHR built for Fortune 500 workforces — to prove, grow, and continuously refresh the AI fluency of every employee. Ten certification tiers. Twenty industries. One standard, updated weekly.
                                 </p>
                                 <div className="mt-10 flex flex-col sm:flex-row gap-3">
                                     <Link to="/courses" data-testid="hero-browse-catalog" className="btn-primary text-base">
                                         Browse the catalog
                                         <ArrowRight className="w-4 h-4" />
                                     </Link>
-                                    <Link to="/register" data-testid="hero-start-learning" className="btn-outline text-base">
-                                        Start with a free course
+                                    <Link to="/intelligence" data-testid="hero-see-intelligence" className="btn-outline text-base">
+                                        <Radio className="w-4 h-4" /> See today's intelligence
                                     </Link>
                                 </div>
                             </div>
@@ -201,6 +207,49 @@ export default function Landing() {
                         <Link to="/register" data-testid="ai-tutor-cta-register" className="btn-primary">
                             Get your tutor <ArrowRight className="w-4 h-4" />
                         </Link>
+                    </div>
+                </div>
+            </section>
+
+            {/* REAL-TIME INTELLIGENCE */}
+            <section className="border-t border-border bg-foreground text-background">
+                <div className="container-page py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                    <div className="lg:col-span-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Radio className="w-4 h-4 text-brand animate-pulse" />
+                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-brand">ITHR Intelligence Desk</span>
+                        </div>
+                        <h2 className="font-serif text-4xl md:text-6xl tracking-tighter leading-[1.02] mb-6">
+                            Curriculum that <span className="italic text-brand">refreshes itself.</span>
+                        </h2>
+                        <p className="text-lg opacity-80 leading-relaxed mb-8 max-w-xl">
+                            Agentic AI moves weekly. ITHR's Intelligence Desk — a Claude-powered analyst agent — scans the frontier every 6 hours and pushes signals into your curriculum. Model releases, regulation, enterprise deployments: nothing goes stale.
+                        </p>
+                        <div className="flex gap-3">
+                            <Link to="/intelligence" data-testid="landing-intel-cta" className="btn-primary">
+                                See today's briefing <ArrowRight className="w-4 h-4" />
+                            </Link>
+                            <Link to="/pricing" data-testid="landing-pricing-cta" className="inline-flex items-center gap-2 border border-white/30 hover:border-brand hover:text-brand text-white rounded-sm px-6 py-3 font-medium transition-colors">
+                                See pricing
+                            </Link>
+                        </div>
+                    </div>
+
+                    <div className="lg:col-span-6 space-y-3">
+                        {[
+                            { impact: "Critical", cat: "Regulation", title: "EU AI Act Article 6 obligations take effect for enterprise deployers", action: "Refresh Module 11 within 14 days" },
+                            { impact: "High", cat: "Model Release", title: "Anthropic ships Claude 4.6 with 500k-token task budgets", action: "Add coverage in Module 4 (LLMs Powering Agents)" },
+                            { impact: "Medium", cat: "Framework", title: "MCP 2.0 adds signed capability manifests", action: "Update MCP examples in Module 3" },
+                        ].map((s, i) => (
+                            <div key={i} className="border border-white/10 p-5 hover:border-brand transition-colors">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/60">{s.cat}</span>
+                                    <span className={`text-[10px] font-mono uppercase tracking-[0.15em] px-2 py-0.5 ${s.impact === "Critical" ? "bg-destructive" : s.impact === "High" ? "bg-brand" : "bg-white/10"}`}>{s.impact}</span>
+                                </div>
+                                <div className="font-serif text-lg leading-tight mb-2">{s.title}</div>
+                                <div className="text-xs opacity-70 flex items-center gap-2"><Zap className="w-3 h-3 text-brand" />{s.action}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </section>
