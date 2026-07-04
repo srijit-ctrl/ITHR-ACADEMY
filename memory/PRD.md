@@ -118,6 +118,16 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Field-level Pydantic validation on `OrganizationCreate.seat_count` (Field(ge=10, le=5000))
 - Extract shared course scaffold helper to DRY seed_* files
 - Design-system dialog to replace `confirm()`/`alert()` in EnterprisePortal
+- (Iter 8) Extract `<HeroSection kicker title italic variant />` component — hero markup now duplicated across Verify/Certifications/Pricing/EnterprisePortal
+- (Iter 8) Consider auth or rate-limit on public `GET /api/certificates/{id}/pdf` to prevent bulk scraping
+- (Iter 8) EnterprisePortal.jsx ~409 lines — split SeatEditor/StatCard/MemberRow into `/components/enterprise/*` when the file grows further
+
+### Iteration 8 — aiilm.me tokens on secondary pages + WeasyPrint runtime (Feb 2026)
+- **Verify page (/verify)** now uses `HeroBlobs variant="cool"` + `section-kicker` pill + italic serif accent on "credential". 0 console errors.
+- **EnterprisePortal (/enterprise/portal)** — JSX repaired (2 missing `</div>` closes + missing `HeroBlobs` import from prior fork); hero now renders with cool blobs, role/industry pill kicker, italic org name.
+- **WeasyPrint system deps installed** (`libpango-1.0-0`, `libpangoft2-1.0-0`, `libcairo2`, `libgdk-pixbuf2.0-0`, `libffi-dev`, `shared-mime-info`). `GET /api/certificates/{id}/pdf` now returns a valid 26KB A4-landscape PDF (`%PDF-1.7`, Content-Disposition attachment).
+- Certifications + Pricing hero styling already matched — re-verified 0 console errors.
+- 2/2 backend pytest (`test_iteration8_pdf.py`) + 4/4 frontend hero pages pass (iteration_8.json).
 
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
