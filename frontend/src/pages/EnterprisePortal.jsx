@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Building2, Users, Award, TrendingUp, Copy, Plus, Loader2, ArrowRight, Trash2, Settings, Receipt, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import HeroBlobs from "@/components/HeroBlobs";
 
 export default function EnterprisePortal() {
     const navigate = useNavigate();
@@ -194,6 +195,7 @@ export default function EnterprisePortal() {
                         <p className="text-xs text-muted-foreground mt-2">{copied ? "Copied!" : "Share with employees to onboard"}</p>
                     </div>
                 </div>
+            </div>
             </div>
             </section>
 
@@ -388,6 +390,7 @@ export default function EnterprisePortal() {
                     )}
                 </div>
             </div>
+        </div>
         </div>
     );
 }

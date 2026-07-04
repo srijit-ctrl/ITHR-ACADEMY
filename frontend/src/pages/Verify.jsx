@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, API_BASE } from "@/lib/api";
 import { ShieldCheck, XCircle, Search, Loader2 } from "lucide-react";
+import HeroBlobs from "@/components/HeroBlobs";
 
 export default function Verify() {
     const { certId } = useParams();
@@ -29,14 +30,23 @@ export default function Verify() {
     }, [certId]);
 
     return (
-        <div className="container-narrow py-20">
-            <div className="text-center mb-12">
-                <div className="overline mb-4">Public Verification Portal</div>
-                <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none mb-4">Verify a credential</h1>
-                <p className="text-muted-foreground text-lg">Enter any Agentic AI Academy credential ID to verify its authenticity.</p>
-            </div>
+        <div>
+            {/* Hero — aiilm blob style */}
+            <section className="relative overflow-hidden bg-white">
+                <HeroBlobs variant="cool" />
+                <div className="relative container-narrow pt-16 pb-10 text-center z-10">
+                    <span className="section-kicker">Public Verification Portal</span>
+                    <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none mb-4">
+                        Verify a <span className="italic text-brand">credential</span>.
+                    </h1>
+                    <p className="text-muted-foreground text-lg max-w-xl mx-auto">
+                        Enter any Agentic AI Academy credential ID to instantly verify its authenticity, issuer, and issue date.
+                    </p>
+                </div>
+            </section>
 
-            <form onSubmit={(e) => { e.preventDefault(); verify(query.trim()); }} className="flex gap-3 mb-8">
+            <div className="container-narrow pb-20">
+                <form onSubmit={(e) => { e.preventDefault(); verify(query.trim()); }} className="flex gap-3 mb-8">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
@@ -108,6 +118,7 @@ export default function Verify() {
             <div className="mt-16 text-center text-sm text-muted-foreground">
                 Employers and partners can integrate verification into applicant tracking via our{" "}
                 <Link to="/enterprise" className="text-brand hover:underline">enterprise API</Link>.
+            </div>
             </div>
         </div>
     );

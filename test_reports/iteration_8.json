@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 8 — aiilm.me hero style tokens (HeroBlobs + pill kickers) applied across /verify, /certifications, /pricing, /enterprise/portal, plus Certificate PDF export endpoint. ALL 5 test areas PASS. Backend: 2/2 tests pass in test_iteration8_pdf.py — GET /api/certificates/verify/EAIA-2026-FK78B1 returns 200 with valid=true; GET /api/certificates/EAIA-2026-FK78B1/pdf returns 200 with Content-Type=application/pdf, size=26,110 bytes (>10KB), body starts with %PDF-1.7, Content-Disposition includes the certificate ID. WeasyPrint system deps (libpango/libcairo/libgdk-pixbuf) are correctly wired and rendering fine. Frontend Playwright: (1) /verify renders HeroBlobs cool variant (3 blobs), section-kicker 'Public Verification Portal' (uppercased by CSS to 'PUBLIC VERIFICATION PORTAL'), h1 'Verify a credential.' with italic serif accent on 'credential', 0 console errors, 0 page errors; (2) /certifications renders HeroBlobs gold variant (3 blobs), kickers 'Certification Ladder' + 'Renewal & CE', h1 'Eight tiers. One global standard.' with italic serif on 'global standard', 0 console errors; (3) /pricing renders HeroBlobs (3 blobs), kicker 'Pricing', h1 with italic 'scales', 3 pricing tiers visible (Explorer Free, Practitioner $29/mo, Professional Track $499 one-time), 0 console errors; (4) /enterprise/portal (post-register+create-org via API + localStorage token seed) renders HeroBlobs cool variant (3 blobs), section-kicker 'banking · OWNER' (uppercased pill), org name in italic-serif h1 at 6xl, invite code card on the right (M9DRLL34), Readiness Index / Certifications / Avg Progress / Cert Coverage stat cards, team members list, invite form, departments panel, top courses panel — 0 console errors, 0 page errors, 0 React DOM-nesting warnings. Previously-reported JSX imbalance in EnterprisePortal.jsx is confirmed FIXED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration8_pdf.py",
+    "/app/test_reports/pytest/iter8_pdf.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "EnterprisePortal.jsx (409 lines) — file is approaching the 700-line threshold but still under. Not urgent, but as more team-mgmt features get added, consider extracting SeatEditor modal + StatCard + Member row into /components/enterprise/ modules.",
+    "HeroBlobs.jsx configs object hardcodes 3-4 blob positions per variant with pixel offsets. On < 768px viewports these positions overflow the container in unexpected ways because the blobs are absolute-positioned with fixed px values, and only the outer section has overflow-hidden. For MVP it's fine but a responsive scale factor (or vw-based sizing) would harden mobile hero rendering.",
+    "assessment_router.py /certificates/{id}/pdf endpoint is publicly accessible (no auth) with a short opaque id — combined with /verify/{id} being public, this is a scraping vector. Fine if the platform intends credentials to be publicly verifiable+downloadable, but worth flagging for a future rate-limit or CAPTCHA layer.",
+    "Kicker uppercase rule: the source JSX writes 'Public Verification Portal' and CSS applies text-transform:uppercase via .section-kicker. Confirmed working — but note that if a translator ever localises these labels, the CSS uppercase will apply to non-Latin scripts too. Consider a data-attribute pattern for i18n safety.",
+    "verify/certifications/pricing hero markup pattern is now duplicated across 4+ pages (Verify.jsx, Certifications.jsx, Pricing.jsx, EnterprisePortal.jsx). Extract to a <HeroSection kicker= title= italic= variant=/> component to DRY up and to make the italic-accent + kicker pattern authoritative."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration8_pdf.py (NEW — 2 tests for existing cert EAIA-2026-FK78B1 verify + pdf export)"
+  ],
+  "success_rate": {"backend": "100% (2/2)", "frontend": "100% (4/4 pages)"},
+  "test_credentials": "Ephemeral owner test.owner+<ts>-<hex>@example.com / TestPass123! (registered per run). PDF test uses pre-existing cert EAIA-2026-FK78B1.",
+  "seed_data_creation": "1 ephemeral owner + 1 ephemeral org 'TEST Enterprise Co <ts>-<hex>' with 25 seats (invite code M9DRLL34 for this run) — created only to render the /enterprise/portal hero.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter8 test file at /app/backend/tests/test_iteration8_pdf.py — runs in <1s. Requires REACT_APP_BACKEND_URL env var: `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env | cut -d= -f2) python -m pytest backend/tests/test_iteration8_pdf.py -v -n 0`. Certificate EAIA-2026-FK78B1 is already in the DB — do not re-seed. Frontend hero verification pattern: check `.blob` count (should be 3-4), `.section-kicker` textContent (source-case, CSS uppercases), and h1 italic accent via `h1 .italic, h1 em`. To hit the auth-gated portal in Playwright, register+create-org via requests, then `localStorage.setItem('eaia_token', token)` before navigating to /enterprise/portal. All 4 hero pages have 0 console errors, 0 pageerrors, 0 DOM-nesting warnings.",
+  "rca of the issue": "N/A — all 5 test areas pass on first attempt. Prior iteration's fixes to EnterprisePortal.jsx (2 missing closing </div> tags + HeroBlobs import) and WeasyPrint system deps install are both confirmed working end-to-end."
+}
