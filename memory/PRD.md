@@ -43,7 +43,15 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - **New collections**: `organizations`, `org_members`, `org_invites`, `curriculum_patches`
 - 75/75 tests pass
 
-### Iteration 6 — Phase 4+5: Patch Review UI, Stripe Seat Ops, Skills Passport, Role Paths, Adaptive Assessments, Inline Tutor (current)
+### Iteration 7 — Try-a-lesson demo + Digest + Notifications + PDF + Visual Refresh (current)
+- **Try a Lesson (anonymous demo)** — `GET /api/demo/lesson` + `POST /api/demo/ask` (SSE, IP rate-limited 5 per 30-min). New landing widget streams Aletheia's answer with 3 suggested prompts, then converts to a "Register free" CTA on limit.
+- **Weekly Enterprise Digest** — Resend integration with graceful `no_api_key` degradation. Endpoints: `/digest/preview`, `/digest/send`, `/digest/log`. HTML email template with KPIs, top signals, pending patches, ITHR seal header.
+- **Slack + Teams patch-approval notifications** — org-level webhook URLs stored on `organizations` doc; patch-approve automatically POSTs `notify_channels()`. Endpoints: `/organizations/notifications` (GET/POST).
+- **Certificate PDF export** — `GET /api/certificates/{id}/pdf` returns WeasyPrint-rendered A4-landscape certificate with ITHR seal, gold-foil borders, embedded QR.
+- **Landing visual refresh (aiilm.me-inspired)** — removed all dark backgrounds; introduced soft warm section tints (mint/cream), pill-shaped `section-kicker` labels, numbered `.step-card` treatments with big serif numerals. New "How the Academy works" 3-step section, refreshed Certification Ladder + Intelligence Desk sections.
+- **13/13 backend pytest + full frontend E2E scenarios pass** (iteration_7.json).
+
+
 - **Curriculum Patch Review UI** at `/patches` — list + filter (pending/approved/rejected), inline preview, approve/reject actions.
 - **Stripe seat operations** in Enterprise Portal:
   - `POST /api/enterprise/organizations/seats/preview` — real-time charge/credit preview.
