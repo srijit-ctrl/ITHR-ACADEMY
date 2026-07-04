@@ -12,7 +12,7 @@ from starlette.middleware.cors import CORSMiddleware
 from core import db, logger, mongo_client, now_iso
 from routers import (
     assessment_router, auth_router, catalog_router, checkout_router,
-    dashboard_router, enterprise_router, intelligence_router,
+    dashboard_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, paths_router,
     recommendation_router, tutor_router,
 )
@@ -131,6 +131,7 @@ for r in (
     intelligence_router.router,
     checkout_router.router,
     enterprise_router.router,
+    digest_router.router,
 ):
     app.include_router(r)
 

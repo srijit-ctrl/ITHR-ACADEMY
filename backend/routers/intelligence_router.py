@@ -186,10 +186,46 @@ async def decide_patch(patch_id: str, payload: dict, user_id: str = Depends(get_
     decision = payload.get("decision")
     if decision not in ("approved", "rejected"):
         raise HTTPException(status_code=400, detail="decision must be 'approved' or 'rejected'")
-    result = await db.curriculum_patches.update_one(
-        {"id": patch_id},
-        {"$set": {"status": decision, "reviewed_at": now_iso()}},
-    )
-    if result.matched_count == 0:
+    patch = await db.curriculum_patches.find_one({"id": patch_id}, {"_id": 0})
+    if not patch:
         raise HTTPException(status_code=404, detail="Patch not found")
+    await db.curriculum_patches.update_one(
+        {"id": patch_id},
+        {"$set": {"status": decision, "reviewed_at": now_iso(), "reviewed_by": user_id}},
+    )
+
+    # Fire notifications to org channels (best-effort, non-blocking failure)
+    if decision == "approved":
+        try:
+            from notifications import notify_channels
+            # Notify every org that has webhooks + notify_on_patch_approval enabled
+            orgs_cursor = db.organizations.find(
+                {"$or": [{"slack_webhook_url": {"$ne": None}},
+                         {"teams_webhook_url": {"$ne": None}}],
+                 "notify_on_patch_approval": {"$ne": False}},
+                {"_id": 0, "slack_webhook_url": 1, "teams_webhook_url": 1, "name": 1, "id": 1},
+            )
+            reviewer = await db.users.find_one({"id": user_id}, {"_id": 0, "full_name": 1})
+            reviewer_name = (reviewer or {}).get("full_name", "an editor")
+            title = f"Curriculum patch approved · {patch.get('course_slug')}"
+            text = (
+                f"*{patch.get('proposed_title','(untitled)')}*\n"
+                f"Signal: {patch.get('signal_title','')}\n"
+                f"Module: {patch.get('module_number')} · Reviewer: {reviewer_name}"
+            )
+            facts = [
+                {"name": "Course", "value": patch.get("course_slug", "")},
+                {"name": "Module", "value": str(patch.get("module_number", "-"))},
+                {"name": "Reviewer", "value": reviewer_name},
+                {"name": "Type", "value": patch.get("patch_type", "module_update")},
+            ]
+            async for org in orgs_cursor:
+                await notify_channels(
+                    slack_url=org.get("slack_webhook_url"),
+                    teams_url=org.get("teams_webhook_url"),
+                    title=title, text=text, facts=facts,
+                )
+        except Exception:
+            logger.exception("Patch approval notifications failed (non-fatal)")
+
     return {"status": decision, "patch_id": patch_id}

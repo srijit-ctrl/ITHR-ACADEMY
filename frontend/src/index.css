@@ -233,7 +233,55 @@
     }
 }
 
-/* subtle background grain */
+/* aiilm-style warm section tints (no dark backgrounds anywhere) */
+.section-warm-1 { background: linear-gradient(180deg, hsl(38 60% 97%) 0%, hsl(174 30% 96%) 100%); }
+.section-warm-2 { background: linear-gradient(180deg, hsl(210 35% 97%) 0%, hsl(210 40% 94%) 100%); }
+.section-warm-3 { background: linear-gradient(180deg, hsl(41 65% 96%) 0%, hsl(41 55% 92%) 100%); }
+.section-warm-mint { background: hsl(174 40% 96%); }
+.section-warm-cream { background: hsl(38 50% 96%); }
+
+.step-numeral {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 88px;
+    line-height: 0.8;
+    color: hsl(var(--brand));
+    opacity: 0.15;
+}
+
+/* Numbered aiilm-style step card */
+.step-card {
+    position: relative;
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    border-radius: 16px;
+    padding: 32px;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.step-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -20px hsl(var(--foreground) / 0.15);
+}
+.step-card .step-num {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 64px;
+    line-height: 1;
+    color: hsl(var(--brand) / 0.2);
+}
+.section-kicker {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: hsl(var(--brand) / 0.1);
+    color: hsl(var(--brand));
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+}
 .grain {
     position: relative;
 }

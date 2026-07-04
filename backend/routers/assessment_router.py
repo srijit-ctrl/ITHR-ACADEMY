@@ -276,3 +276,202 @@ async def certificate_qr(certificate_id: str):
     buf = io.BytesIO()
     qr.save(buf, kind="svg", scale=6, dark="#0d1321", light="#ffffff", border=2, xmldecl=False)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")
+
+
+@router.get("/certificates/{certificate_id}/pdf")
+async def certificate_pdf(certificate_id: str):
+    """Server-rendered, print-ready PDF of a certificate.
+
+    Uses WeasyPrint to render an A4-landscape HTML template with the ITHR seal,
+    gold accents, and embedded QR (base64 SVG). Public — anyone with the ID
+    can download since the credential is already publicly verifiable.
+    """
+    cert = await db.certificates.find_one(
+        {"certificate_id": certificate_id}, {"_id": 0}
+    )
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificate not found")
+
+    import base64
+    import os
+    from datetime import datetime
+
+    from weasyprint import HTML
+
+    # Generate QR SVG inline
+    base_url = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
+    verify_url = f"{base_url}/verify/{certificate_id}" if base_url else f"/verify/{certificate_id}"
+    qr_buf = io.BytesIO()
+    segno.make(verify_url, error="H").save(qr_buf, kind="svg", scale=6, dark="#0d1321", light="#ffffff", border=1, xmldecl=False)
+    qr_b64 = base64.b64encode(qr_buf.getvalue()).decode("ascii")
+
+    issued_raw = cert.get("issued_at", "")
+    try:
+        issued = datetime.fromisoformat(issued_raw.replace("Z", "+00:00")).strftime("%B %d, %Y")
+    except Exception:
+        issued = issued_raw[:10]
+
+    html = _CERT_PDF_TEMPLATE.format(
+        holder=_html_escape(cert["user_name"]),
+        course=_html_escape(cert["course_title"]),
+        score=cert.get("score", 0),
+        cert_id=_html_escape(cert["certificate_id"]),
+        issued=issued,
+        qr_b64=qr_b64,
+        verify_url=_html_escape(verify_url),
+    )
+
+    pdf_buf = io.BytesIO()
+    HTML(string=html).write_pdf(pdf_buf)
+    return Response(
+        content=pdf_buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="ITHR-{certificate_id}.pdf"'},
+    )
+
+
+def _html_escape(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_CERT_PDF_TEMPLATE = r"""
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  @page {{ size: A4 landscape; margin: 0; }}
+  body {{ margin: 0; font-family: 'Helvetica', Arial, sans-serif; color: #0d1321; }}
+  .sheet {{
+    width: 297mm; height: 210mm; padding: 18mm 22mm;
+    box-sizing: border-box; position: relative;
+    background: #ffffff;
+    background-image:
+      linear-gradient(0deg, transparent 24%, rgba(0,168,151,0.02) 25%, rgba(0,168,151,0.02) 26%, transparent 27%, transparent 74%, rgba(0,168,151,0.02) 75%, rgba(0,168,151,0.02) 76%, transparent 77%);
+    background-size: 100% 60px;
+  }}
+  /* Ornamental gold borders */
+  .sheet::before, .sheet::after {{
+    content: ''; position: absolute; left: 10mm; right: 10mm; height: 3mm;
+    background: linear-gradient(90deg, transparent, #d4a836 20%, #d4a836 80%, transparent);
+  }}
+  .sheet::before {{ top: 8mm; }}
+  .sheet::after  {{ bottom: 8mm; }}
+
+  /* Inner double rule */
+  .inner-rule {{
+    position: absolute; inset: 14mm 18mm; border: 0.6mm solid #d4a836;
+    box-shadow: inset 0 0 0 1mm #ffffff, inset 0 0 0 1.4mm #0d1321;
+    pointer-events: none;
+  }}
+
+  .header {{
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8mm; position: relative;
+  }}
+  .brand-lockup {{ display: flex; align-items: center; gap: 6mm; }}
+  .seal {{
+    width: 28mm; height: 28mm; border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, #1a2540 0%, #0d1321 100%);
+    box-shadow: 0 0 0 1mm #d4a836, 0 0 0 1.6mm #ffffff, 0 0 0 1.9mm #d4a836;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #ffffff; text-align: center;
+  }}
+  .seal-est   {{ font-size: 6pt; letter-spacing: 2pt; color: #d4a836; text-transform: uppercase; }}
+  .seal-mark  {{ font-family: 'Georgia', serif; font-size: 14pt; letter-spacing: 1pt; margin: 1mm 0; }}
+  .seal-tag   {{ font-size: 5pt; letter-spacing: 1.5pt; color: rgba(255,255,255,0.8); text-transform: uppercase; }}
+  .seal-line  {{ width: 8mm; height: 0.3mm; background: #d4a836; margin: 1mm 0; }}
+
+  .brand-name    {{ font-family: 'Georgia', serif; font-size: 22pt; letter-spacing: -0.5pt; margin: 0; }}
+  .brand-name .accent {{ color: #00a897; }}
+  .brand-tag     {{ font-size: 8pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; margin-top: 1.5mm; }}
+
+  .award-block  {{ text-align: right; }}
+  .award-title  {{ font-size: 8pt; letter-spacing: 3pt; color: #d4a836; text-transform: uppercase; }}
+  .award-num    {{ font-family: 'Georgia', serif; font-size: 18pt; }}
+
+  .body {{ text-align: center; margin-top: 6mm; position: relative; }}
+  .presents  {{ font-size: 9pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; }}
+  .holder    {{ font-family: 'Georgia', serif; font-size: 48pt; letter-spacing: -1pt; margin: 4mm 0; color: #0d1321; }}
+  .completed {{ font-size: 9pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; margin-top: 2mm; }}
+  .course    {{ font-family: 'Georgia', serif; font-style: italic; font-size: 22pt; margin: 4mm 0 3mm; color: #00a897; }}
+  .score     {{ font-size: 11pt; color: #4a5768; }}
+  .score b   {{ color: #0d1321; }}
+
+  .divider-gold {{
+    width: 40mm; height: 0.4mm;
+    background: linear-gradient(90deg, transparent, #d4a836, transparent);
+    margin: 6mm auto;
+  }}
+
+  .footer {{
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-top: 6mm; position: relative;
+  }}
+  .fact {{ font-size: 8pt; }}
+  .fact-label {{ letter-spacing: 2pt; color: #7d8ba0; text-transform: uppercase; font-size: 6.5pt; margin-bottom: 1mm; }}
+  .fact-value {{ font-family: 'Courier', monospace; color: #0d1321; }}
+
+  .qr-frame {{
+    padding: 2mm; border: 0.5mm solid #d4a836; background: #ffffff;
+  }}
+  .qr-frame img {{ width: 24mm; height: 24mm; display: block; }}
+
+  .signature-line {{ border-top: 0.3mm solid #0d1321; padding-top: 1.5mm; width: 55mm; text-align: center; font-family: 'Georgia', serif; font-style: italic; }}
+  .signature-role {{ font-size: 7pt; letter-spacing: 2pt; color: #7d8ba0; text-transform: uppercase; margin-top: 1mm; }}
+</style></head>
+<body>
+  <div class="sheet">
+    <div class="inner-rule"></div>
+
+    <div class="header">
+      <div class="brand-lockup">
+        <div class="seal">
+          <div class="seal-est">Est. 2026</div>
+          <div class="seal-mark">ITHR</div>
+          <div class="seal-line"></div>
+          <div class="seal-tag">Academy</div>
+        </div>
+        <div>
+          <div class="brand-name">ITHR <span class="accent">Academy</span></div>
+          <div class="brand-tag">Enterprise Agentic AI · Certification Authority</div>
+        </div>
+      </div>
+      <div class="award-block">
+        <div class="award-title">Certificate</div>
+        <div class="award-num">of Achievement</div>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="presents">This is to certify that</div>
+      <div class="holder">{holder}</div>
+      <div class="completed">has successfully completed the program</div>
+      <div class="course">{course}</div>
+      <div class="score">with a score of <b>{score}%</b></div>
+      <div class="divider-gold"></div>
+    </div>
+
+    <div class="footer">
+      <div>
+        <div class="signature-line">Reyes Al-Fahad</div>
+        <div class="signature-role">Chief Learning Officer · ITHR</div>
+      </div>
+
+      <div style="text-align:center;">
+        <div class="fact">
+          <div class="fact-label">Credential ID</div>
+          <div class="fact-value">{cert_id}</div>
+        </div>
+        <div class="fact" style="margin-top:3mm;">
+          <div class="fact-label">Issued</div>
+          <div class="fact-value">{issued}</div>
+        </div>
+        <div style="font-size:7pt;color:#7d8ba0;margin-top:3mm;">Verify at {verify_url}</div>
+      </div>
+
+      <div class="qr-frame">
+        <img src="data:image/svg+xml;base64,{qr_b64}" alt="QR" />
+      </div>
+    </div>
+  </div>
+</body></html>
+"""

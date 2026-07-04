@@ -111,11 +111,50 @@ export default function Landing() {
                 </div>
             </section>
 
+            {/* HOW IT WORKS — aiilm-style numbered steps */}
+            <section className="section-warm-mint py-24">
+                <div className="container-page">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        <span className="section-kicker">Three ways in</span>
+                        <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-tight">
+                            How the Academy works.
+                        </h2>
+                        <p className="mt-4 text-muted-foreground text-lg">
+                            Anchor to a role, learn with a tutor, and prove your competency — in weeks, not years.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[
+                            {
+                                num: "01", icon: "🧭", title: "Anchor to your role",
+                                desc: "Pick a role-based track — Product Manager, Engineer, Risk Officer, HR, Banking, Healthcare, Executive — and let the curriculum sequence itself for you.",
+                            },
+                            {
+                                num: "02", icon: "🎯", title: "Learn with an AI Tutor",
+                                desc: "Aletheia sits inside every lesson to explain, quiz, and coach. Solon, your career mentor, plans your next credential and 90-day project.",
+                            },
+                            {
+                                num: "03", icon: "🏅", title: "Prove it. Publicly.",
+                                desc: "Pass adaptive assessments to earn cryptographically-verifiable credentials. Share a public AI Skills Passport on LinkedIn or your résumé.",
+                            },
+                        ].map((s) => (
+                            <div key={s.num} className="step-card" data-testid={`how-step-${s.num}`}>
+                                <div className="step-num">{s.num}</div>
+                                <div className="text-4xl mb-4">{s.icon}</div>
+                                <h3 className="font-serif text-2xl tracking-tight mb-3">{s.title}</h3>
+                                <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* FEATURED COURSES */}
             <section className="container-page py-24">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-10 mb-12">
                     <div className="md:col-span-8">
-                        <div className="overline mb-4 fine-rule pl-4">Featured Curriculum</div>
+                        <span className="section-kicker">Featured Curriculum</span>
                         <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">
                             Rigorous coursework.<br />
                             Written by practitioners.
@@ -134,11 +173,11 @@ export default function Landing() {
             </section>
 
             {/* CERTIFICATION LADDER */}
-            <section className="border-y border-border bg-surface-alt/40 py-24">
+            <section className="section-warm-cream border-y border-border py-24">
                 <div className="container-page">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-10 mb-14">
                         <div className="md:col-span-6">
-                            <div className="overline mb-4 fine-rule pl-4">The Certification Ladder</div>
+                            <span className="section-kicker">The Certification Ladder</span>
                             <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">
                                 Eight tiers.<br />
                                 From analyst to <span className="italic text-brand">CAIO</span>.
@@ -153,11 +192,9 @@ export default function Landing() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {CERT_TIERS.map((t) => (
-                            <div key={t.title} className="card-flat p-8" data-testid={`cert-tier-${t.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                                <div className="flex items-baseline gap-3 mb-4">
-                                    <span className="font-serif text-4xl text-brand leading-none">{t.tier}</span>
-                                    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Tier</span>
-                                </div>
+                            <div key={t.title} className="step-card" data-testid={`cert-tier-${t.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                                <div className="step-num">{t.tier}</div>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-gold-deep mb-2">Tier {t.tier}</div>
                                 <div className="font-serif text-2xl tracking-tight mb-2">{t.title}</div>
                                 <p className="text-sm text-muted-foreground leading-relaxed">{t.desc}</p>
                             </div>
@@ -222,25 +259,25 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* REAL-TIME INTELLIGENCE */}
-            <section className="border-t border-border bg-foreground text-background">
+            {/* REAL-TIME INTELLIGENCE — light teal instead of black */}
+            <section className="section-warm-mint border-t border-border">
                 <div className="container-page py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                     <div className="lg:col-span-6">
                         <div className="flex items-center gap-2 mb-4">
                             <Radio className="w-4 h-4 text-brand animate-pulse" />
-                            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-brand">ITHR Intelligence Desk</span>
+                            <span className="section-kicker mb-0">ITHR Intelligence Desk</span>
                         </div>
                         <h2 className="font-serif text-4xl md:text-6xl tracking-tighter leading-[1.02] mb-6">
                             Curriculum that <span className="italic text-brand">refreshes itself.</span>
                         </h2>
-                        <p className="text-lg opacity-80 leading-relaxed mb-8 max-w-xl">
+                        <p className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-xl">
                             Agentic AI moves weekly. ITHR&apos;s Intelligence Desk — a Claude-powered analyst agent — scans the frontier every 6 hours and pushes signals into your curriculum. Model releases, regulation, enterprise deployments: nothing goes stale.
                         </p>
                         <div className="flex gap-3">
                             <Link to="/intelligence" data-testid="landing-intel-cta" className="btn-primary">
                                 See today&apos;s briefing <ArrowRight className="w-4 h-4" />
                             </Link>
-                            <Link to="/pricing" data-testid="landing-pricing-cta" className="inline-flex items-center gap-2 border border-white/30 hover:border-brand hover:text-brand text-white rounded-sm px-6 py-3 font-medium transition-colors">
+                            <Link to="/pricing" data-testid="landing-pricing-cta" className="btn-outline">
                                 See pricing
                             </Link>
                         </div>
@@ -252,13 +289,13 @@ export default function Landing() {
                             { impact: "High", cat: "Model Release", title: "Anthropic ships Claude 4.6 with 500k-token task budgets", action: "Add coverage in Module 4 (LLMs Powering Agents)" },
                             { impact: "Medium", cat: "Framework", title: "MCP 2.0 adds signed capability manifests", action: "Update MCP examples in Module 3" },
                         ].map((s, i) => (
-                            <div key={i} className="border border-white/10 p-5 hover:border-brand transition-colors">
+                            <div key={i} className="bg-surface border border-border rounded-2xl p-5 hover:border-brand hover:-translate-y-0.5 transition-all">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/60">{s.cat}</span>
-                                    <span className={`text-[10px] font-mono uppercase tracking-[0.15em] px-2 py-0.5 ${s.impact === "Critical" ? "bg-destructive" : s.impact === "High" ? "bg-brand" : "bg-white/10"}`}>{s.impact}</span>
+                                    <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">{s.cat}</span>
+                                    <span className={`text-[10px] font-mono uppercase tracking-[0.15em] px-2 py-0.5 rounded-full ${s.impact === "Critical" ? "bg-destructive text-white" : s.impact === "High" ? "bg-brand text-white" : "bg-surface-alt"}`}>{s.impact}</span>
                                 </div>
                                 <div className="font-serif text-lg leading-tight mb-2">{s.title}</div>
-                                <div className="text-xs opacity-70 flex items-center gap-2"><Zap className="w-3 h-3 text-brand" />{s.action}</div>
+                                <div className="text-xs text-muted-foreground flex items-center gap-2"><Zap className="w-3 h-3 text-brand" />{s.action}</div>
                             </div>
                         ))}
                     </div>
