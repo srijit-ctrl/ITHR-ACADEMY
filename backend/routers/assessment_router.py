@@ -47,13 +47,15 @@ async def start_assessment_session(
     slug: str,
     count: int = Query(DEFAULT_QUESTIONS_PER_ATTEMPT, ge=5, le=40),
     seed: Optional[int] = None,
+    adaptive: bool = Query(True, description="If true, weight question selection by learner's prior attempts"),
     user_id: str = Depends(get_current_user_id),
 ):
     """Return a randomized paper for this attempt.
 
-    Client uses the returned question IDs + option indices as-is; when
-    submitting we look up the original course quiz and decode the option
-    permutation via the shipped map.
+    Adaptive mode:
+    - New learner (no prior attempts): 60% beginner, 30% intermediate, 10% advanced
+    - Passed prior attempt: escalate — 20% beginner, 50% intermediate, 30% advanced
+    - Failed prior attempt: reinforce — 55% beginner, 35% intermediate, 10% advanced
     """
     course = await db.courses.find_one({"slug": slug}, {"_id": 0})
     if not course:
@@ -63,12 +65,54 @@ async def start_assessment_session(
         raise HTTPException(status_code=400, detail="No assessment available for this course")
 
     rng = random.Random(seed or random.SystemRandom().randint(0, 2**32 - 1))
-    pool = list(bank)
-    rng.shuffle(pool)
-    picked = pool[: min(count, len(pool))]
+
+    if adaptive:
+        # Look at learner's history on this course to shape difficulty mix
+        history = await db.quiz_attempts.find(
+            {"user_id": user_id, "course_id": course["id"]},
+            {"_id": 0, "passed": 1, "score": 1},
+        ).sort("attempted_at", -1).to_list(5)
+
+        if not history:
+            mix = {"beginner": 0.60, "intermediate": 0.30, "advanced": 0.10}
+            mode = "onboarding"
+        elif history[0].get("passed"):
+            mix = {"beginner": 0.20, "intermediate": 0.50, "advanced": 0.30}
+            mode = "escalate"
+        else:
+            mix = {"beginner": 0.55, "intermediate": 0.35, "advanced": 0.10}
+            mode = "reinforce"
+
+        # Bucket bank
+        buckets = {"beginner": [], "intermediate": [], "advanced": []}
+        for q in bank:
+            d = (q.get("difficulty") or "intermediate").lower()
+            if d not in buckets:
+                d = "intermediate"
+            buckets[d].append(q)
+        for k in buckets:
+            rng.shuffle(buckets[k])
+
+        # Draw with fallback to nearby buckets if a bucket is short
+        picked = []
+        for level, weight in mix.items():
+            target = round(count * weight)
+            picked.extend(buckets[level][:target])
+            buckets[level] = buckets[level][target:]
+        # top up with any leftover
+        leftover = buckets["intermediate"] + buckets["beginner"] + buckets["advanced"]
+        rng.shuffle(leftover)
+        while len(picked) < count and leftover:
+            picked.append(leftover.pop())
+        rng.shuffle(picked)
+    else:
+        mode = "random"
+        pool = list(bank)
+        rng.shuffle(pool)
+        picked = pool[: min(count, len(pool))]
+
     shuffled = [_shuffle_options(q, rng) for q in picked]
 
-    # Do NOT reveal `correct` or `explanation` to client; keep permutation for submit-side mapping.
     client_view = [
         {
             "id": q["id"],
@@ -88,6 +132,7 @@ async def start_assessment_session(
         "duration_minutes": 30,
         "total": len(client_view),
         "bank_size": len(bank),
+        "adaptive_mode": mode,
         "questions": client_view,
     }
 

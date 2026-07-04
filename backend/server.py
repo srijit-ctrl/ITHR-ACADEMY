@@ -13,7 +13,8 @@ from core import db, logger, mongo_client, now_iso
 from routers import (
     assessment_router, auth_router, catalog_router, checkout_router,
     dashboard_router, enterprise_router, intelligence_router,
-    mentor_router, recommendation_router, tutor_router,
+    mentor_router, passport_router, paths_router,
+    recommendation_router, tutor_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
 
@@ -55,7 +56,14 @@ async def seed_database():
         days_ago = seed_hash % 45
         reviewed_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
         doc["last_reviewed_at"] = reviewed_at.isoformat()
-        await db.courses.update_one({"slug": full.slug}, {"$set": doc}, upsert=True)
+        # Preserve existing extended quiz bank on upsert: use $setOnInsert for quiz
+        # so seed_assessments' extra questions survive restarts.
+        quiz_default = doc.pop("quiz", [])
+        await db.courses.update_one(
+            {"slug": full.slug},
+            {"$set": doc, "$setOnInsert": {"quiz": quiz_default}},
+            upsert=True,
+        )
         full_slugs.add(full.slug)
 
     logger.info(f"Upserted {len(full_slugs)} full courses.")
@@ -96,6 +104,7 @@ async def seed_database():
     await db.organizations.create_index("invite_code", unique=True)
     await db.org_members.create_index([("org_id", 1), ("user_id", 1)], unique=True)
     await db.rec_rationales.create_index("key", unique=True)
+    await db.users.create_index("passport_slug", unique=True, sparse=True)
 
     # Seed randomized assessment banks (idempotent)
     from seed_assessments import seed_all as seed_assessment_banks
@@ -117,6 +126,8 @@ for r in (
     tutor_router.router,
     mentor_router.router,
     recommendation_router.router,
+    paths_router.router,
+    passport_router.router,
     intelligence_router.router,
     checkout_router.router,
     enterprise_router.router,

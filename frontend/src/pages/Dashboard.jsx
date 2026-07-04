@@ -71,6 +71,16 @@ export default function Dashboard() {
                         </div>
                         <ExternalLink className="w-4 h-4 text-muted-foreground" />
                     </Link>
+                    <Link to="/passport" data-testid="dashboard-passport-link" className="card-flat p-4 col-span-2 flex items-center justify-between hover:border-brand transition-colors">
+                        <div className="flex items-center gap-3">
+                            <Award className="w-4 h-4 text-brand" />
+                            <div>
+                                <div className="font-serif text-sm leading-none">AI Skills Passport</div>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Portable · verifiable · shareable</div>
+                            </div>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                    </Link>
                 </div>
             </div>
 

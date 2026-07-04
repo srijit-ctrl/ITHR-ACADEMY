@@ -2,7 +2,7 @@
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from auth import get_current_user_id
 from core import db, gen_invite_code, logger, now_iso
@@ -241,24 +241,206 @@ async def team_dashboard(user_id: str = Depends(get_current_user_id)):
 
 
 # -------------------- Seat management --------------------
+SEAT_PRICE_PER_MONTH = 18.00
+
+
+@router.post("/organizations/seats/preview")
+async def preview_seats(payload: dict, user_id: str = Depends(get_current_user_id)):
+    """Preview financial impact of a seat change before checkout."""
+    org, member = await _resolve_org_for_user(user_id, require_admin=True)
+    new_count = int(payload.get("seat_count", 0))
+    current = org.get("seat_count", 25)
+    delta = new_count - current
+    result = {
+        "current_seat_count": current,
+        "new_seat_count": new_count,
+        "delta": delta,
+        "unit_price_monthly": SEAT_PRICE_PER_MONTH,
+    }
+    if delta > 0:
+        result["charge_now"] = round(delta * SEAT_PRICE_PER_MONTH, 2)
+        result["action"] = "checkout"
+        result["message"] = f"Adding {delta} seats: ${result['charge_now']:.2f}/month starting now (prorated on renewal)."
+    elif delta < 0:
+        result["credit_note"] = round(abs(delta) * SEAT_PRICE_PER_MONTH, 2)
+        result["action"] = "credit"
+        result["message"] = f"Removing {abs(delta)} seats: a prorated credit of up to ${result['credit_note']:.2f} will apply on next renewal."
+    else:
+        result["action"] = "noop"
+        result["message"] = "No change."
+    return result
+
+
 @router.post("/organizations/seats")
-async def update_seats(payload: dict, user_id: str = Depends(get_current_user_id)):
-    """Adjust seat count (owner only). In production this would trigger a Stripe subscription update."""
+async def update_seats(payload: dict, request: Request, user_id: str = Depends(get_current_user_id)):
+    """Adjust seat count (owner only).
+
+    Owner-side flow:
+      - INCREASE: returns a Stripe Checkout URL for the incremental cost.
+        Seats are NOT bumped until webhook / status check flags the txn paid.
+      - DECREASE: seat_count is set immediately, prorated credit line noted.
+      - NOOP: returns unchanged.
+    """
     org, member = await _resolve_org_for_user(user_id, require_admin=True)
     if member["role"] != "owner":
         raise HTTPException(status_code=403, detail="Only the owner may adjust seats")
 
     new_count = int(payload.get("seat_count", 0))
+    origin_url = (payload.get("origin_url") or "").rstrip("/")
     if new_count < org.get("seats_used", 0):
-        raise HTTPException(status_code=400, detail=f"Cannot reduce below current usage ({org.get('seats_used', 0)} seats used)")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reduce below current usage ({org.get('seats_used', 0)} seats used)",
+        )
     if new_count > 5000:
         raise HTTPException(status_code=400, detail="Contact ITHR sales for >5000 seats")
     if new_count < 10:
         raise HTTPException(status_code=400, detail="Team plans require minimum 10 seats")
 
-    await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
-    org["seat_count"] = new_count
-    return {"organization": org, "message": f"Seat count updated to {new_count}"}
+    current = org.get("seat_count", 25)
+    delta = new_count - current
+
+    # DECREASE — apply immediately + record prorated credit line
+    if delta < 0:
+        credit_amount = round(abs(delta) * SEAT_PRICE_PER_MONTH, 2)
+        await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
+        credit_doc = {
+            "id": __import__("uuid").uuid4().hex,
+            "org_id": org["id"],
+            "type": "prorated_credit",
+            "seats_removed": abs(delta),
+            "amount": credit_amount,
+            "currency": "usd",
+            "note": f"Prorated credit for removing {abs(delta)} seats.",
+            "created_by": user_id,
+            "created_at": now_iso(),
+        }
+        await db.org_billing_events.insert_one(credit_doc)
+        credit_doc.pop("_id", None)
+        org["seat_count"] = new_count
+        return {
+            "organization": org,
+            "action": "credit",
+            "message": f"Seat count reduced to {new_count}. Prorated credit of ${credit_amount:.2f} will apply on next renewal.",
+            "credit_note": credit_doc,
+        }
+
+    if delta == 0:
+        return {"organization": org, "action": "noop", "message": "No change."}
+
+    # INCREASE — create a Stripe checkout for the incremental amount
+    if not origin_url:
+        raise HTTPException(status_code=400, detail="origin_url required for seat increases")
+
+    from core import get_stripe
+    from emergentintegrations.payments.stripe.checkout import CheckoutSessionRequest
+
+    amount = round(delta * SEAT_PRICE_PER_MONTH, 2)
+    success_url = f"{origin_url}/enterprise/portal?seats_added={delta}&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/enterprise/portal"
+    metadata = {
+        "user_id": user_id,
+        "org_id": org["id"],
+        "package_id": "team_seat_increment",
+        "seats_delta": str(delta),
+        "target_seat_count": str(new_count),
+        "type": "seat_increment",
+    }
+    stripe = get_stripe(request)
+    try:
+        session = await stripe.create_checkout_session(
+            CheckoutSessionRequest(
+                amount=amount, currency="usd",
+                success_url=success_url, cancel_url=cancel_url,
+                metadata=metadata,
+            )
+        )
+    except Exception as e:
+        logger.exception("Stripe seat-increment session failed")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
+
+    # Track the pending seat purchase so status webhook can fulfill it
+    await db.payment_transactions.insert_one({
+        "session_id": session.session_id,
+        "user_id": user_id,
+        "org_id": org["id"],
+        "type": "seat_increment",
+        "package_id": "team_seat_increment",
+        "seats_delta": delta,
+        "target_seat_count": new_count,
+        "amount": amount, "currency": "usd",
+        "payment_status": "initiated", "status": "pending",
+        "metadata": metadata,
+        "created_at": now_iso(),
+    })
+
+    return {
+        "organization": org,
+        "action": "checkout",
+        "checkout_url": session.url,
+        "session_id": session.session_id,
+        "amount": amount,
+        "seats_delta": delta,
+        "message": f"Complete checkout to add {delta} seats (${amount:.2f}/month).",
+    }
+
+
+@router.post("/organizations/seats/fulfill/{session_id}")
+async def fulfill_seat_increment(session_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
+    """Called by the client on redirect back to portal — verifies checkout and bumps seat count."""
+    org, member = await _resolve_org_for_user(user_id, require_admin=True)
+    if member["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner may fulfill seat purchases")
+
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not txn or txn.get("type") != "seat_increment":
+        raise HTTPException(status_code=404, detail="Seat increment transaction not found")
+    if txn.get("org_id") != org["id"]:
+        raise HTTPException(status_code=403, detail="This transaction does not belong to your org")
+
+    if txn.get("payment_status") == "paid" and txn.get("fulfilled_at"):
+        return {"already_fulfilled": True, "seat_count": org.get("seat_count")}
+
+    from core import get_stripe
+    stripe = get_stripe(request)
+    try:
+        status_resp = await stripe.get_checkout_status(session_id)
+    except Exception as e:
+        logger.exception("Stripe seat-increment status failed")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
+
+    updates = {"payment_status": status_resp.payment_status, "status": status_resp.status, "updated_at": now_iso()}
+    if status_resp.payment_status == "paid":
+        new_count = int(txn["target_seat_count"])
+        await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
+        await db.org_billing_events.insert_one({
+            "id": __import__("uuid").uuid4().hex,
+            "org_id": org["id"],
+            "type": "seat_increment_paid",
+            "seats_added": int(txn["seats_delta"]),
+            "amount": txn["amount"],
+            "currency": txn["currency"],
+            "session_id": session_id,
+            "created_at": now_iso(),
+        })
+        updates["fulfilled_at"] = now_iso()
+        org["seat_count"] = new_count
+
+    await db.payment_transactions.update_one({"session_id": session_id}, {"$set": updates})
+    return {
+        "fulfilled": status_resp.payment_status == "paid",
+        "payment_status": status_resp.payment_status,
+        "seat_count": org.get("seat_count"),
+    }
+
+
+@router.get("/organizations/billing")
+async def list_billing_events(user_id: str = Depends(get_current_user_id)):
+    org, _ = await _resolve_org_for_user(user_id, require_admin=True)
+    events = await db.org_billing_events.find(
+        {"org_id": org["id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+    return {"events": events}
 
 
 @router.delete("/organizations/members/{member_id}")

@@ -27,6 +27,10 @@ import EnterprisePortal from "@/pages/EnterprisePortal";
 import EnterpriseSetup from "@/pages/EnterpriseSetup";
 import EnterpriseJoin from "@/pages/EnterpriseJoin";
 import Mentor from "@/pages/Mentor";
+import Paths from "@/pages/Paths";
+import PathDetail from "@/pages/PathDetail";
+import Passport from "@/pages/Passport";
+import PatchReview from "@/pages/PatchReview";
 
 function AppShell() {
     const location = useLocation();
@@ -61,6 +65,11 @@ function AppShell() {
 
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />
+                    <Route path="/paths" element={<Paths />} />
+                    <Route path="/paths/:slug" element={<PathDetail />} />
+                    <Route path="/passport" element={<ProtectedRoute><Passport /></ProtectedRoute>} />
+                    <Route path="/passport/:slug" element={<Passport />} />
+                    <Route path="/patches" element={<ProtectedRoute><PatchReview /></ProtectedRoute>} />
                     <Route path="/learn/:slug/:moduleId/:lessonId" element={<ProtectedRoute><LessonViewer /></ProtectedRoute>} />
                     <Route path="/quiz/:slug" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
                     <Route path="/certificate/:certId" element={<ProtectedRoute><Certificate /></ProtectedRoute>} />

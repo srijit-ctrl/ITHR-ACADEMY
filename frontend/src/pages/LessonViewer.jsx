@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, Award, Loader2 } from "lucide-react";
+import InlineTutor from "@/components/InlineTutor";
 
 export default function LessonViewer() {
     const { slug, moduleId, lessonId } = useParams();
@@ -145,6 +146,9 @@ export default function LessonViewer() {
                         </ul>
                     </div>
                 )}
+
+                {/* Inline AI Tutor (Aletheia) — contextual to this lesson */}
+                <InlineTutor courseSlug={slug} lesson={lesson} moduleTitle={module.title} />
 
                 {/* Actions */}
                 <div className="mt-14 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-8 border-t border-border">

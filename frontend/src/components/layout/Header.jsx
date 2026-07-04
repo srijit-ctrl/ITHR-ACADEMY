@@ -5,10 +5,10 @@ import { Sparkles, LogOut, User as UserIcon } from "lucide-react";
 export const ITHR_LOGO_URL = "https://customer-assets.emergentagent.com/job_enterprise-ai-learn-2/artifacts/8f0fkfxa_ITHR_Logo_FullColor_1500px.png";
 
 const navItems = [
+    { to: "/paths", label: "Learning paths" },
     { to: "/courses", label: "Catalog" },
     { to: "/intelligence", label: "Intelligence" },
     { to: "/mentor", label: "Mentor" },
-    { to: "/industries", label: "Industries" },
     { to: "/certifications", label: "Certifications" },
     { to: "/pricing", label: "Pricing" },
     { to: "/enterprise", label: "For Enterprise" },

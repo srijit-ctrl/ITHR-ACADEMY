@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
-import { Building2, Users, Award, TrendingUp, Copy, Plus, X, Loader2, ArrowRight, Trash2 } from "lucide-react";
+import { Building2, Users, Award, TrendingUp, Copy, Plus, Loader2, ArrowRight, Trash2, Settings, Receipt, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 export default function EnterprisePortal() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
@@ -14,6 +16,11 @@ export default function EnterprisePortal() {
     const [inviting, setInviting] = useState(false);
     const [inviteError, setInviteError] = useState("");
     const [copied, setCopied] = useState(false);
+    const [showSeatEditor, setShowSeatEditor] = useState(false);
+    const [seatTarget, setSeatTarget] = useState(0);
+    const [seatPreview, setSeatPreview] = useState(null);
+    const [seatBusy, setSeatBusy] = useState(false);
+    const [billing, setBilling] = useState([]);
 
     const load = () => {
         setLoading(true);
@@ -27,6 +34,66 @@ export default function EnterprisePortal() {
     };
 
     useEffect(() => { load(); }, []);
+
+    // Load billing events once we know the org exists
+    useEffect(() => {
+        if (dashboard && dashboard.membership?.role === "owner") {
+            api.get("/enterprise/organizations/billing")
+                .then((r) => setBilling(r.data.events || []))
+                .catch(() => {});
+        }
+    }, [dashboard]);
+
+    // Handle post-checkout redirect to fulfill seat purchase
+    useEffect(() => {
+        const sid = searchParams.get("session_id");
+        if (!sid) return;
+        api.post(`/enterprise/organizations/seats/fulfill/${sid}`)
+            .then((r) => {
+                if (r.data.fulfilled) toast.success(`Seat purchase complete — you now have ${r.data.seat_count} seats.`);
+                else toast.error("Seat purchase not yet confirmed. Try refreshing in a moment.");
+                setSearchParams({}, { replace: true });
+                load();
+            })
+            .catch(() => {
+                toast.error("Could not verify checkout — refresh in a moment.");
+                setSearchParams({}, { replace: true });
+            });
+    }, [searchParams]);
+
+    // Live preview of seat change
+    useEffect(() => {
+        if (!showSeatEditor || !dashboard) return;
+        const timeout = setTimeout(() => {
+            api.post("/enterprise/organizations/seats/preview", { seat_count: seatTarget })
+                .then((r) => setSeatPreview(r.data))
+                .catch(() => setSeatPreview(null));
+        }, 200);
+        return () => clearTimeout(timeout);
+    }, [seatTarget, showSeatEditor, dashboard]);
+
+    const applySeatChange = async () => {
+        setSeatBusy(true);
+        try {
+            const res = await api.post("/enterprise/organizations/seats", {
+                seat_count: seatTarget,
+                origin_url: window.location.origin,
+            });
+            if (res.data.action === "checkout" && res.data.checkout_url) {
+                window.location.href = res.data.checkout_url;
+                return;
+            }
+            if (res.data.action === "credit") {
+                toast.success(res.data.message);
+            } else {
+                toast.info("No change applied.");
+            }
+            setShowSeatEditor(false);
+            load();
+        } catch (e) {
+            toast.error(e?.response?.data?.detail || "Seat update failed");
+        } finally { setSeatBusy(false); }
+    };
 
     const invite = async (e) => {
         e.preventDefault();
@@ -47,12 +114,12 @@ export default function EnterprisePortal() {
     };
 
     const removeMember = async (memberId) => {
-        if (!confirm("Remove this team member?")) return;
+        if (!window.confirm("Remove this team member?")) return;
         try {
             await api.delete(`/enterprise/organizations/members/${memberId}`);
             load();
         } catch (e) {
-            alert(e.response?.data?.detail || "Failed");
+            toast.error(e.response?.data?.detail || "Failed");
         }
     };
 
@@ -85,6 +152,7 @@ export default function EnterprisePortal() {
 
     const { organization: org, summary, members, departments, top_courses, membership } = dashboard;
     const isAdmin = membership.role === "owner" || membership.role === "admin";
+    const isOwner = membership.role === "owner";
 
     return (
         <div className="container-page py-12">
@@ -96,6 +164,20 @@ export default function EnterprisePortal() {
                     <p className="mt-4 text-muted-foreground max-w-xl">
                         {summary.seats_used} of {summary.seat_count} seats active · {summary.total_certificates} certifications earned by your team
                     </p>
+                    <div className="mt-5 flex gap-3 flex-wrap">
+                        <Link to="/patches" data-testid="portal-patches-link" className="btn-outline text-xs">
+                            <Sparkles className="w-3 h-3" /> Curriculum patches
+                        </Link>
+                        {isOwner && (
+                            <button
+                                onClick={() => { setShowSeatEditor(true); setSeatTarget(org.seat_count); }}
+                                data-testid="manage-seats"
+                                className="btn-outline text-xs"
+                            >
+                                <Settings className="w-3 h-3" /> Manage seats
+                            </button>
+                        )}
+                    </div>
                 </div>
                 <div className="md:col-span-4">
                     <div className="card-flat p-5">
@@ -110,6 +192,56 @@ export default function EnterprisePortal() {
                     </div>
                 </div>
             </div>
+
+            {/* Seat editor modal */}
+            {showSeatEditor && (
+                <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={() => setShowSeatEditor(false)}>
+                    <div className="card-flat max-w-lg w-full bg-surface" onClick={(e) => e.stopPropagation()} data-testid="seat-editor">
+                        <div className="p-6 border-b border-border">
+                            <div className="overline mb-2">Manage seats</div>
+                            <h3 className="font-serif text-2xl">Adjust your team plan</h3>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <div>
+                                <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Seat count (min 10)</label>
+                                <input
+                                    type="number"
+                                    min={10}
+                                    max={5000}
+                                    value={seatTarget}
+                                    onChange={(e) => setSeatTarget(parseInt(e.target.value || 0))}
+                                    data-testid="seat-target"
+                                    className="mt-1 w-full bg-surface-alt border border-border rounded-sm px-4 py-2 text-lg focus:outline-none focus:border-brand"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">Currently: {org.seat_count} · In use: {summary.seats_used}</p>
+                            </div>
+
+                            {seatPreview && seatPreview.action !== "noop" && (
+                                <div className={`border p-4 ${seatPreview.action === "checkout" ? "border-brand bg-brand/5" : "border-border bg-surface-alt"}`} data-testid="seat-preview">
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] mb-1">
+                                        {seatPreview.action === "checkout" ? "Charge summary" : "Credit note"}
+                                    </div>
+                                    <p className="text-sm">{seatPreview.message}</p>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3 justify-end pt-2">
+                                <button onClick={() => setShowSeatEditor(false)} className="btn-outline">Cancel</button>
+                                <button
+                                    onClick={applySeatChange}
+                                    disabled={seatBusy || seatTarget === org.seat_count}
+                                    data-testid="apply-seat-change"
+                                    className="btn-primary"
+                                >
+                                    {seatBusy ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                                        seatPreview?.action === "checkout" ? "Proceed to checkout" :
+                                        seatPreview?.action === "credit" ? "Apply reduction" : "Apply"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Readiness Index */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
@@ -221,6 +353,33 @@ export default function EnterprisePortal() {
                             ))}
                         </div>
                     </div>
+
+                    {isOwner && billing.length > 0 && (
+                        <div>
+                            <h2 className="font-serif text-xl tracking-tight mb-4 flex items-center gap-2">
+                                <Receipt className="w-4 h-4 text-brand" /> Billing history
+                            </h2>
+                            <div className="card-flat divide-y divide-border" data-testid="billing-history">
+                                {billing.slice(0, 5).map((b) => (
+                                    <div key={b.id} className="p-4 text-xs" data-testid={`billing-event-${b.id}`}>
+                                        <div className="flex items-baseline justify-between gap-2 mb-1">
+                                            <span className="font-mono uppercase tracking-[0.15em] text-brand">
+                                                {b.type === "prorated_credit" ? "Credit" : "Seats"}
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                {new Date(b.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                            </span>
+                                        </div>
+                                        <div className="font-serif text-sm">
+                                            {b.type === "prorated_credit"
+                                                ? `-${b.seats_removed} seats · $${b.amount.toFixed(2)} credit`
+                                                : `+${b.seats_added} seats · $${b.amount.toFixed(2)}`}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
