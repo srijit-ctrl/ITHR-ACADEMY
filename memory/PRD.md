@@ -43,7 +43,28 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - **New collections**: `organizations`, `org_members`, `org_invites`, `curriculum_patches`
 - 75/75 tests pass
 
-## Prioritized Backlog
+### Iteration 5 — Phase 4 AI Layer + Expanded Assessment/Certification (current)
+- **AI Mentor (Solon)**: dedicated career coach persona separate from Aletheia (Tutor).
+  - `POST /api/mentor/chat` streams SSE deltas via Claude Sonnet 4.5, persistent history per user.
+  - `GET/DELETE /api/mentor/sessions[/{id}]` CRUD.
+  - New `/mentor` page: profile inputs (role/industry/years), 4 starter prompts, sidebar of past sessions.
+- **Randomized Assessment Engine**: `GET /api/courses/{slug}/assessment/session?count=15` returns shuffled question subset with shuffled option order.
+  - Server returns `permutation` per question — no `correct`/`explanation` leaked to client.
+  - `POST .../quiz/submit` accepts `answers.__perm__` map to decode shuffled indices.
+  - `GET /api/courses/{slug}/attempts` history.
+  - Seeded **341 questions across all 24 courses** (15-27 per course, mix of mcq/multi/true_false/scenario).
+- **Certification Engine**:
+  - `GET /api/certificates/{id}/qr.svg` returns SVG QR (segno lib, high error correction) pointing to `/verify/{id}`.
+  - LinkedIn "Add to profile" deep-link on Certificate page.
+  - QR embedded on both `/certificate/{id}` and public `/verify/{id}` pages.
+- **AI Recommendation Engine**:
+  - `GET /api/recommendations` — rule-based scoring (industry/category overlap, difficulty ladder, freshness, popularity, has_full_content bonus).
+  - `GET /api/recommendations/next-best` — top pick + Claude-drafted rationale (24h cache via `rec_rationales` collection).
+  - Dashboard shows Next-Best banner + 6-course recommendation grid.
+- Dashboard adds Mentor entry + Recommendations grid; Header adds Mentor nav item.
+- **18/18 backend pytest + 5/5 frontend E2E scenarios pass** (iteration_5.json).
+
+
 
 ### P0 — Next
 - Curriculum patch review queue UI (admin/editor) with approve/reject workflow
@@ -53,9 +74,9 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 ### P1 — Milestone 2
 - AI Skills Passport (portable verifiable competency record)
 - Role-based learning paths (HR, Finance, Sales, Procurement, Manufacturing)
-- AI Mentor + AI Career Advisor
-- AI Recommendation Engine (next-best course)
 - Renewal / CE credit engine
+- In-lesson inline AI Tutor Q&A widget (leveraging Aletheia)
+- Adaptive assessments (difficulty escalation based on prior answers)
 
 ### P2 — Milestone 3 (Production Hardening)
 - Multi-tenant white-label, SSO (Azure AD, Okta, SCIM/LDAP)
