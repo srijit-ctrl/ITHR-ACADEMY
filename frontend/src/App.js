@@ -23,6 +23,9 @@ import Certifications from "@/pages/Certifications";
 import Pricing from "@/pages/Pricing";
 import Intelligence from "@/pages/Intelligence";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
+import EnterprisePortal from "@/pages/EnterprisePortal";
+import EnterpriseSetup from "@/pages/EnterpriseSetup";
+import EnterpriseJoin from "@/pages/EnterpriseJoin";
 
 function AppShell() {
     const location = useLocation();
@@ -59,6 +62,9 @@ function AppShell() {
                     <Route path="/learn/:slug/:moduleId/:lessonId" element={<ProtectedRoute><LessonViewer /></ProtectedRoute>} />
                     <Route path="/quiz/:slug" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
                     <Route path="/certificate/:certId" element={<ProtectedRoute><Certificate /></ProtectedRoute>} />
+                    <Route path="/enterprise/portal" element={<ProtectedRoute><EnterprisePortal /></ProtectedRoute>} />
+                    <Route path="/enterprise/setup" element={<ProtectedRoute><EnterpriseSetup /></ProtectedRoute>} />
+                    <Route path="/enterprise/join" element={<ProtectedRoute><EnterpriseJoin /></ProtectedRoute>} />
                 </Routes>
             </main>
             {!isLesson && <Footer />}

@@ -118,7 +118,7 @@ class TestCourses:
         r = api_client.get(f"{API}/courses")
         assert r.status_code == 200
         courses = r.json()
-        assert len(courses) == 23, f"expected 23 courses, got {len(courses)}"
+        assert len(courses) == 24, f"expected 24 courses, got {len(courses)}"
 
     def test_filter_by_difficulty(self, api_client):
         r = api_client.get(f"{API}/courses?difficulty=beginner")
@@ -364,7 +364,7 @@ class TestFreshness:
         r = api_client.get(f"{API}/courses")
         assert r.status_code == 200
         courses = r.json()
-        assert len(courses) == 23
+        assert len(courses) == 24
         for c in courses:
             assert "freshness_score" in c
             assert "days_since_review" in c
@@ -402,6 +402,11 @@ FULL_COURSES = [
     "multi-agent-systems",
     "rag-enterprise",
     "ai-governance-compliance",
+    "agentic-ai-banking",
+    "agentic-ai-healthcare",
+    "agentic-ai-manufacturing",
+    "agentic-ai-retail",
+    "agentic-ai-government",
 ]
 
 
@@ -418,11 +423,11 @@ class TestFullCourses:
             assert "lessons" in m
             assert len(m["lessons"]) >= 1
 
-    def test_list_has_five_full_courses(self, api_client):
+    def test_list_has_ten_full_courses(self, api_client):
         r = api_client.get(f"{API}/courses")
         courses = r.json()
         full = [c for c in courses if c.get("has_full_content")]
-        assert len(full) == 5, f"expected 5 full courses, got {len(full)}: {[c['slug'] for c in full]}"
+        assert len(full) == 10, f"expected 10 full courses, got {len(full)}: {[c['slug'] for c in full]}"
         slugs = {c["slug"] for c in full}
         assert slugs == set(FULL_COURSES), f"slugs mismatch: {slugs}"
 
@@ -556,3 +561,303 @@ class TestStripeCheckout:
         assert d["package_id"] == "professional_track"
         assert d["tier"] == "professional"
         assert d["amount"] == 499.0
+
+
+# ==================== Iteration 4: Enterprise Portal ====================
+def _register_user(api_client, prefix="ent"):
+    email = f"{prefix}+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
+    r = api_client.post(f"{API}/auth/register", json={
+        "email": email, "password": "TestPass123!", "full_name": f"{prefix.title()} User"
+    })
+    assert r.status_code == 200, r.text
+    d = r.json()
+    return {"email": email, "token": d["token"], "user": d["user"]}
+
+
+class TestEnterpriseOrg:
+    """Enterprise portal: org create/get/dashboard/seats/members/invite/join."""
+
+    def test_mine_returns_404_when_no_org(self, api_client):
+        u = _register_user(api_client, "noorg")
+        r = api_client.get(f"{API}/enterprise/organizations/mine",
+                           headers={"Authorization": f"Bearer {u['token']}"})
+        assert r.status_code == 404
+
+    def test_create_organization_requires_auth(self, api_client):
+        r = requests.post(f"{API}/enterprise/organizations",
+                          json={"name": "NoAuth Co", "industry": "banking", "seat_count": 25})
+        assert r.status_code in (401, 403)
+
+    def test_full_org_flow(self, api_client):
+        # === 1. Owner registers + creates org ===
+        owner = _register_user(api_client, "owner")
+        owner_h = {"Authorization": f"Bearer {owner['token']}"}
+        create_payload = {"name": f"TEST Org {uuid.uuid4().hex[:6]}",
+                          "industry": "banking", "seat_count": 25}
+        r = api_client.post(f"{API}/enterprise/organizations",
+                            headers=owner_h, json=create_payload)
+        assert r.status_code == 200, r.text
+        org = r.json()["organization"]
+        assert org["name"] == create_payload["name"]
+        assert org["slug"] and len(org["slug"]) > 0
+        assert org["invite_code"] and len(org["invite_code"]) >= 4
+        assert org["seat_count"] == 25
+        assert org["seats_used"] == 1
+        assert org["owner_user_id"] == owner["user"]["id"]
+        pytest.ent_org = org
+        pytest.ent_owner = owner
+
+        # === 2. Second create for same user returns 400 ===
+        r2 = api_client.post(f"{API}/enterprise/organizations",
+                             headers=owner_h, json=create_payload)
+        assert r2.status_code == 400
+
+        # === 3. GET /organizations/mine returns org + membership ===
+        r = api_client.get(f"{API}/enterprise/organizations/mine", headers=owner_h)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["organization"]["id"] == org["id"]
+        assert d["membership"]["role"] == "owner"
+
+        # === 4. Owner creates invite ===
+        invitee_email = f"invitee+{uuid.uuid4().hex[:6]}@example.com"
+        r = api_client.post(f"{API}/enterprise/organizations/invites",
+                            headers=owner_h,
+                            json={"email": invitee_email, "role": "member", "department": "Engineering"})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["invite"]["email"] == invitee_email
+        assert d["invite"]["role"] == "member"
+        assert d["invite"]["department"] == "Engineering"
+        assert d["invite"]["status"] == "pending"
+        assert "invite_url" in d
+        assert org["invite_code"] in d["invite_url"]
+
+        # === 5. Invalid role defaults to "member" ===
+        r = api_client.post(f"{API}/enterprise/organizations/invites",
+                            headers=owner_h,
+                            json={"email": f"x+{uuid.uuid4().hex[:4]}@example.com", "role": "hacker"})
+        assert r.status_code == 200
+        assert r.json()["invite"]["role"] == "member"
+
+        # === 6. Bad email ===
+        r = api_client.post(f"{API}/enterprise/organizations/invites",
+                            headers=owner_h, json={"email": "not-an-email"})
+        assert r.status_code == 400
+
+        # === 7. List invites ===
+        r = api_client.get(f"{API}/enterprise/organizations/invites", headers=owner_h)
+        assert r.status_code == 200
+        assert len(r.json()["invites"]) >= 2
+
+        # === 8. New user joins via invite_code ===
+        member = _register_user(api_client, "member")
+        member_h = {"Authorization": f"Bearer {member['token']}"}
+        r = api_client.post(f"{API}/enterprise/organizations/join",
+                            headers=member_h,
+                            json={"invite_code": org["invite_code"]})
+        assert r.status_code == 200, r.text
+        assert r.json()["membership"]["role"] == "member"
+        pytest.ent_member = member
+
+        # verify seats_used incremented
+        r = api_client.get(f"{API}/enterprise/organizations/mine", headers=owner_h)
+        assert r.json()["organization"]["seats_used"] == 2
+
+        # === 9. Invalid invite code ===
+        another = _register_user(api_client, "another")
+        r = api_client.post(f"{API}/enterprise/organizations/join",
+                            headers={"Authorization": f"Bearer {another['token']}"},
+                            json={"invite_code": "BOGUSCODE"})
+        assert r.status_code == 404
+
+        # === 10. Already-in-org user cannot join again ===
+        r = api_client.post(f"{API}/enterprise/organizations/join",
+                            headers=member_h,
+                            json={"invite_code": org["invite_code"]})
+        assert r.status_code == 400
+
+        # === 11. Dashboard summary ===
+        r = api_client.get(f"{API}/enterprise/organizations/dashboard", headers=owner_h)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["organization"]["id"] == org["id"]
+        assert "summary" in d
+        for k in ("readiness_index", "seat_count", "seats_used",
+                  "avg_progress", "cert_coverage_pct"):
+            assert k in d["summary"], f"missing summary key {k}"
+        assert d["summary"]["seats_used"] == 2
+        assert isinstance(d["members"], list) and len(d["members"]) == 2
+        assert "stats" in d["members"][0]
+        assert isinstance(d["departments"], list)
+        assert isinstance(d["top_courses"], list)
+
+        # Fresh org: readiness_index should be 0 (no progress/certs yet)
+        assert d["summary"]["readiness_index"] == 0.0
+
+        # === 12. Adjust seats (owner only) ===
+        r = api_client.post(f"{API}/enterprise/organizations/seats",
+                            headers=owner_h, json={"seat_count": 50})
+        assert r.status_code == 200
+        assert r.json()["organization"]["seat_count"] == 50
+
+        # Cannot go below current usage
+        r = api_client.post(f"{API}/enterprise/organizations/seats",
+                            headers=owner_h, json={"seat_count": 1})
+        assert r.status_code == 400
+
+        # Cannot exceed 5000
+        r = api_client.post(f"{API}/enterprise/organizations/seats",
+                            headers=owner_h, json={"seat_count": 10000})
+        assert r.status_code == 400
+
+        # Member cannot adjust seats (403)
+        r = api_client.post(f"{API}/enterprise/organizations/seats",
+                            headers=member_h, json={"seat_count": 30})
+        assert r.status_code == 403
+
+        # === 13. Remove member ===
+        # Find member's org_member id via dashboard
+        dash = api_client.get(f"{API}/enterprise/organizations/dashboard", headers=owner_h).json()
+        member_row = next((m for m in dash["members"] if m["role"] == "member"), None)
+        assert member_row is not None
+        r = api_client.delete(f"{API}/enterprise/organizations/members/{member_row['id']}",
+                              headers=owner_h)
+        assert r.status_code == 200
+        assert r.json()["removed"] is True
+
+        # Verify seats_used decremented
+        r = api_client.get(f"{API}/enterprise/organizations/mine", headers=owner_h)
+        assert r.json()["organization"]["seats_used"] == 1
+
+        # Cannot remove the owner
+        owner_row = next(m for m in dash["members"] if m["role"] == "owner")
+        r = api_client.delete(f"{API}/enterprise/organizations/members/{owner_row['id']}",
+                              headers=owner_h)
+        assert r.status_code == 400
+
+
+# ==================== Iteration 4: Push signals into curriculum ====================
+class TestPushToCurriculum:
+    """Apply intelligence signals to courses as curriculum patches."""
+
+    def test_apply_requires_auth(self, api_client):
+        r = requests.post(f"{API}/intelligence/signals/sig-x/apply",
+                          json={"course_slug": "agentic-ai-foundations"})
+        assert r.status_code in (401, 403)
+
+    def test_apply_requires_course_slug(self, api_client, auth_headers):
+        r = api_client.post(f"{API}/intelligence/signals/sig-x/apply",
+                            headers=auth_headers, json={})
+        assert r.status_code == 400
+
+    def test_apply_unknown_signal_404(self, api_client, auth_headers):
+        # Ensure briefing exists (cached)
+        api_client.get(f"{API}/intelligence/briefing", timeout=120)
+        r = api_client.post(f"{API}/intelligence/signals/does-not-exist-signal/apply",
+                            headers=auth_headers,
+                            json={"course_slug": "agentic-ai-foundations"})
+        assert r.status_code == 404
+
+    def test_apply_unknown_course_404(self, api_client, auth_headers):
+        brief = api_client.get(f"{API}/intelligence/briefing", timeout=120).json()
+        sig_id = brief["signals"][0]["id"]
+        r = api_client.post(f"{API}/intelligence/signals/{sig_id}/apply",
+                            headers=auth_headers,
+                            json={"course_slug": "no-such-course"})
+        assert r.status_code == 404
+
+    def test_apply_success_returns_patch_and_updates_freshness(self, api_client, auth_headers):
+        # cached briefing
+        brief = api_client.get(f"{API}/intelligence/briefing", timeout=120).json()
+        sig_id = brief["signals"][0]["id"]
+        # course freshness BEFORE
+        c_before = api_client.get(f"{API}/courses/agentic-ai-foundations").json()
+        r = api_client.post(f"{API}/intelligence/signals/{sig_id}/apply",
+                            headers=auth_headers,
+                            json={"course_slug": "agentic-ai-foundations"},
+                            timeout=90)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["status"] == "proposed"
+        p = d["patch"]
+        for k in ("course_slug", "signal_id", "module_number", "module_title",
+                  "patch_type", "proposed_title", "proposed_content", "rationale",
+                  "status", "created_by", "created_at"):
+            assert k in p, f"patch missing {k}"
+        assert p["course_slug"] == "agentic-ai-foundations"
+        assert p["signal_id"] == sig_id
+        assert p["status"] == "proposed"
+        assert isinstance(p["module_number"], int)
+        pytest.push_patch_id = p["id"]
+
+        # course freshness_score bumped to ~100 (0 days since review)
+        c_after = api_client.get(f"{API}/courses/agentic-ai-foundations").json()
+        assert c_after["freshness_score"] >= c_before.get("freshness_score", 0)
+        assert c_after["days_since_review"] == 0
+        assert c_after["freshness_score"] == 100
+
+    def test_list_patches(self, api_client, auth_headers):
+        r = api_client.get(f"{API}/intelligence/patches", headers=auth_headers)
+        assert r.status_code == 200
+        d = r.json()
+        assert "patches" in d and isinstance(d["patches"], list)
+        assert d["count"] == len(d["patches"])
+
+    def test_list_patches_filter_by_course(self, api_client, auth_headers):
+        r = api_client.get(f"{API}/intelligence/patches?course_slug=agentic-ai-foundations",
+                           headers=auth_headers)
+        assert r.status_code == 200
+        for p in r.json()["patches"]:
+            assert p["course_slug"] == "agentic-ai-foundations"
+
+    def test_list_patches_filter_by_status(self, api_client, auth_headers):
+        r = api_client.get(f"{API}/intelligence/patches?status=proposed",
+                           headers=auth_headers)
+        assert r.status_code == 200
+        for p in r.json()["patches"]:
+            assert p["status"] == "proposed"
+
+    def test_decide_patch_approve(self, api_client, auth_headers):
+        pid = getattr(pytest, "push_patch_id", None)
+        if not pid:
+            pytest.skip("no patch id from previous test")
+        r = api_client.post(f"{API}/intelligence/patches/{pid}/decide",
+                            headers=auth_headers, json={"decision": "approved"})
+        assert r.status_code == 200
+        assert r.json()["status"] == "approved"
+
+    def test_decide_patch_invalid_decision(self, api_client, auth_headers):
+        pid = getattr(pytest, "push_patch_id", None)
+        if not pid:
+            pytest.skip("no patch id")
+        r = api_client.post(f"{API}/intelligence/patches/{pid}/decide",
+                            headers=auth_headers, json={"decision": "maybe"})
+        assert r.status_code == 400
+
+    def test_decide_patch_unknown(self, api_client, auth_headers):
+        r = api_client.post(f"{API}/intelligence/patches/nonexistent-patch-id/decide",
+                            headers=auth_headers, json={"decision": "approved"})
+        assert r.status_code == 404
+
+
+# ==================== Iteration 4: Router refactor sanity ====================
+class TestRouterRefactorSanity:
+    """After router refactor, endpoints across 8 routers still respond."""
+
+    def test_all_router_endpoints_respond(self, api_client, auth_headers):
+        """Sample endpoints from each of the 8 routers must respond (mounted)."""
+        checks = [
+            ("GET", "/health", None, [200]),                       # dashboard_router
+            ("GET", "/courses", None, [200]),                      # catalog_router
+            ("GET", "/catalog/industries", None, [200]),
+            ("GET", "/dashboard/stats", auth_headers, [200]),
+            ("GET", "/enrollments", auth_headers, [200]),          # assessment_router
+            ("GET", "/certificates", auth_headers, [200]),
+            ("GET", "/checkout/packages", None, [200]),            # checkout_router
+            ("GET", "/enterprise/organizations/mine", auth_headers, [200, 404]),  # enterprise_router
+            ("GET", "/intelligence/patches", auth_headers, [200]), # intelligence_router
+        ]
+        for method, ep, hdrs, ok_codes in checks:
+            r = requests.request(method, f"{API}{ep}", headers=hdrs or {})
+            assert r.status_code in ok_codes, f"{ep} returned {r.status_code}, expected {ok_codes}"

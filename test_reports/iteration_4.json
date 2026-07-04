@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 4 fully verified. Backend pytest: 75/75 passing in 25s (previous 55 regression tests + 20 new tests covering router refactor sanity, 24 courses / 10 full courses, 5 new industry courses × 15 modules × 12 quiz, complete Enterprise Portal flow (create org, one-org-per-user, mine, invite create/list/role-normalization/bad-email/seats-check, join via valid+invalid code + already-joined-400, dashboard summary with readiness_index=0 for fresh org + members[]+departments[]+top_courses[], seat adjust owner-only + clamp 10-5000 + cannot-reduce-below-usage + member-403, remove member with seat decrement + cannot-remove-owner-400), and Push-to-Curriculum (auth-required, missing-slug-400, unknown-signal-404, unknown-course-404, successful patch generation + course freshness bumped to 100 + last_reviewed_at=now, list patches + filter by course_slug/status, decide approved + invalid-decision-400 + unknown-patch-404). Frontend E2E: (1) new user with no org lands on /enterprise/portal hero with 'No organization yet' + 'Create organization' CTA + 'Join with invite code' link; (2) /enterprise/setup form (name, industry select, domain, seat_count 10-5000) submits and redirects to portal; (3) portal shows org name (data-testid=org-name), invite code with copy button, 4 stat cards (readiness_index, certs, avg progress, cert coverage), members table with self as owner, invite form (email/role/dept) that adds to invites list, seat management wired; (4) /enterprise/join?code=XXXX pre-fills invite code and joins the org successfully; (5) /dashboard has 'Enterprise Portal — Team dashboard · Invites · Seats' link card; (6) /intelligence renders 8 signal cards, each 'Affected Courses' chip is a Sparkles-icon button (32 total); clicking opens patch-modal with proposed_title + markdown proposed_content + module_title + rationale + status='proposed' badge; close button + backdrop click both close modal. All previous flows (login, register, catalog, course detail, freshness badges) still functional. Router refactor: server.py=133 lines (down from 906), all 8 routers (auth, catalog, assessment, tutor, intelligence, checkout, dashboard, enterprise) mounted and responding.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/enterprise/organizations/seats", "issue": "Docs say '10-5000 range enforcement' — endpoint correctly enforces MIN=10 AND MAX=5000 AND cannot-reduce-below-current-usage, but the require_admin=True check gates the endpoint before the 'owner-only' check, so an ADMIN (not just owner) gets a distinct 403 with 'Only the owner may adjust seats' — behavior matches spec but the intermediate _resolve_org_for_user require_admin gate is technically dead-code for this endpoint since we re-check role after. Cosmetic."},
+      {"endpoint": "POST /api/enterprise/organizations/invites", "issue": "Uses raw dict body instead of Pydantic model — email/role/department are not validated by Pydantic. Manual '@' check only. Suggest OrgInviteCreate model with EmailStr for stricter validation."},
+      {"endpoint": "POST /api/intelligence/signals/{signal_id}/apply", "issue": "Uses raw dict body for course_slug. Would benefit from a Pydantic model (ApplySignalRequest) matching payload={'course_slug': str} + optional 'notes'."},
+      {"endpoint": "GET /api/intelligence/patches", "issue": "Accepts course_slug/status as raw query params without a Literal enum on status — a caller could pass status='banana' and get an empty list rather than 400. Low priority."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/enterprise/portal (fresh org, owner-only)", "issues": ["Readiness Index card shows '0/ 100' with a hairline space before '100' due to <span> unit rendering — visually reads as '0 / 100' but the '/ ' has extra whitespace. Cosmetic."]},
+      {"screen": "EnterprisePortal Team members row", "issues": ["On narrow desktop (≤1280px) the 12-col grid squashes the stats sub-grid (courses/certs/avg) — 3 stats stacked on 2 lines. Consider md:grid-cols-3 with reserved column widths."]},
+      {"screen": "Intelligence signal chips", "issues": ["Sparkles-prefixed chip buttons are dense (2 rows of 3-4 chips per card); hover state uses same brand color as normal state — no visual affordance signaling clickability beyond the Sparkles icon. Consider chip hover:bg-brand/5 border-brand/40."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter4.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Wrap /api/enterprise/organizations/invites, /api/intelligence/signals/{id}/apply, /api/intelligence/patches/{id}/decide in Pydantic request models for stricter validation instead of raw dict payloads.",
+    "LOW: Minor design polish for the Readiness Index '/100' spacing and Sparkles chip hover state.",
+    "LOW: Consider adding a status enum validation on GET /api/intelligence/patches?status= to 400 unknown values."
+  ],
+  "critical_code_review_comments": [
+    "Router refactor is clean — server.py dropped from ~906 → 133 lines. Shared code (db/logger/helpers) correctly lives in core.py. All 8 routers mount cleanly. Excellent maintainability win.",
+    "enterprise_router.create_organization: after inserting the org via motor, mutates local dict then pops _id — motor's insert_one mutates the passed doc by injecting _id. The pop happens correctly. OK.",
+    "enterprise_router seat_count guard duplicates work: OrganizationCreate.seat_count has no field-level validation, but create_organization clamps via max(10, min(5000, ...)). Consider moving the clamp into Pydantic (Field(ge=10, le=5000)) to reject invalid inputs at parse time with 422.",
+    "intelligence_router._generate_patch imports emergentintegrations types inside the function scope — should be at module scope for micro-perf (called per patch). Minor.",
+    "intelligence_router.decide_patch does NOT verify the caller has permission (any authenticated user can approve/reject any patch). Consider gating to admin/curriculum_editor role or restricting to patch.created_by. Currently exposed to all learners.",
+    "curriculum_patches doesn't enforce a unique index — a signal can be applied multiple times against the same course, producing duplicate patches. May be intentional (allow re-drafts) but consider deduplicating by (signal_id, course_slug, status='proposed').",
+    "seed_industry_courses.py + seed_more_courses.py + seed_data.py duplicate module/quiz-scaffold logic — consider extracting a shared _course_scaffold(slug, title, modules, quiz) helper.",
+    "Frontend EnterprisePortal.jsx uses browser confirm()/alert() for member removal error handling — replace with a design-system dialog for consistency."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (75/75)", "frontend": "100% functional pass"},
+  "test_credentials": "Fresh users registered per test (test.ent+<ts>, pusher+<ts>, joiner+<ts>, dash+<ts>, owner+<ts>, member+<ts>, invitee+<ts>, noorg+<ts>, another+<ts> / TestPass123!).",
+  "seed_data_creation": "None — used pre-seeded 24 catalog courses + intelligence cache. Registered ~10 ephemeral users + created 2 test orgs (TEST Acme <ts>, TEST Org <ts>) during testing. Curriculum patches inserted: 1 (approved) from Push-to-Curriculum backend test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 4 fully verified with 20 new pytest tests appended to /app/backend/tests/backend_test.py (75 tests total). Key testIds added in Iteration 4: setup-org-cta, join-org-cta, setup-name/industry/domain/seats/submit/error, org-name, invite-code, copy-invite-code, stat-readiness/certs/progress/coverage, member-row-<uid>, remove-member-<uid>, invite-email/role/department, send-invite, dept-<name>, top-course-<slug>, join-code-input, join-submit, join-error, signal-<id>, push-signal-<sid>-to-<slug>, patch-modal, close-patch-modal. Enterprise dashboard summary readiness_index = 0.5*avg_progress + 0.5*cert_coverage. Push-to-curriculum takes ~10-25s per call (Claude Sonnet 4.5 streaming). Signal IDs come from cached /api/intelligence/briefing. New MongoDB collections: organizations (unique slug + invite_code), org_members (unique org_id+user_id), org_invites, curriculum_patches. server.py=133 lines, 8 routers in /app/backend/routers/, shared code in /app/backend/core.py.",
+  "rca of the issue": "N/A — no bugs found. All 4 Iteration-4 items (enterprise portal, 5 industry courses, push-to-curriculum, router refactor) are fully working end-to-end."
+}

@@ -1,0 +1,240 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { api } from "@/lib/api";
+import { Building2, Users, Award, TrendingUp, Copy, Plus, X, Loader2, ArrowRight, Trash2 } from "lucide-react";
+
+export default function EnterprisePortal() {
+    const navigate = useNavigate();
+    const [dashboard, setDashboard] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [notFound, setNotFound] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteRole, setInviteRole] = useState("member");
+    const [inviteDept, setInviteDept] = useState("");
+    const [inviting, setInviting] = useState(false);
+    const [inviteError, setInviteError] = useState("");
+    const [copied, setCopied] = useState(false);
+
+    const load = () => {
+        setLoading(true);
+        api.get("/enterprise/organizations/dashboard")
+            .then((r) => setDashboard(r.data))
+            .catch((e) => {
+                if (e.response?.status === 404) setNotFound(true);
+                else setDashboard(null);
+            })
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => { load(); }, []);
+
+    const invite = async (e) => {
+        e.preventDefault();
+        setInviteError("");
+        setInviting(true);
+        try {
+            await api.post("/enterprise/organizations/invites", {
+                email: inviteEmail, role: inviteRole, department: inviteDept || null,
+            });
+            setInviteEmail("");
+            setInviteDept("");
+            load();
+        } catch (e) {
+            setInviteError(e.response?.data?.detail || "Invite failed");
+        } finally {
+            setInviting(false);
+        }
+    };
+
+    const removeMember = async (memberId) => {
+        if (!confirm("Remove this team member?")) return;
+        try {
+            await api.delete(`/enterprise/organizations/members/${memberId}`);
+            load();
+        } catch (e) {
+            alert(e.response?.data?.detail || "Failed");
+        }
+    };
+
+    const copyInviteCode = () => {
+        navigator.clipboard.writeText(dashboard.organization.invite_code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (loading) return <div className="container-page py-24"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
+
+    if (notFound) return (
+        <div className="container-narrow py-20 text-center">
+            <Building2 className="w-12 h-12 text-brand mx-auto mb-6" />
+            <div className="overline mb-4">Enterprise Portal</div>
+            <h1 className="font-serif text-5xl tracking-tighter leading-none mb-4">No organization yet.</h1>
+            <p className="text-muted-foreground mb-8">Create your organization to invite team members and unlock team analytics.</p>
+            <div className="flex gap-3 justify-center">
+                <Link to="/enterprise/setup" data-testid="setup-org-cta" className="btn-primary">
+                    Create organization <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link to="/enterprise/join" data-testid="join-org-cta" className="btn-outline">
+                    Join with invite code
+                </Link>
+            </div>
+        </div>
+    );
+
+    if (!dashboard) return <div className="container-page py-24 text-center text-muted-foreground">Could not load organization data.</div>;
+
+    const { organization: org, summary, members, departments, top_courses, membership } = dashboard;
+    const isAdmin = membership.role === "owner" || membership.role === "admin";
+
+    return (
+        <div className="container-page py-12">
+            {/* Header */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-12">
+                <div className="md:col-span-8">
+                    <div className="overline mb-4 fine-rule pl-4">{org.industry || "Enterprise"} · {membership.role.toUpperCase()}</div>
+                    <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none" data-testid="org-name">{org.name}</h1>
+                    <p className="mt-4 text-muted-foreground max-w-xl">
+                        {summary.seats_used} of {summary.seat_count} seats active · {summary.total_certificates} certifications earned by your team
+                    </p>
+                </div>
+                <div className="md:col-span-4">
+                    <div className="card-flat p-5">
+                        <div className="overline mb-2">Invite Code</div>
+                        <div className="flex items-center gap-2">
+                            <code className="font-mono text-lg text-brand flex-1" data-testid="invite-code">{org.invite_code}</code>
+                            <button onClick={copyInviteCode} data-testid="copy-invite-code" className="p-2 hover:bg-surface-alt rounded-sm">
+                                <Copy className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">{copied ? "Copied!" : "Share with employees to onboard"}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Readiness Index */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+                <StatCard label="Readiness Index" value={`${summary.readiness_index}`} unit="/ 100" icon={TrendingUp} accent testId="stat-readiness" />
+                <StatCard label="Certifications" value={summary.total_certificates} icon={Award} testId="stat-certs" />
+                <StatCard label="Avg Progress" value={`${summary.avg_progress}%`} icon={TrendingUp} testId="stat-progress" />
+                <StatCard label="Cert Coverage" value={`${summary.cert_coverage_pct}%`} icon={Users} testId="stat-coverage" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                {/* Members */}
+                <div className="lg:col-span-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="font-serif text-2xl tracking-tight">Team members</h2>
+                        <span className="text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground">{summary.seats_used}/{summary.seat_count} seats</span>
+                    </div>
+
+                    <div className="card-flat divide-y divide-border">
+                        {members.map((m) => (
+                            <div key={m.id} className="grid grid-cols-12 gap-4 p-4 items-center" data-testid={`member-row-${m.user_id}`}>
+                                <div className="col-span-5">
+                                    <div className="font-serif text-base leading-tight">{m.full_name}</div>
+                                    <div className="text-xs text-muted-foreground">{m.email}</div>
+                                    {m.department && <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">{m.department}</div>}
+                                </div>
+                                <div className="col-span-2 text-xs">
+                                    <span className={`badge-mono ${m.role === "owner" ? "border-brand text-brand" : ""}`}>{m.role}</span>
+                                </div>
+                                <div className="col-span-4 text-xs text-muted-foreground grid grid-cols-3 gap-2">
+                                    <div><b className="text-foreground">{m.stats.enrollments}</b><br/>courses</div>
+                                    <div><b className="text-foreground">{m.stats.certificates}</b><br/>certs</div>
+                                    <div><b className="text-foreground">{m.stats.avg_progress}%</b><br/>avg</div>
+                                </div>
+                                <div className="col-span-1 text-right">
+                                    {isAdmin && m.role !== "owner" && (
+                                        <button onClick={() => removeMember(m.id)} data-testid={`remove-member-${m.user_id}`} className="p-1.5 text-muted-foreground hover:text-destructive">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Invite */}
+                    {isAdmin && (
+                        <div className="mt-8">
+                            <h3 className="font-serif text-xl mb-4">Invite team member</h3>
+                            <form onSubmit={invite} className="card-flat p-6 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <input type="email" required placeholder="employee@company.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} data-testid="invite-email" className="bg-surface border border-border rounded-sm px-3 py-2 text-sm md:col-span-2 focus:outline-none focus:border-brand" />
+                                    <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} data-testid="invite-role" className="bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand">
+                                        <option value="member">Member</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                                <input type="text" placeholder="Department (optional) — HR, Finance, Sales…" value={inviteDept} onChange={(e) => setInviteDept(e.target.value)} data-testid="invite-department" className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand" />
+                                {inviteError && <div className="text-sm text-destructive">{inviteError}</div>}
+                                <button type="submit" disabled={inviting || summary.seats_remaining <= 0} data-testid="send-invite" className="btn-primary">
+                                    {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" /> Send invite</>}
+                                </button>
+                                {summary.seats_remaining <= 0 && <div className="text-xs text-warning">No seats available — increase seat count in settings.</div>}
+                            </form>
+                        </div>
+                    )}
+                </div>
+
+                {/* Sidebar — Departments + Top Courses */}
+                <div className="lg:col-span-4 space-y-8">
+                    <div>
+                        <h2 className="font-serif text-xl tracking-tight mb-4">Departments</h2>
+                        <div className="card-flat">
+                            {departments.length === 0 ? (
+                                <div className="p-6 text-sm text-muted-foreground">No departments yet — assign departments when inviting.</div>
+                            ) : departments.map((d) => (
+                                <div key={d.name} className="p-4 border-b border-border last:border-b-0" data-testid={`dept-${d.name}`}>
+                                    <div className="flex justify-between items-baseline mb-2">
+                                        <div className="font-serif text-base">{d.name}</div>
+                                        <div className="text-xs text-muted-foreground">{d.members} people</div>
+                                    </div>
+                                    <div className="h-1 bg-border">
+                                        <div className="h-full bg-brand" style={{ width: `${Math.min(100, d.avg_progress)}%` }} />
+                                    </div>
+                                    <div className="flex justify-between text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">
+                                        <span>{d.avg_progress}% avg progress</span>
+                                        <span>{d.certificates} certs</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h2 className="font-serif text-xl tracking-tight mb-4">Top courses</h2>
+                        <div className="space-y-2">
+                            {top_courses.length === 0 ? (
+                                <div className="card-flat p-6 text-sm text-muted-foreground">No enrollments yet</div>
+                            ) : top_courses.map((c) => (
+                                <Link key={c.id} to={`/courses/${c.slug}`} className="card-flat p-4 flex gap-3 items-center hover:border-brand transition-colors" data-testid={`top-course-${c.slug}`}>
+                                    <div className="w-14 h-14 shrink-0 overflow-hidden border border-border">
+                                        <img src={c.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{c.category}</div>
+                                        <div className="font-serif text-sm leading-tight truncate">{c.title}</div>
+                                    </div>
+                                    <div className="text-xs font-mono text-brand">{c.enrolled_count}×</div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function StatCard({ label, value, unit, icon: Icon, accent, testId }) {
+    return (
+        <div className={`card-flat p-5 ${accent ? "border-brand border-2" : ""}`} data-testid={testId}>
+            <Icon className={`w-4 h-4 mb-2 ${accent ? "text-brand" : "text-muted-foreground"}`} />
+            <div className="font-serif text-3xl leading-none">
+                {value}<span className="text-sm text-muted-foreground">{unit}</span>
+            </div>
+            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-2">{label}</div>
+        </div>
+    );
+}

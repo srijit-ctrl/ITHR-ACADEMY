@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2 } from "lucide-react";
+import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2 } from "lucide-react";
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -45,6 +45,16 @@ export default function Dashboard() {
                     <StatCard icon={Award} label="Certificates" value={stats?.certificates || 0} testId="stat-certificates" />
                     <StatCard icon={TrendingUp} label="XP" value={stats?.xp || 0} testId="stat-xp" />
                     <StatCard icon={Flame} label="Day streak" value={stats?.streak_days || 0} testId="stat-streak" />
+                    <Link to="/enterprise/portal" data-testid="dashboard-enterprise-link" className="card-flat p-4 col-span-2 flex items-center justify-between hover:border-brand transition-colors">
+                        <div className="flex items-center gap-3">
+                            <Building2 className="w-4 h-4 text-brand" />
+                            <div>
+                                <div className="font-serif text-sm leading-none">Enterprise Portal</div>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Team dashboard · Invites · Seats</div>
+                            </div>
+                        </div>
+                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                    </Link>
                 </div>
             </div>
 
