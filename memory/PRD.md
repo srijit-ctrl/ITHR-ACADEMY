@@ -43,7 +43,27 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - **New collections**: `organizations`, `org_members`, `org_invites`, `curriculum_patches`
 - 75/75 tests pass
 
-### Iteration 5 — Phase 4 AI Layer + Expanded Assessment/Certification (current)
+### Iteration 6 — Phase 4+5: Patch Review UI, Stripe Seat Ops, Skills Passport, Role Paths, Adaptive Assessments, Inline Tutor (current)
+- **Curriculum Patch Review UI** at `/patches` — list + filter (pending/approved/rejected), inline preview, approve/reject actions.
+- **Stripe seat operations** in Enterprise Portal:
+  - `POST /api/enterprise/organizations/seats/preview` — real-time charge/credit preview.
+  - `POST /api/enterprise/organizations/seats` (increase) — returns Stripe Checkout URL; seats only bumped after `/seats/fulfill/{session_id}` verifies paid status.
+  - `POST /api/enterprise/organizations/seats` (decrease) — applies immediately + records prorated credit in `org_billing_events`.
+  - Enterprise Portal: `Manage seats` modal with live preview + `Billing history` sidebar for owners.
+- **AI Skills Passport**:
+  - `GET /api/passport/me` (auth) auto-generates a stable public slug.
+  - `GET /api/passport/{slug}` (public, no auth) — LinkedIn/CV-shareable.
+  - Category-to-skills mapping surfaces earned competencies from certified courses only.
+  - `/passport` and `/passport/:slug` pages with cert-QR-cards, LinkedIn share, copy-URL.
+- **Role-based learning paths**: 7 curated tracks (Product Manager, Engineer, Risk/Compliance, HR, Banking, Healthcare, Executive):
+  - `GET /api/paths`, `GET /api/paths/{slug}`, `POST /api/paths/{slug}/enroll` (bulk-enroll all courses in track).
+  - `/paths` and `/paths/:slug` pages.
+- **Adaptive assessments**: `/assessment/session?adaptive=true` returns `adaptive_mode` (`onboarding` / `escalate` / `reinforce`) and mixes difficulty buckets based on the learner's past attempts (60/30/10, 20/50/30, 55/35/10).
+- **Inline AI Tutor widget** (Aletheia) embedded in LessonViewer — 3 contextual quick-prompts (Explain / Example / Quiz me) + streaming chat scoped to the current lesson.
+- Full-course upsert now uses `$setOnInsert` for `quiz` so extended assessment banks persist across restarts.
+- **20/20 backend pytest + 10/10 frontend E2E scenarios pass** (iteration_6.json).
+
+
 - **AI Mentor (Solon)**: dedicated career coach persona separate from Aletheia (Tutor).
   - `POST /api/mentor/chat` streams SSE deltas via Claude Sonnet 4.5, persistent history per user.
   - `GET/DELETE /api/mentor/sessions[/{id}]` CRUD.
@@ -67,21 +87,19 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 
 ### P0 — Next
-- Curriculum patch review queue UI (admin/editor) with approve/reject workflow
-- Wire Stripe subscription updates on team seat adjustments
 - Weekly email digest to enterprise buyers with critical signals
+- Slack/Teams notifications on patch approvals
+- Certificate PDF export (server-side rendered, not just print)
 
 ### P1 — Milestone 2
-- AI Skills Passport (portable verifiable competency record)
-- Role-based learning paths (HR, Finance, Sales, Procurement, Manufacturing)
-- Renewal / CE credit engine
-- In-lesson inline AI Tutor Q&A widget (leveraging Aletheia)
-- Adaptive assessments (difficulty escalation based on prior answers)
+- Renewal / CE credit engine (annual re-certification workflows)
+- Multi-language content (i18n)
+- Advanced proctoring (webcam + focus loss detection)
+- Skills-gap report per organization (compare to industry benchmark)
+- Talent Directory: public opt-in registry of certified graduates
 
 ### P2 — Milestone 3 (Production Hardening)
 - Multi-tenant white-label, SSO (Azure AD, Okta, SCIM/LDAP)
-- Multi-language content
-- Advanced proctoring
 - Blockchain credential anchoring
 - Kubernetes + load testing (10M / 100K concurrent)
 - SOC 2 / ISO 27001 / GDPR / FERPA formal evidence
