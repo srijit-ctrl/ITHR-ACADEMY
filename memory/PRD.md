@@ -1,76 +1,87 @@
 # Enterprise Agentic AI Academy — PRD
 
 ## Original Problem Statement (Summary)
-Build a commercially deployable enterprise SaaS Learning & Certification Platform for Agentic AI — positioned as "Enterprise AI Workforce Transformation Platform" competing with Coursera Business, Microsoft Learn, Salesforce Trailhead, and AWS Skill Builder. Serve individual learners AND Fortune 500 companies. Course structure: 15 modules across 3 levels (Free 1–5, Premium 6–10, Certification 11–15). Multiple industries. Assessment engine + certification engine + AI tutor + enterprise dashboards.
+Build a commercially deployable enterprise SaaS Learning & Certification Platform for Agentic AI — positioned as an "Enterprise AI Workforce Transformation Platform" competing with Coursera Business, Microsoft Learn, Salesforce Trailhead, and AWS Skill Builder. Serve individual learners AND Fortune 500 companies. 15-module × 3-level course structure. Multiple industries. Assessment + certification + AI tutor + enterprise dashboards.
 
-## User Choices Confirmed (Feb 2026)
+**Iteration 2 addition (Feb 2026)**: Rebrand as ITHR Technologies value proposition — apply ITHR logo + teal/navy palette + add dedicated Pricing page + build real-time course intelligence system that keeps curriculum current.
+
+## User Choices Confirmed
 - Pillars: Learner portal + Assessment engine + Certification engine + Course catalog with industry tracks
 - AI: Claude Sonnet 4.5 via Emergent Universal LLM key
-- Auth: JWT email/password **+** Emergent-managed Google OAuth (both flows)
-- Payments: deferred (mark courses free/premium, no real Stripe yet)
+- Auth: JWT email/password + Emergent-managed Google OAuth (unified JWT)
+- Payments: deferred (pricing displayed, no Stripe yet)
 - Seed content: 1 full 15-module course + 22 catalog-metadata courses
+- Branding: ITHR Technologies (teal #00A896 + navy #1F3B78)
 
 ## Personas
-- Individual Learner (professional, developer, student)
-- Corporate Learner (HR, PM, analyst)
-- Training Manager / L&D
-- CXO / Enterprise Leader
-- Instructor / Content Author (deferred)
-- Corporate Admin (deferred to Milestone 2)
-- Super Admin (deferred)
+- Individual Learner, Corporate Learner, Training Manager, CXO/Enterprise Leader, Instructor (deferred), Corporate Admin (deferred to M2), Super Admin (deferred).
 
 ## Core Requirements (Static)
-1. **Auth**: JWT email/password + Google OAuth (both issue same JWT format, unified user record).
-2. **Course Catalog**: 20+ categories, 22 industries, 8-tier certification ladder, filter/search.
-3. **Course Structure**: 15 modules × ~5 lessons, 3 levels (Free/Premium/Certification).
-4. **Assessment Engine**: MCQ/multi-select/true-false/scenario. Randomized pool ready. 65% pass threshold.
-5. **Certification Engine**: Unique EAIA-2026-XXXXXX ID, public verification portal, printable credential.
-6. **AI Tutor "Aletheia"**: Streaming Claude Sonnet 4.5 via Emergent Universal Key, session-persistent chat.
-7. **Progress Tracking**: XP, streaks, per-lesson completion, enrollment progress bars.
-8. **Enterprise Marketing Pages**: Enterprise value prop, industry tracks, certification paths.
+1. Auth: dual JWT + Google OAuth
+2. Course Catalog: 20+ categories, 22 industries, 8-tier certification ladder, filter/search
+3. Course Structure: 15 modules × ~5 lessons, 3 levels (Free/Premium/Certification)
+4. Assessment Engine: MCQ/multi/true-false/scenario, 65% pass, randomized pool
+5. Certification Engine: EAIA-2026-XXXXXX IDs, public verification portal
+6. AI Tutor "Aletheia": Streaming Claude Sonnet 4.5, session-persistent
+7. Progress Tracking: XP, streaks, per-lesson completion
+8. Enterprise Marketing: Enterprise tier value prop, industry tracks, cert paths
+9. **ITHR Branding**: logo in header/footer, teal palette, "ITHR value proposition"
+10. **Pricing**: Individual (Explorer Free / Practitioner $29/mo / Professional $499) + Enterprise (Team $18/seat/mo / Enterprise custom / Global custom)
+11. **Real-time Intelligence**: Public /intelligence briefing refreshed every 6h; per-course refresh endpoint for authoring
 
-## What's Been Implemented (Feb 2026 — Milestone 1 Core)
-- ✅ Backend (FastAPI + MongoDB + JWT + bcrypt)
-- ✅ Backend auth: register / login / me + Emergent Google OAuth exchange (`/api/auth/google/callback`)
-- ✅ Course catalog: 1 full course (Agentic AI Foundations — 15 modules, 75 lessons, 12-question quiz) + 22 catalog metadata courses
-- ✅ Enrollment + lesson completion + progress tracking
-- ✅ Quiz engine with scoring + certificate auto-issuance on pass
-- ✅ Public certificate verification portal
-- ✅ AI Tutor "Aletheia" (Claude Sonnet 4.5, SSE streaming, persistent chat sessions)
-- ✅ Landing page (Ivy League design), Course Catalog with filters, Course Detail, Lesson Viewer, Dashboard, Quiz, Certificate view, Verify page, Industries page, Enterprise pricing page, Certifications ladder
-- ✅ Frontend design: Cormorant Garamond + IBM Plex Sans + crimson accent, parchment/oxford palette
-- ✅ Emergent Google OAuth flow + email/password (dual login on both /login and /register)
-- ✅ Test coverage: 27/27 backend pytest tests passing
+## What's Been Implemented
+
+### Iteration 1 (Feb 2026 — Milestone 1 Core)
+- ✅ FastAPI + MongoDB backend with JWT + bcrypt + Emergent Google OAuth
+- ✅ Catalog: 1 full course (75 lessons, 12-Q quiz) + 22 catalog metadata courses
+- ✅ Enrollment + lesson completion + XP + progress tracking
+- ✅ Quiz + certificate auto-issuance + public verification
+- ✅ AI Tutor Aletheia (Claude Sonnet 4.5, SSE streaming, persistent chat sessions)
+- ✅ All pages: Landing, Catalog, Course Detail, Lesson Viewer, Dashboard, Quiz, Certificate, Verify, Industries, Enterprise, Certifications, Login/Register
+- ✅ 27/27 backend tests + full frontend e2e pass
+
+### Iteration 2 (Feb 2026 — ITHR Rebrand + Intelligence)
+- ✅ Full ITHR Technologies rebrand: logo in header + footer + hero, teal palette (#00A896), navy accent, copyright ITHR Technologies Consulting LLC
+- ✅ Dedicated `/pricing` page with 6 plans (3 individual + 3 enterprise) + real-time intelligence value prop
+- ✅ Real-time **Intelligence Desk**: public `/intelligence` briefing generated by Claude Sonnet 4.5 with 8 signals (Model Release / Framework / Regulation / Enterprise / Research / Security / Standards) + 8 course refresh priorities; 6h Mongo cache with force-regenerate
+- ✅ Backend endpoints: `GET /api/intelligence/briefing` (public, 6h cache) + `GET /api/intelligence/course/{slug}/refresh` (auth, 12h cache — freshness_score + gaps + new_lessons_suggested + deprecations + executive_note)
+- ✅ Landing page updated: ITHR value prop hero + dark navy "Curriculum that refreshes itself" section
+- ✅ 33/33 backend tests + frontend e2e pass
 
 ## Prioritized Backlog
 
-### P0 (next iteration)
-- **Payments/Subscriptions**: Stripe integration for premium tier + enterprise seats
-- **Full curriculum authoring**: Extend the 22 catalog courses with real lesson content
-- **AI course generator UI**: The backend endpoint exists (`/api/ai/generate-course`) but no admin UI
+### P0 — Next
+- Stripe integration for Practitioner/Professional/Team billing
+- Author full curriculum for 5 more catalog courses (Banking, Healthcare, Manufacturing, RAG, Multi-Agent)
+- Admin UI for AI course generator (`/api/ai/generate-course` backend endpoint already live)
+- Auto-apply intelligence signals to course "last_updated" timestamps + display freshness scores on Course Detail
 
-### P1 (Milestone 2)
-- **Enterprise Portal** (Layer 2): org management, employee dashboard, department analytics
-- **AI Skills Passport** (Layer 2): portable verifiable competency record
-- **Manager dashboards** (Layer 2): team progress, skill gaps
-- **AI Mentor + AI Career Advisor**: role-based coaching separate from lesson-tutor
-- **AI Recommendation Engine**: next-best course based on progress + role
-- **Renewal / CE credit engine**: keep credentials current
+### P1 — Milestone 2 (Layer 2 Enterprise Transformation)
+- Enterprise Portal (org registration, invite employees, team analytics, department dashboards)
+- AI Skills Passport
+- Role-based learning paths (HR, Finance, Sales, Procurement, Manufacturing)
+- Manager dashboards
+- AI Mentor + AI Career Advisor
+- AI Recommendation Engine
+- Renewal / CE credit engine
+- Weekly email digests to enterprise buyers with the top critical-impact intelligence signals
 
-### P2 (Milestone 3 — production hardening)
-- Multi-tenant white-label + SSO (Azure AD, Okta, SCIM/LDAP)
+### P2 — Milestone 3 (Production Hardening)
+- Multi-tenant white-label, SSO (Azure AD, Okta, SCIM/LDAP)
 - Multi-language content
-- Advanced proctoring (webcam + screen)
-- Blockchain credential anchoring (currently stub)
-- Kubernetes deployment, load testing (10M users / 100k concurrent target)
+- Advanced proctoring
+- Blockchain credential anchoring
+- Kubernetes + load testing (10M / 100K concurrent)
 - SOC 2 / ISO 27001 / GDPR / FERPA formal evidence
 
-## Next Tasks (immediate)
-1. Wire real payments (Stripe) with tiered plans for Layer 1 sellability
-2. Author lesson content for 5 more catalog courses (Industry-specific: Banking, Healthcare, Manufacturing, RAG, Multi-Agent)
-3. Build Enterprise Portal MVP (org registration, invite employees, view team progress)
-4. Add AI-course-generator admin UI (backend endpoint ready)
+## Next Tasks (Immediate)
+1. Stripe integration for Practitioner / Team plans
+2. Author 3 more full courses to broaden certification catalog
+3. Add course freshness badge on Course Card / Course Detail (surface the intelligence data users are paying for)
+4. Weekly digest email endpoint for enterprise buyers
 
-## Test Users
-- No pre-seeded accounts. Register fresh via `/api/auth/register`.
-- See `/app/memory/test_credentials.md` and `/app/auth_testing.md`.
+## Test Users & Files
+- No pre-seeded users. Register via `POST /api/auth/register`.
+- Backend test suite: `/app/backend/tests/backend_test.py` (33/33 pass)
+- Auth playbook: `/app/auth_testing.md`
+- Test credentials memo: `/app/memory/test_credentials.md`

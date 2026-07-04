@@ -118,6 +118,9 @@
     .badge-crimson {
         @apply inline-flex items-center px-2.5 py-0.5 rounded-none border border-brand text-[10px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
     }
+    .badge-brand {
+        @apply inline-flex items-center px-2.5 py-0.5 rounded-none border border-brand text-[10px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
+    }
     .glass-header {
         @apply backdrop-blur-xl bg-background/80 border-b border-border;
     }
