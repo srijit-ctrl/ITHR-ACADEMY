@@ -41,7 +41,7 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
                         <span className="badge-mono bg-background/95 backdrop-blur border-brand text-brand">Full curriculum</span>
                     )}
                     <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-mono uppercase tracking-[0.15em] backdrop-blur border ${freshnessColor(score)} bg-background/90`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-mono uppercase tracking-[0.15em] border ${freshnessColor(score)} bg-background shadow-sm`}
                         data-testid={`freshness-badge-${course.slug}`}
                         title={freshnessLabel(course.days_since_review)}
                     >
