@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Building2, Users, TrendingUp, ShieldCheck, Zap, Award, ArrowRight, Check } from "lucide-react";
+import HeroBlobs from "@/components/HeroBlobs";
 
 const CAPABILITIES = [
     { icon: Users, title: "AI Skills Passport", desc: "A portable, verifiable record of AI competencies for every employee — accepted across the organization." },
@@ -19,33 +20,42 @@ const PLANS = [
 export default function Enterprise() {
     return (
         <div>
-            {/* Hero */}
-            <section className="border-b border-border">
-                <div className="container-page py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                    <div className="lg:col-span-7">
-                        <div className="overline mb-4 fine-rule pl-4">For Enterprise</div>
+            {/* Hero — aiilm blob style */}
+            <section className="relative overflow-hidden bg-white">
+                <HeroBlobs variant="warm" />
+                <div className="relative container-page py-20 md:py-28 z-10">
+                    <div className="max-w-4xl mx-auto text-center">
+                        <span className="section-kicker">For Enterprise</span>
                         <h1 className="font-serif text-5xl md:text-7xl tracking-tighter leading-[1.02] mb-6">
-                            From LMS to<br />
-                            <span className="italic text-brand">workforce transformation.</span>
+                            From LMS to <span className="italic text-brand">workforce transformation.</span>
                         </h1>
-                        <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-8 max-w-2xl">
-                            The Agentic AI Academy Enterprise Tier gives you more than courses. You get an organization-wide capability system — passports, readiness diagnostics, role-based paths, and dashboards that show where AI fluency sits in your business.
+                        <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-10 max-w-2xl mx-auto">
+                            The ITHR Academy Enterprise Tier gives you more than courses. You get an organization-wide capability system &mdash; passports, readiness diagnostics, role-based paths, and dashboards that show where AI fluency sits in your business.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <a href="mailto:enterprise@agenticai.academy" data-testid="enterprise-book-demo" className="btn-primary">Book a demo <ArrowRight className="w-4 h-4" /></a>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
+                            <a href="mailto:enterprise@ithr.tech" data-testid="enterprise-book-demo" className="btn-primary">
+                                Book a demo <ArrowRight className="w-4 h-4" />
+                            </a>
                             <Link to="/courses" data-testid="enterprise-see-catalog" className="btn-outline">See the catalog</Link>
                         </div>
-                    </div>
-                    <div className="lg:col-span-5">
-                        <div className="card-flat p-8 space-y-4">
-                            <div className="overline">Trusted by</div>
-                            <div className="font-serif text-4xl leading-none">400+ Enterprises</div>
-                            <div className="h-px bg-border" />
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div><div className="font-serif text-3xl text-brand">2.3×</div><div className="text-muted-foreground">Higher AI ROI</div></div>
-                                <div><div className="font-serif text-3xl text-brand">68%</div><div className="text-muted-foreground">Faster upskilling</div></div>
-                                <div><div className="font-serif text-3xl text-brand">128k</div><div className="text-muted-foreground">Certified in 2026</div></div>
-                                <div><div className="font-serif text-3xl text-brand">99.9%</div><div className="text-muted-foreground">Platform SLA</div></div>
+
+                        {/* Stat pips */}
+                        <div className="flex flex-wrap justify-center gap-x-14 gap-y-6 pt-8 border-t border-border">
+                            <div className="text-left">
+                                <div className="font-serif text-3xl leading-none text-brand">2.3×</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Higher AI ROI</div>
+                            </div>
+                            <div className="text-left">
+                                <div className="font-serif text-3xl leading-none text-brand">68%</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Faster upskilling</div>
+                            </div>
+                            <div className="text-left">
+                                <div className="font-serif text-3xl leading-none text-brand">128k</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Certified · Q1 2026</div>
+                            </div>
+                            <div className="text-left">
+                                <div className="font-serif text-3xl leading-none text-brand">400+</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Enterprises</div>
                             </div>
                         </div>
                     </div>
@@ -54,8 +64,8 @@ export default function Enterprise() {
 
             {/* Capabilities */}
             <section className="container-page py-24">
-                <div className="max-w-2xl mb-16">
-                    <div className="overline mb-4 fine-rule pl-4">Layer II — Premium Tier</div>
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    <span className="section-kicker">Layer II · Premium</span>
                     <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-tight">
                         Six capabilities beyond the LMS.
                     </h2>
@@ -63,7 +73,7 @@ export default function Enterprise() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {CAPABILITIES.map((c) => (
-                        <div key={c.title} className="card-flat p-8" data-testid={`capability-${c.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                        <div key={c.title} className="step-card" data-testid={`capability-${c.title.toLowerCase().replace(/\s+/g, "-")}`}>
                             <c.icon className="w-6 h-6 text-brand mb-5" />
                             <div className="font-serif text-xl leading-tight mb-3">{c.title}</div>
                             <p className="text-sm text-muted-foreground leading-relaxed">{c.desc}</p>
@@ -72,33 +82,37 @@ export default function Enterprise() {
                 </div>
             </section>
 
-            {/* Pricing */}
-            <section className="border-t border-border bg-surface-alt/40 py-24">
+            {/* Pricing — colored blocks */}
+            <section className="section-warm-mint py-24">
                 <div className="container-page">
                     <div className="text-center max-w-2xl mx-auto mb-14">
-                        <div className="overline mb-4">Enterprise Plans</div>
+                        <span className="section-kicker">Enterprise Plans</span>
                         <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-tight">
                             Priced by seats. Delivered as outcomes.
                         </h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-                        {PLANS.map((p) => (
+                        {PLANS.map((p, i) => (
                             <div
                                 key={p.name}
-                                className={`card-flat p-8 relative ${p.featured ? "border-brand border-2" : ""}`}
+                                className={`color-card ${["color-card-blue", "color-card-purple", "color-card-navy"][i]}`}
                                 data-testid={`plan-${p.name.toLowerCase()}`}
                             >
-                                {p.featured && <div className="absolute -top-3 left-8 badge-crimson bg-background">Most popular</div>}
-                                <div className="font-serif text-3xl leading-none mb-1">{p.name}</div>
-                                <div className="text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground mb-6">{p.seats}</div>
-                                <div className="text-2xl mb-6">{p.price}</div>
-                                <ul className="space-y-2 text-sm mb-8">
+                                <div className="color-card-kicker">{p.seats}</div>
+                                <div className="font-serif text-3xl md:text-4xl tracking-tight mb-2 leading-none">{p.name}</div>
+                                <div className="text-lg opacity-80 mb-5">{p.price}</div>
+                                <ul className="space-y-2 text-sm mb-6 flex-1 opacity-95">
                                     {p.features.map((f) => (
-                                        <li key={f} className="flex gap-2"><Check className="w-4 h-4 text-brand mt-0.5 shrink-0" />{f}</li>
+                                        <li key={f} className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 opacity-80" />{f}</li>
                                     ))}
                                 </ul>
-                                <a href="mailto:enterprise@agenticai.academy" className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}>Contact sales</a>
+                                <a
+                                    href="mailto:enterprise@ithr.tech"
+                                    className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 bg-white/20 backdrop-blur hover:bg-white/30 text-sm font-semibold transition-colors self-start"
+                                >
+                                    Contact sales <ArrowRight className="w-3.5 h-3.5" />
+                                </a>
                             </div>
                         ))}
                     </div>

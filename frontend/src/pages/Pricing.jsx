@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Check, ArrowRight, Building2, User, Loader2 } from "lucide-react";
+import HeroBlobs from "@/components/HeroBlobs";
 
 const INDIVIDUAL = [
     {
@@ -154,15 +155,16 @@ export default function Pricing() {
 
     return (
         <div>
-            {/* Hero */}
-            <section className="border-b border-border">
-                <div className="container-page py-20 md:py-24 text-center max-w-3xl mx-auto">
-                    <div className="overline mb-4">Pricing</div>
-                    <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none mb-5">
+            {/* Hero — aiilm blob style */}
+            <section className="relative overflow-hidden bg-white">
+                <HeroBlobs variant="cool" />
+                <div className="relative container-page py-20 md:py-24 text-center max-w-3xl mx-auto z-10">
+                    <span className="section-kicker">Pricing</span>
+                    <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none mb-6">
                         Pricing that <span className="italic text-brand">scales</span> with your ambition.
                     </h1>
                     <p className="text-lg text-muted-foreground leading-relaxed">
-                        Free for exploration. Fair for professionals. Bespoke for enterprises. Every plan includes ITHR's real-time curriculum intelligence — courses that refresh as the field moves.
+                        Free for exploration. Fair for professionals. Bespoke for enterprises. Every plan includes ITHR&apos;s real-time curriculum intelligence &mdash; courses that refresh as the field moves.
                     </p>
                 </div>
             </section>

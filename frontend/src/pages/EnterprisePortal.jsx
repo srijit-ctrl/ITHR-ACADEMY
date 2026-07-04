@@ -155,24 +155,27 @@ export default function EnterprisePortal() {
     const isOwner = membership.role === "owner";
 
     return (
-        <div className="container-page py-12">
-            {/* Header */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-12">
-                <div className="md:col-span-8">
-                    <div className="overline mb-4 fine-rule pl-4">{org.industry || "Enterprise"} · {membership.role.toUpperCase()}</div>
-                    <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none" data-testid="org-name">{org.name}</h1>
-                    <p className="mt-4 text-muted-foreground max-w-xl">
-                        {summary.seats_used} of {summary.seat_count} seats active · {summary.total_certificates} certifications earned by your team
-                    </p>
-                    <div className="mt-5 flex gap-3 flex-wrap">
-                        <Link to="/patches" data-testid="portal-patches-link" className="btn-outline text-xs">
-                            <Sparkles className="w-3 h-3" /> Curriculum patches
-                        </Link>
-                        {isOwner && (
-                            <button
-                                onClick={() => { setShowSeatEditor(true); setSeatTarget(org.seat_count); }}
-                                data-testid="manage-seats"
-                                className="btn-outline text-xs"
+        <div>
+            {/* Hero with blobs */}
+            <section className="relative overflow-hidden bg-white">
+                <HeroBlobs variant="cool" />
+                <div className="relative container-page pt-12 pb-8 z-10">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                        <div className="md:col-span-8">
+                            <span className="section-kicker">{org.industry || "Enterprise"} · {membership.role.toUpperCase()}</span>
+                            <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none" data-testid="org-name">{org.name}</h1>
+                            <p className="mt-4 text-muted-foreground max-w-xl">
+                                {summary.seats_used} of {summary.seat_count} seats active · {summary.total_certificates} certifications earned by your team
+                            </p>
+                            <div className="mt-5 flex gap-3 flex-wrap">
+                                <Link to="/patches" data-testid="portal-patches-link" className="btn-outline text-xs">
+                                    <Sparkles className="w-3 h-3" /> Curriculum patches
+                                </Link>
+                                {isOwner && (
+                                    <button
+                                        onClick={() => { setShowSeatEditor(true); setSeatTarget(org.seat_count); }}
+                                        data-testid="manage-seats"
+                                        className="btn-outline text-xs"
                             >
                                 <Settings className="w-3 h-3" /> Manage seats
                             </button>
@@ -192,6 +195,9 @@ export default function EnterprisePortal() {
                     </div>
                 </div>
             </div>
+            </section>
+
+            <div className="container-page pb-12">
 
             {/* Seat editor modal */}
             {showSeatEditor && (
