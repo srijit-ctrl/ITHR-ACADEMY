@@ -65,7 +65,7 @@ export default function AITutorPanel({ courseSlug = null }) {
                 <button
                     onClick={() => setOpen(true)}
                     data-testid="open-ai-tutor"
-                    className="fixed bottom-6 right-6 z-50 group flex items-center gap-2 bg-foreground text-background rounded-sm pl-4 pr-5 py-3 shadow-[0_10px_40px_-10px_rgba(163,22,33,0.4)] hover:bg-brand transition-all duration-300"
+                    className="fixed bottom-6 left-6 z-50 group flex items-center gap-2 bg-foreground text-background rounded-sm pl-4 pr-5 py-3 shadow-[0_10px_40px_-10px_rgba(163,22,33,0.4)] hover:bg-brand transition-all duration-300"
                 >
                     <div className="relative">
                         <Sparkles className="w-5 h-5" />
@@ -77,7 +77,7 @@ export default function AITutorPanel({ courseSlug = null }) {
 
             {open && (
                 <div
-                    className="fixed bottom-6 right-6 z-50 w-[calc(100vw-3rem)] sm:w-[440px] h-[600px] max-h-[calc(100vh-3rem)] card-flat shadow-[0_30px_80px_-20px_rgba(13,19,33,0.35)] flex flex-col overflow-hidden"
+                    className="fixed bottom-6 left-6 z-50 w-[calc(100vw-3rem)] sm:w-[440px] h-[600px] max-h-[calc(100vh-3rem)] card-flat shadow-[0_30px_80px_-20px_rgba(13,19,33,0.35)] flex flex-col overflow-hidden"
                     data-testid="ai-tutor-panel"
                 >
                     <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-alt/60 backdrop-blur-xl">
