@@ -364,9 +364,29 @@ Surgical fixes applied to the real (non-false-positive) findings from the earlie
 - `is` vs `==` on `is None` checks — idiomatic Python, not bugs.
 - Reactor Quiz.jsx / LessonViewer.jsx stale-closure claims — both files already use `useCallback` correctly with the right deps (verified this iteration).
 
-**Backlog (P1/P2) — unchanged**
-- P1: Stripe webhook proration hardening during seat adjustments.
-- P2: Print CSS + WeasyPrint template palette alignment to ITHR Teal/Navy.
-- P2: Resend API key wiring (blocked on user-provided key — currently graceful bypass).
-- P2: Platform hardening for production (K8s config, caching, CI/CD, full test suite).
+### Iteration 20 — Code-Quality Sweep #2 (Feb 2026)
+
+Second-round fixes from the follow-up Code Review. Focus on **real** issues; the "eval() in seed_assessments" and "missing DOMPurify in 3 files" flagged again are the SAME false positives already verified in iter-14 & iter-19 (`grep` confirmed).
+
+**Backend refactors — pure structural, no behaviour change:**
+- `routers/admin_router.py::create_org_with_admin` (was 101 lines, complexity 11) → split into `_validate_create_org_payload`, `_unique_org_slug`, `_insert_admin_user`.
+- `routers/enterprise_router.py::update_seats` (was 110 lines) → split into `_validate_seat_change`, `_apply_seat_decrease`, `_start_seat_increment_checkout`.
+- `routers/enterprise_router.py::admin_create_user` (was 78 lines, complexity 12) → validation extracted into `_validate_admin_user_payload`.
+- `routers/recommendation_router.py::_score_courses` (was 71 lines, nesting 6, complexity 18) → split into `_learner_posture`, `_difficulty_score`, `_score_one_course`.
+
+**Frontend real fixes:**
+- Array-index-as-key removed in 3 flagged files: `CourseDetail.jsx` (learning objectives now `key={\`objective-${i}-${o.slice(0,24)}\`}`), `CourseCatalog.jsx` (skeleton now `key={\`skeleton-${i}\`}`), `HeroBlobs.jsx` (blob now `key={\`blob-${b.cls}-${i}\`}`).
+- `context/AuthContext.jsx::logout` empty catch replaced with `console.debug("[Auth] logout POST failed (non-fatal): ...")` — errors observable without breaking UX.
+- `pages/SuperAdminPortal.jsx::loadAll` wrapped in `useCallback([])`; `useEffect` deps now correctly list `[user, loadAll]` — the flagged missing hook dep. No infinite re-renders in testing.
+
+**Deliberately skipped (documented false positives / high-risk-low-value):**
+- `eval()` in seed_assessments.py — no `eval()` exists in the backend (grep-verified iter 14 + iter 20).
+- `DOMPurify` missing in `LessonViewer:137 / Intelligence:259 / TryALesson:122` — all three DO call `DOMPurify.sanitize()` (grep-verified). Same false positive as iter 14.
+- Complexity refactors of `TryALesson.jsx` / `InlineTutor.jsx` / `AITutorPanel.jsx` / `EnterprisePortal.jsx` — high regression risk, no behavioural benefit. Deferred as P2 tech-debt.
+- `assessment_router.py::random` — used with an explicit user-visible seed for **reproducible** shuffling (documented design choice), not for security tokens. Safe as-is.
+
+**Testing verdict (iteration_20.json):**
+- Backend: **14/14 (100%)** on new refactor suite (`test_iteration20_refactors.py`), 26/29 on iter-15+iter-16 baseline (3 failures are the SAME pre-existing `.test`-TLD email_validator issue documented for 5+ iterations).
+- Frontend: **5/5 (100%)** — Landing, Catalog, CourseDetail, Intelligence, SuperAdmin. Zero React key warnings, zero non-401 console errors, zero infinite re-render warnings.
+
 
