@@ -77,18 +77,11 @@ def _build_chat(session_id: str, extra_context: Optional[str] = None) -> LlmChat
     ).with_model("anthropic", "claude-sonnet-4-5-20250929")
 
 
-@router.post("/mentor/chat")
-async def mentor_chat(payload: MentorRequest, user_id: str = Depends(get_current_user_id)):
-    session_id = payload.session_id or str(uuid.uuid4())
-    session = await db.mentor_sessions.find_one(
-        {"id": session_id, "user_id": user_id}, {"_id": 0}
-    )
-    history = session.get("messages", []) if session else []
-
-    # Attach persistent learner context if the user has a profile stored.
-    ctx_lines = []
-    if payload.context:
-        for k, v in payload.context.items():
+async def _build_context_block(payload_context: Optional[dict], user_id: str) -> Optional[str]:
+    """Assemble a compact context block from request + stored user profile."""
+    ctx_lines: list[str] = []
+    if payload_context:
+        for k, v in payload_context.items():
             if v:
                 ctx_lines.append(f"- {k}: {v}")
     user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "title": 1, "organization": 1})
@@ -97,21 +90,56 @@ async def mentor_chat(payload: MentorRequest, user_id: str = Depends(get_current
             ctx_lines.append(f"- title: {user_doc['title']}")
         if user_doc.get("organization"):
             ctx_lines.append(f"- organization: {user_doc['organization']}")
-    context_block = "\n".join(ctx_lines) if ctx_lines else None
+    return "\n".join(ctx_lines) if ctx_lines else None
 
+
+def _preamble_with_history(history: list[dict], new_message: str) -> str:
+    """Feed prior turns as a preamble so the model has continuity even when
+    the emergentintegrations session cache expires."""
+    if not history:
+        return new_message
+    recap = "\n".join(f"{m['role'].upper()}: {m['content'][:400]}" for m in history[-6:])
+    return f"Prior conversation summary (do not repeat):\n{recap}\n\nNew learner turn:\n{new_message}"
+
+
+async def _persist_mentor_turn(
+    session_id: str, user_id: str, existing_session: Optional[dict],
+    user_message: str, assistant_message: str,
+) -> None:
+    user_msg = {"role": "user", "content": user_message, "timestamp": now_iso()}
+    ai_msg = {"role": "assistant", "content": assistant_message, "timestamp": now_iso()}
+    if existing_session:
+        await db.mentor_sessions.update_one(
+            {"id": session_id},
+            {"$push": {"messages": {"$each": [user_msg, ai_msg]}},
+             "$set": {"updated_at": now_iso()}},
+        )
+    else:
+        await db.mentor_sessions.insert_one({
+            "id": session_id,
+            "user_id": user_id,
+            "title": user_message[:60],
+            "messages": [user_msg, ai_msg],
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+        })
+
+
+@router.post("/mentor/chat")
+async def mentor_chat(payload: MentorRequest, user_id: str = Depends(get_current_user_id)):
+    session_id = payload.session_id or str(uuid.uuid4())
+    session = await db.mentor_sessions.find_one(
+        {"id": session_id, "user_id": user_id}, {"_id": 0}
+    )
+    history = session.get("messages", []) if session else []
+    context_block = await _build_context_block(payload.context, user_id)
     chat = _build_chat(session_id, context_block)
+    prompt = _preamble_with_history(history, payload.message)
 
     async def event_generator():
-        collected = []
-        # Feed prior turns as a preamble so the model has continuity even
-        # when emergentintegrations session-cache expires.
-        preamble = None
-        if history:
-            recap = "\n".join(f"{m['role'].upper()}: {m['content'][:400]}" for m in history[-6:])
-            preamble = f"Prior conversation summary (do not repeat):\n{recap}\n\nNew learner turn:\n{payload.message}"
+        collected: list[str] = []
         try:
-            msg = UserMessage(text=preamble or payload.message)
-            async for event in chat.stream_message(msg):
+            async for event in chat.stream_message(UserMessage(text=prompt)):
                 if isinstance(event, TextDelta):
                     collected.append(event.content)
                     yield f"data: {json.dumps({'delta': event.content})}\n\n"
@@ -122,24 +150,7 @@ async def mentor_chat(payload: MentorRequest, user_id: str = Depends(get_current
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
 
-        full = "".join(collected)
-        user_msg = {"role": "user", "content": payload.message, "timestamp": now_iso()}
-        ai_msg = {"role": "assistant", "content": full, "timestamp": now_iso()}
-        if session:
-            await db.mentor_sessions.update_one(
-                {"id": session_id},
-                {"$push": {"messages": {"$each": [user_msg, ai_msg]}},
-                 "$set": {"updated_at": now_iso()}},
-            )
-        else:
-            await db.mentor_sessions.insert_one({
-                "id": session_id,
-                "user_id": user_id,
-                "title": payload.message[:60],
-                "messages": [user_msg, ai_msg],
-                "created_at": now_iso(),
-                "updated_at": now_iso(),
-            })
+        await _persist_mentor_turn(session_id, user_id, session, payload.message, "".join(collected))
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
 
     return StreamingResponse(

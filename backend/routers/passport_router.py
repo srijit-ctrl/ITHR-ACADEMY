@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 
 import uuid
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -71,6 +72,76 @@ CATEGORY_TO_SKILLS = {
 }
 
 
+async def _fetch_course_map(course_ids: list[str]) -> dict[str, dict]:
+    if not course_ids:
+        return {}
+    docs = await db.courses.find(
+        {"id": {"$in": course_ids}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "category": 1, "industries": 1, "difficulty": 1, "duration_hours": 1},
+    ).to_list(200)
+    return {c["id"]: c for c in docs}
+
+
+def _skills_from_certs(certs: list[dict], course_map: dict[str, dict]) -> tuple[list[str], list[str]]:
+    """Return (sorted_skills, sorted_completed_categories) derived from cert list."""
+    skills: set[str] = set()
+    categories: set[str] = set()
+    for cert in certs:
+        c = course_map.get(cert["course_id"])
+        if not c:
+            continue
+        cat = c.get("category") or ""
+        categories.add(cat)
+        skills.update(CATEGORY_TO_SKILLS.get(cat, []))
+    return sorted(skills), sorted(categories)
+
+
+def _credential_level_from_certs(certs: list[dict], course_map: dict[str, dict]) -> str:
+    ladder = ["Beginner", "Intermediate", "Advanced", "Expert", "Architect", "Enterprise Leader", "CXO"]
+    max_idx = -1
+    for cert in certs:
+        c = course_map.get(cert["course_id"])
+        if not c:
+            continue
+        try:
+            idx = ladder.index(c.get("difficulty", "Beginner"))
+            if idx > max_idx:
+                max_idx = idx
+        except ValueError:
+            continue
+    return ladder[max_idx] if max_idx >= 0 else "Learner"
+
+
+def _industry_footprint(certs: list[dict], course_map: dict[str, dict]) -> list[str]:
+    inds: set[str] = set()
+    for cert in certs:
+        c = course_map.get(cert["course_id"])
+        if c:
+            inds.update(c.get("industries", []))
+    return sorted(inds)
+
+
+def _learning_hours(certs: list[dict], course_map: dict[str, dict]) -> int:
+    total = 0
+    for cert in certs:
+        c = course_map.get(cert["course_id"])
+        if c:
+            total += c.get("duration_hours", 0) or 0
+    return total
+
+
+def _serialise_cert(cert: dict) -> Optional[dict]:
+    if not cert or not cert.get("certificate_id") or not cert.get("course_title"):
+        return None
+    return {
+        "certificate_id": cert["certificate_id"],
+        "course_title": cert["course_title"],
+        "score": cert.get("score"),
+        "issued_at": cert.get("issued_at"),
+        "verification_url": cert.get("verification_url"),
+    }
+
+
 async def _build_passport(user: dict) -> dict:
     user_id = user["id"]
     certs = await db.certificates.find(
@@ -80,82 +151,25 @@ async def _build_passport(user: dict) -> dict:
         {"user_id": user_id}, {"_id": 0}
     ).to_list(500)
 
-    # Resolve course meta for skills mapping
     all_course_ids = list({e["course_id"] for e in enrollments} | {c["course_id"] for c in certs})
-    course_map = {}
-    if all_course_ids:
-        for c in await db.courses.find(
-            {"id": {"$in": all_course_ids}},
-            {"_id": 0, "id": 1, "slug": 1, "title": 1, "category": 1, "industries": 1, "difficulty": 1},
-        ).to_list(200):
-            course_map[c["id"]] = c
+    course_map = await _fetch_course_map(all_course_ids)
 
-    # Skills earned from CERTIFIED categories only (not just enrolled)
-    skills = set()
-    completed_categories = set()
-    for cert in certs:
-        c = course_map.get(cert["course_id"])
-        if not c:
-            continue
-        cat = c.get("category") or ""
-        completed_categories.add(cat)
-        for skill in CATEGORY_TO_SKILLS.get(cat, []):
-            skills.add(skill)
+    skills, categories = _skills_from_certs(certs, course_map)
+    credential_level = _credential_level_from_certs(certs, course_map)
+    industries = _industry_footprint(certs, course_map)
+    hours = _learning_hours(certs, course_map)
 
-    # Credential ladder position (from difficulty of completed courses)
-    ladder = ["Beginner", "Intermediate", "Advanced", "Expert", "Architect", "Enterprise Leader", "CXO"]
-    max_level_idx = -1
-    for cert in certs:
-        c = course_map.get(cert["course_id"])
-        if c:
-            try:
-                idx = ladder.index(c.get("difficulty", "Beginner"))
-                if idx > max_level_idx:
-                    max_level_idx = idx
-            except ValueError:
-                pass
-    credential_level = ladder[max_level_idx] if max_level_idx >= 0 else "Learner"
-
-    # Industry footprint
-    industries = set()
-    for cert in certs:
-        c = course_map.get(cert["course_id"])
-        if c:
-            industries.update(c.get("industries", []))
-
-    # Total learning hours from certified courses
-    hours = 0
-    for cert in certs:
-        c = course_map.get(cert["course_id"])
-        if c:
-            course_doc = await db.courses.find_one(
-                {"id": c["id"]}, {"_id": 0, "duration_hours": 1}
-            )
-            hours += (course_doc or {}).get("duration_hours", 0)
-
-    xp = user.get("xp", 0)
     return {
         "passport_slug": user.get("passport_slug"),
         "full_name": user.get("full_name"),
         "title": user.get("title"),
         "organization": user.get("organization"),
         "credential_level": credential_level,
-        "xp": xp,
-        # Defensive filter — skip any malformed cert docs missing the id (scanner-friendly).
-        "certificates": [
-            {
-                "certificate_id": cert["certificate_id"],
-                "course_title": cert["course_title"],
-                "score": cert.get("score"),
-                "issued_at": cert.get("issued_at"),
-                "verification_url": cert.get("verification_url"),
-            }
-            for cert in certs
-            if cert and cert.get("certificate_id") and cert.get("course_title")
-        ],
-        "skills": sorted(skills),
-        "categories": sorted(completed_categories),
-        "industries": sorted(industries),
+        "xp": user.get("xp", 0),
+        "certificates": [c for c in (_serialise_cert(cert) for cert in certs) if c],
+        "skills": skills,
+        "categories": categories,
+        "industries": industries,
         "learning_hours": hours,
         "generated_at": now_iso(),
     }

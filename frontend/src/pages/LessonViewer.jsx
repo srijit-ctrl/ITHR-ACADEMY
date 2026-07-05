@@ -151,8 +151,8 @@ export default function LessonViewer() {
                     <div className="mt-10 card-flat p-6 bg-surface-alt/40">
                         <div className="overline mb-4">Key Takeaways</div>
                         <ul className="space-y-2">
-                            {lesson.key_takeaways.map((t, i) => (
-                                <li key={i} className="flex gap-3 text-sm">
+                            {lesson.key_takeaways.map((t) => (
+                                <li key={t} className="flex gap-3 text-sm">
                                     <CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" />
                                     <span>{t}</span>
                                 </li>

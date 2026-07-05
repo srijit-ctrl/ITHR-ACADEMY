@@ -229,7 +229,7 @@ export default function Trust() {
                     </div>
                     <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {ISSUER_PILLARS.map((p, i) => (
-                            <div key={i} className="card-flat p-4" data-testid={`issuer-pillar-${i}`}>
+                            <div key={p.title} className="card-flat p-4" data-testid={`issuer-pillar-${i}`}>
                                 <div className="flex items-start justify-between gap-3 mb-2">
                                     <div className="font-serif text-base leading-tight">{p.title}</div>
                                     <StatusPill status={p.status} />
@@ -253,7 +253,7 @@ export default function Trust() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {CONTROLS.map((c, i) => (
-                            <div key={i} className="card-flat p-5" data-testid={`control-${i}`}>
+                            <div key={c.title} className="card-flat p-5" data-testid={`control-${i}`}>
                                 <div className="flex items-start justify-between gap-3 mb-3">
                                     <c.icon className="w-5 h-5 text-brand" />
                                     <StatusPill status={c.status} />
@@ -323,7 +323,7 @@ export default function Trust() {
                             <div className="col-span-1 text-right">Status</div>
                         </div>
                         {SUB_PROCESSORS.map((s, i) => (
-                            <div key={i} className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" data-testid={`subproc-${i}`}>
+                            <div key={s.name} className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-border last:border-b-0 items-center text-sm" data-testid={`subproc-${i}`}>
                                 <div className="col-span-3 font-serif text-base">{s.name}</div>
                                 <div className="col-span-5 text-sm text-muted-foreground">{s.purpose}</div>
                                 <div className="col-span-3 text-xs text-muted-foreground">{s.region}</div>

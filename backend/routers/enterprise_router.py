@@ -157,19 +157,15 @@ async def accept_invite(payload: InviteAcceptRequest, user_id: str = Depends(get
     return {"membership": member_doc, "organization": org}
 
 
-# -------------------- Team Analytics Dashboard --------------------
-@router.get("/organizations/dashboard")
-async def team_dashboard(user_id: str = Depends(get_current_user_id)):
-    org, member = await _resolve_org_for_user(user_id)
-
-    members = await db.org_members.find({"org_id": org["id"]}, {"_id": 0}).to_list(500)
-    member_user_ids = [m["user_id"] for m in members]
-
-    # Aggregate stats per user
-    enrollments = await db.enrollments.find({"user_id": {"$in": member_user_ids}}, {"_id": 0}).to_list(5000)
-    certificates = await db.certificates.find({"user_id": {"$in": member_user_ids}}, {"_id": 0}).to_list(5000)
-
-    per_user = {uid: {"enrollments": 0, "completed": 0, "certificates": 0, "avg_progress": 0.0, "progress_sum": 0.0} for uid in member_user_ids}
+def _aggregate_per_user_stats(
+    member_user_ids: list[str],
+    enrollments: list[dict],
+    certificates: list[dict],
+) -> dict[str, dict]:
+    per_user = {
+        uid: {"enrollments": 0, "completed": 0, "certificates": 0, "avg_progress": 0.0, "progress_sum": 0.0}
+        for uid in member_user_ids
+    }
     for e in enrollments:
         p = per_user.get(e["user_id"])
         if not p:
@@ -182,12 +178,15 @@ async def team_dashboard(user_id: str = Depends(get_current_user_id)):
         p = per_user.get(c["user_id"])
         if p:
             p["certificates"] += 1
-    for uid, p in per_user.items():
+    for _uid, p in per_user.items():
         p["avg_progress"] = round(p["progress_sum"] / p["enrollments"], 1) if p["enrollments"] else 0.0
         p.pop("progress_sum")
+    return per_user
 
-    # Department breakdown
-    dept_stats = {}
+
+def _build_department_breakdown(members: list[dict], per_user: dict[str, dict]) -> tuple[list[dict], list[dict]]:
+    """Return (enriched_members_with_stats, sorted_department_stats)."""
+    dept_stats: dict[str, dict] = {}
     enriched_members = []
     for m in members:
         stats = per_user.get(m["user_id"], {"enrollments": 0, "completed": 0, "certificates": 0, "avg_progress": 0.0})
@@ -203,38 +202,67 @@ async def team_dashboard(user_id: str = Depends(get_current_user_id)):
         for name, v in dept_stats.items()
     ]
     departments.sort(key=lambda d: -d["avg_progress"])
+    return enriched_members, departments
 
-    # Top courses by enrollment across the org
-    course_counts = {}
+
+async def _top_courses_by_enrollment(enrollments: list[dict], limit: int = 5) -> list[dict]:
+    course_counts: dict[str, int] = {}
     for e in enrollments:
         course_counts[e["course_id"]] = course_counts.get(e["course_id"], 0) + 1
-    top_course_ids = sorted(course_counts, key=lambda k: -course_counts[k])[:5]
-    top_courses_docs = await db.courses.find({"id": {"$in": top_course_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "thumbnail_url": 1, "category": 1}).to_list(20)
-    top_courses = []
-    for c in top_courses_docs:
-        top_courses.append({**c, "enrolled_count": course_counts.get(c["id"], 0)})
-    top_courses.sort(key=lambda c: -c["enrolled_count"])
+    top_ids = sorted(course_counts, key=lambda k: -course_counts[k])[:limit]
+    if not top_ids:
+        return []
+    docs = await db.courses.find(
+        {"id": {"$in": top_ids}},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "thumbnail_url": 1, "category": 1},
+    ).to_list(20)
+    top = [{**c, "enrolled_count": course_counts.get(c["id"], 0)} for c in docs]
+    top.sort(key=lambda c: -c["enrolled_count"])
+    return top
 
-    # Overall readiness score (weighted: 50% avg progress + 50% cert coverage)
+
+def _readiness_summary(per_user: dict[str, dict], seat_count: int, members_len: int, enrollments_len: int) -> dict:
     total_progress = sum(p["avg_progress"] for p in per_user.values())
     avg_progress = round(total_progress / len(per_user), 1) if per_user else 0.0
     cert_coverage = round(sum(1 for p in per_user.values() if p["certificates"] > 0) / len(per_user) * 100, 1) if per_user else 0.0
     readiness_index = round((avg_progress * 0.5) + (cert_coverage * 0.5), 1)
+    return {
+        "seat_count": seat_count,
+        "seats_used": members_len,
+        "seats_remaining": max(0, seat_count - members_len),
+        "total_enrollments": enrollments_len,
+        "total_completed": sum(p["completed"] for p in per_user.values()),
+        "total_certificates": sum(p["certificates"] for p in per_user.values()),
+        "avg_progress": avg_progress,
+        "cert_coverage_pct": cert_coverage,
+        "readiness_index": readiness_index,
+    }
+
+
+# -------------------- Team Analytics Dashboard --------------------
+@router.get("/organizations/dashboard")
+async def team_dashboard(user_id: str = Depends(get_current_user_id)):
+    org, member = await _resolve_org_for_user(user_id)
+    members = await db.org_members.find({"org_id": org["id"]}, {"_id": 0}).to_list(500)
+    member_user_ids = [m["user_id"] for m in members]
+
+    enrollments = await db.enrollments.find({"user_id": {"$in": member_user_ids}}, {"_id": 0}).to_list(5000)
+    certificates = await db.certificates.find({"user_id": {"$in": member_user_ids}}, {"_id": 0}).to_list(5000)
+
+    per_user = _aggregate_per_user_stats(member_user_ids, enrollments, certificates)
+    enriched_members, departments = _build_department_breakdown(members, per_user)
+    top_courses = await _top_courses_by_enrollment(enrollments)
+    summary = _readiness_summary(
+        per_user,
+        seat_count=org.get("seat_count", 25),
+        members_len=len(members),
+        enrollments_len=len(enrollments),
+    )
 
     return {
         "organization": org,
         "membership": member,
-        "summary": {
-            "seat_count": org.get("seat_count", 25),
-            "seats_used": len(members),
-            "seats_remaining": max(0, org.get("seat_count", 25) - len(members)),
-            "total_enrollments": len(enrollments),
-            "total_completed": sum(p["completed"] for p in per_user.values()),
-            "total_certificates": sum(p["certificates"] for p in per_user.values()),
-            "avg_progress": avg_progress,
-            "cert_coverage_pct": cert_coverage,
-            "readiness_index": readiness_index,
-        },
+        "summary": summary,
         "members": enriched_members,
         "departments": departments,
         "top_courses": top_courses,

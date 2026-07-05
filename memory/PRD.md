@@ -173,6 +173,37 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Files touched: `Landing.jsx`, `Enterprise.jsx`, `Pricing.jsx`, `Certificate.jsx`, `Trust.jsx`, `Footer.jsx`, `TryALesson.jsx`, `CourseCard.jsx`, `CourseDetail.jsx`, `components/brand/ITHRBrand.jsx`.
 - Verified via smoke screenshots on `/`, `/courses`, `/courses/agentic-ai-foundations`. Header brand row now reads *"Academy | INDEPENDENT ISSUER"*.
 
+### Iteration 14 — Security Hardening + Backend Refactor + Legacy Rename (Feb 2026)
+
+**Critical security fixes**
+- **Auth token architecture rewritten to in-memory access + httpOnly refresh cookie.**
+  - Backend now issues a 15-min access token in the JSON body **and** sets a 7-day `ithr_refresh` httpOnly + Secure + SameSite=Lax cookie scoped to `/api/auth`.
+  - New endpoints: `POST /api/auth/refresh` (rotates cookie, returns fresh access token) and `POST /api/auth/logout` (clears cookie).
+  - `.env`: `JWT_ACCESS_EXPIRY_MINUTES=15`, `JWT_REFRESH_EXPIRY_DAYS=7`, `JWT_REFRESH_SECRET` (separate secret), `COOKIE_SECURE=true`, `COOKIE_SAMESITE=lax`.
+  - Frontend removes **all** `localStorage.eaia_token / eaia_user` usage. Access token lives in a module-level ref inside `api.js` (`setAccessToken` / `getAccessToken`). `AuthProvider` hydrates via `/auth/refresh` on mount; axios response interceptor auto-refreshes once on 401 and retries the original request.
+  - Verified end-to-end: hard-reload of `/dashboard` after a fresh register successfully rehydrates the session via cookie, 0 console errors, `localStorage` shows only the PostHog analytics key.
+- **Certificate PDF template** — "Certification Authority" → "Independent Issuer" (previous iteration missed this template).
+
+**Frontend quality fixes**
+- Array-index keys replaced with stable identifiers in `Trust.jsx` (issuer pillars, controls, sub-processors), `Mentor.jsx` (starters), `LessonViewer.jsx` (key takeaways), `Landing.jsx` (intelligence signals).
+- Chat message state (`Mentor.jsx`, `TryALesson.jsx`) now attaches a stable `id` at creation time so `key=` is no longer index-based.
+- `AuthContext.jsx` value prop wrapped with `useMemo` so downstream consumers don't re-render on unrelated parent renders.
+- `TryALesson.jsx` empty SSE-parse catch block now logs to `console.debug` instead of swallowing silently.
+
+**Backend refactor (5 flagged high-complexity functions split into helpers)**
+- `assessment_router.start_assessment_session` (91 → ~40 lines) — extracted `_resolve_adaptive_mode`, `_bucket_bank`, `_draw_adaptive`, `_draw_random`, `_client_view`; `ADAPTIVE_MIXES` promoted to module const.
+- `assessment_router.submit_quiz` (90 → ~30 lines) — extracted `_grade_answers`, `_issue_certificate_if_new`.
+- `enterprise_router.team_dashboard` (79 → ~15 lines) — extracted `_aggregate_per_user_stats`, `_build_department_breakdown`, `_top_courses_by_enrollment`, `_readiness_summary`.
+- `mentor_router.mentor_chat` (68 → ~35 lines) — extracted `_build_context_block`, `_preamble_with_history`, `_persist_mentor_turn`.
+- `passport_router._build_passport` (87 → ~25 lines) — extracted `_fetch_course_map`, `_skills_from_certs`, `_credential_level_from_certs`, `_industry_footprint`, `_learning_hours`, `_serialise_cert`.
+- All pytest suites still green (142/144; two pre-existing test-order/Stripe-key failures unchanged).
+
+**False-positive fixes from the code review — deliberately skipped**
+- Report flagged `eval()` at `seed_assessments.py:124` — no `eval()` exists anywhere in the backend (verified via grep).
+- Report flagged undefined `cert` in `passport_router.py:147-154` — `cert` is the comprehension loop variable at L153; Python semantics are correct.
+- Report flagged `is` vs `==` in `auth.py:47,61`, `core.py:66`, `recommendation_router.py:207` — all four are `is None` checks, which is the idiomatic Python pattern (not a bug).
+- Report flagged missing DOMPurify at `LessonViewer:137`, `Intelligence:259`, `TryALesson:118` — all three already use `DOMPurify.sanitize()` (fixed in Iteration 11).
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)

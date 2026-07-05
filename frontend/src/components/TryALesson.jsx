@@ -30,7 +30,7 @@ export default function TryALesson() {
         const msg = (text || input).trim();
         if (!msg || streaming || limitReached) return;
         setInput("");
-        setMessages((m) => [...m, { role: "user", content: msg }, { role: "assistant", content: "" }]);
+        setMessages((m) => [...m, { id: `u-${Date.now()}-${m.length}`, role: "user", content: msg }, { id: `a-${Date.now()}-${m.length + 1}`, role: "assistant", content: "" }]);
         setStreaming(true);
 
         try {
@@ -74,7 +74,11 @@ export default function TryALesson() {
                             });
                         }
                         if (p.error) throw new Error(p.error);
-                    } catch (parseErr) { /* SSE partial JSON — wait for next chunk */ }
+                    } catch (parseErr) { /* SSE partial JSON — wait for next chunk */
+                        if (typeof console !== "undefined") {
+                            console.debug("[TryALesson] SSE partial chunk, awaiting next:", parseErr?.message);
+                        }
+                    }
                 }
             }
         } catch (e) {
@@ -159,7 +163,7 @@ export default function TryALesson() {
                                 </div>
                             ) : (
                                 messages.map((m, i) => (
-                                    <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                    <div key={m.id || `msg-${i}`} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                                         <div className={`max-w-[90%] px-3 py-2 text-[13.5px] leading-relaxed rounded-sm whitespace-pre-wrap ${m.role === "user" ? "bg-foreground text-background" : "bg-surface-alt border border-border"}`}>
                                             {m.content || (streaming && i === messages.length - 1 ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : "")}
                                         </div>

@@ -58,7 +58,7 @@ export default function Mentor() {
         const msg = (text || input).trim();
         if (!msg || streaming) return;
         setInput("");
-        setMessages((m) => [...m, { role: "user", content: msg }, { role: "assistant", content: "" }]);
+        setMessages((m) => [...m, { id: `u-${Date.now()}-${m.length}`, role: "user", content: msg }, { id: `a-${Date.now()}-${m.length + 1}`, role: "assistant", content: "" }]);
         setStreaming(true);
         const ctx = {};
         if (role) ctx.role = role;
@@ -202,7 +202,7 @@ export default function Mentor() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {STARTERS.map((s, i) => (
                                         <button
-                                            key={i}
+                                            key={s.text}
                                             data-testid={`mentor-starter-${i}`}
                                             onClick={() => send(s.text)}
                                             className="text-left card-sharp p-4 group"
@@ -216,7 +216,7 @@ export default function Mentor() {
                             </div>
                         ) : (
                             messages.map((m, i) => (
-                                <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div key={m.id || `msg-${i}`} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                                     <div className={`max-w-[85%] px-4 py-3 text-[14.5px] leading-relaxed rounded-sm whitespace-pre-wrap ${m.role === "user" ? "bg-foreground text-background" : "bg-surface-alt border border-border"}`}>
                                         {m.content || (streaming && i === messages.length - 1 ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : "")}
                                     </div>

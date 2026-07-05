@@ -1,29 +1,26 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { api, setAccessToken } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
+/**
+ * Auth state is held in memory only.
+ * - Access token: kept via api.js's module-level holder; never persisted.
+ * - Refresh token: lives in an httpOnly Secure cookie set by the backend.
+ * On mount we call /auth/refresh to see if a valid session already exists (cookie
+ * survives page reloads, JWT survives navigations because of React context).
+ */
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(() => {
-        const cached = localStorage.getItem("eaia_user");
-        return cached ? JSON.parse(cached) : null;
-    });
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    const refreshUser = useCallback(async () => {
-        const token = localStorage.getItem("eaia_token");
-        if (!token) {
-            setUser(null);
-            setLoading(false);
-            return;
-        }
+    const hydrate = useCallback(async () => {
         try {
-            const res = await api.get("/auth/me");
-            setUser(res.data);
-            localStorage.setItem("eaia_user", JSON.stringify(res.data));
+            const res = await api.post("/auth/refresh");
+            setAccessToken(res.data.token);
+            setUser(res.data.user);
         } catch {
-            localStorage.removeItem("eaia_token");
-            localStorage.removeItem("eaia_user");
+            setAccessToken(null);
             setUser(null);
         } finally {
             setLoading(false);
@@ -31,36 +28,49 @@ export function AuthProvider({ children }) {
     }, []);
 
     useEffect(() => {
-        refreshUser();
-    }, [refreshUser]);
+        hydrate();
+    }, [hydrate]);
 
-    const login = async (email, password) => {
+    const login = useCallback(async (email, password) => {
         const res = await api.post("/auth/login", { email, password });
-        localStorage.setItem("eaia_token", res.data.token);
-        localStorage.setItem("eaia_user", JSON.stringify(res.data.user));
+        setAccessToken(res.data.token);
         setUser(res.data.user);
         return res.data.user;
-    };
+    }, []);
 
-    const register = async (payload) => {
+    const register = useCallback(async (payload) => {
         const res = await api.post("/auth/register", payload);
-        localStorage.setItem("eaia_token", res.data.token);
-        localStorage.setItem("eaia_user", JSON.stringify(res.data.user));
+        setAccessToken(res.data.token);
         setUser(res.data.user);
         return res.data.user;
-    };
+    }, []);
 
-    const logout = () => {
-        localStorage.removeItem("eaia_token");
-        localStorage.removeItem("eaia_user");
+    const logout = useCallback(async () => {
+        try {
+            await api.post("/auth/logout");
+        } catch {
+            /* ignore — we still clear local state */
+        }
+        setAccessToken(null);
         setUser(null);
-    };
+    }, []);
 
-    return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
-            {children}
-        </AuthContext.Provider>
+    const refreshUser = useCallback(async () => {
+        try {
+            const res = await api.get("/auth/me");
+            setUser(res.data);
+        } catch {
+            setAccessToken(null);
+            setUser(null);
+        }
+    }, []);
+
+    const value = useMemo(
+        () => ({ user, loading, login, register, logout, refreshUser }),
+        [user, loading, login, register, logout, refreshUser]
     );
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

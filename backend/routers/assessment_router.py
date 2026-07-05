@@ -29,6 +29,13 @@ router = APIRouter(prefix="/api", tags=["assessment"])
 DEFAULT_QUESTIONS_PER_ATTEMPT = 15
 
 
+ADAPTIVE_MIXES = {
+    "onboarding": {"beginner": 0.60, "intermediate": 0.30, "advanced": 0.10},
+    "escalate":   {"beginner": 0.20, "intermediate": 0.50, "advanced": 0.30},
+    "reinforce":  {"beginner": 0.55, "intermediate": 0.35, "advanced": 0.10},
+}
+
+
 def _shuffle_options(q: dict, rng: random.Random) -> dict:
     """Return a copy of q with options shuffled and correct indices remapped."""
     idx = list(range(len(q["options"])))
@@ -42,6 +49,64 @@ def _shuffle_options(q: dict, rng: random.Random) -> dict:
     }
 
 
+async def _resolve_adaptive_mode(user_id: str, course_id: str) -> str:
+    history = await db.quiz_attempts.find(
+        {"user_id": user_id, "course_id": course_id},
+        {"_id": 0, "passed": 1},
+    ).sort("attempted_at", -1).to_list(5)
+    if not history:
+        return "onboarding"
+    return "escalate" if history[0].get("passed") else "reinforce"
+
+
+def _bucket_bank(bank: list[dict], rng: random.Random) -> dict[str, list[dict]]:
+    buckets: dict[str, list[dict]] = {"beginner": [], "intermediate": [], "advanced": []}
+    for q in bank:
+        d = (q.get("difficulty") or "intermediate").lower()
+        if d not in buckets:
+            d = "intermediate"
+        buckets[d].append(q)
+    for k in buckets:
+        rng.shuffle(buckets[k])
+    return buckets
+
+
+def _draw_adaptive(bank: list[dict], count: int, mode: str, rng: random.Random) -> list[dict]:
+    mix = ADAPTIVE_MIXES[mode]
+    buckets = _bucket_bank(bank, rng)
+    picked: list[dict] = []
+    for level, weight in mix.items():
+        target = round(count * weight)
+        picked.extend(buckets[level][:target])
+        buckets[level] = buckets[level][target:]
+    leftover = buckets["intermediate"] + buckets["beginner"] + buckets["advanced"]
+    rng.shuffle(leftover)
+    while len(picked) < count and leftover:
+        picked.append(leftover.pop())
+    rng.shuffle(picked)
+    return picked
+
+
+def _draw_random(bank: list[dict], count: int, rng: random.Random) -> list[dict]:
+    pool = list(bank)
+    rng.shuffle(pool)
+    return pool[: min(count, len(pool))]
+
+
+def _client_view(shuffled: list[dict]) -> list[dict]:
+    return [
+        {
+            "id": q["id"],
+            "question": q["question"],
+            "type": q.get("type", "mcq"),
+            "options": q["options"],
+            "difficulty": q.get("difficulty", "intermediate"),
+            "permutation": q["_option_permutation"],
+        }
+        for q in shuffled
+    ]
+
+
 @router.get("/courses/{slug}/assessment/session")
 async def start_assessment_session(
     slug: str,
@@ -52,10 +117,10 @@ async def start_assessment_session(
 ):
     """Return a randomized paper for this attempt.
 
-    Adaptive mode:
-    - New learner (no prior attempts): 60% beginner, 30% intermediate, 10% advanced
-    - Passed prior attempt: escalate — 20% beginner, 50% intermediate, 30% advanced
-    - Failed prior attempt: reinforce — 55% beginner, 35% intermediate, 10% advanced
+    Adaptive mode ratios (beginner / intermediate / advanced):
+    - onboarding: 60 / 30 / 10 (learner has no prior attempts)
+    - escalate:   20 / 50 / 30 (learner passed most recent attempt)
+    - reinforce:  55 / 35 / 10 (learner failed most recent attempt)
     """
     course = await db.courses.find_one({"slug": slug}, {"_id": 0})
     if not course:
@@ -67,63 +132,14 @@ async def start_assessment_session(
     rng = random.Random(seed or random.SystemRandom().randint(0, 2**32 - 1))
 
     if adaptive:
-        # Look at learner's history on this course to shape difficulty mix
-        history = await db.quiz_attempts.find(
-            {"user_id": user_id, "course_id": course["id"]},
-            {"_id": 0, "passed": 1, "score": 1},
-        ).sort("attempted_at", -1).to_list(5)
-
-        if not history:
-            mix = {"beginner": 0.60, "intermediate": 0.30, "advanced": 0.10}
-            mode = "onboarding"
-        elif history[0].get("passed"):
-            mix = {"beginner": 0.20, "intermediate": 0.50, "advanced": 0.30}
-            mode = "escalate"
-        else:
-            mix = {"beginner": 0.55, "intermediate": 0.35, "advanced": 0.10}
-            mode = "reinforce"
-
-        # Bucket bank
-        buckets = {"beginner": [], "intermediate": [], "advanced": []}
-        for q in bank:
-            d = (q.get("difficulty") or "intermediate").lower()
-            if d not in buckets:
-                d = "intermediate"
-            buckets[d].append(q)
-        for k in buckets:
-            rng.shuffle(buckets[k])
-
-        # Draw with fallback to nearby buckets if a bucket is short
-        picked = []
-        for level, weight in mix.items():
-            target = round(count * weight)
-            picked.extend(buckets[level][:target])
-            buckets[level] = buckets[level][target:]
-        # top up with any leftover
-        leftover = buckets["intermediate"] + buckets["beginner"] + buckets["advanced"]
-        rng.shuffle(leftover)
-        while len(picked) < count and leftover:
-            picked.append(leftover.pop())
-        rng.shuffle(picked)
+        mode = await _resolve_adaptive_mode(user_id, course["id"])
+        picked = _draw_adaptive(bank, count, mode, rng)
     else:
         mode = "random"
-        pool = list(bank)
-        rng.shuffle(pool)
-        picked = pool[: min(count, len(pool))]
+        picked = _draw_random(bank, count, rng)
 
     shuffled = [_shuffle_options(q, rng) for q in picked]
-
-    client_view = [
-        {
-            "id": q["id"],
-            "question": q["question"],
-            "type": q.get("type", "mcq"),
-            "options": q["options"],
-            "difficulty": q.get("difficulty", "intermediate"),
-            "permutation": q["_option_permutation"],
-        }
-        for q in shuffled
-    ]
+    client_view = _client_view(shuffled)
 
     return {
         "course_id": course["id"],
@@ -137,6 +153,57 @@ async def start_assessment_session(
     }
 
 
+def _grade_answers(
+    questions: list[dict],
+    answers: dict,
+    perms: Optional[dict],
+) -> tuple[int, int]:
+    """Grade an answers dict; returns (correct_count, total_graded)."""
+    by_id = {q["id"]: q for q in questions}
+    graded = len([q for q in questions if q["id"] in answers])
+    total = graded if graded else len(questions)
+    correct = 0
+    for qid, submitted in answers.items():
+        q = by_id.get(qid)
+        if not q:
+            continue
+        submitted_indices = list(submitted or [])
+        if perms and qid in perms:
+            perm = perms[qid]
+            submitted_indices = [perm[i] for i in submitted_indices if 0 <= i < len(perm)]
+        if sorted(submitted_indices) == sorted(q["correct"]):
+            correct += 1
+    return correct, total
+
+
+async def _issue_certificate_if_new(
+    user_id: str, course: dict, score: float,
+) -> Optional[dict]:
+    """Create a Certificate on first pass; return the cert dict (new or existing)."""
+    existing = await db.certificates.find_one({"user_id": user_id, "course_id": course["id"]})
+    if existing:
+        existing.pop("_id", None)
+        return existing
+    user = await db.users.find_one({"id": user_id})
+    cert_obj = Certificate(
+        certificate_id=gen_cert_id(),
+        user_id=user_id,
+        user_name=user["full_name"],
+        course_id=course["id"],
+        course_title=course["title"],
+        score=round(score, 1),
+        verification_url="",
+    )
+    cert_obj.verification_url = f"/verify/{cert_obj.certificate_id}"
+    await db.certificates.insert_one(cert_obj.model_dump())
+    await db.enrollments.update_one(
+        {"user_id": user_id, "course_id": course["id"]},
+        {"$set": {"completed": True, "completed_at": now_iso(), "progress_pct": 100.0}},
+    )
+    await db.users.update_one({"id": user_id}, {"$inc": {"xp": 500}})
+    return cert_obj.model_dump()
+
+
 @router.post("/courses/{slug}/quiz/submit")
 async def submit_quiz(
     slug: str,
@@ -146,10 +213,8 @@ async def submit_quiz(
     """Grade an attempt.
 
     `payload.answers` shape: { question_id: [selected_indices] }
-    If `payload` includes `permutations` in `answers` metadata? — instead,
-    clients using the /session endpoint must pass a `permutations` map on the
-    request as `{qid: [orig_indices]}` via `answers['__perm__']` — a compact
-    convention. Otherwise we assume indices are already course-canonical.
+    Clients using the /session endpoint pass `answers['__perm__']` = {qid: [orig_indices]}
+    so we can translate shuffled indices back to course-canonical positions.
     """
     course = await db.courses.find_one({"slug": slug}, {"_id": 0})
     if not course:
@@ -159,26 +224,11 @@ async def submit_quiz(
         raise HTTPException(status_code=400, detail="No assessment available for this course")
 
     perms = payload.answers.pop("__perm__", None) if isinstance(payload.answers, dict) else None
-
-    by_id = {q["id"]: q for q in questions}
-    correct = 0
-    graded = len([q for q in questions if q["id"] in payload.answers])
-    total = graded if graded else len(questions)
-
-    for qid, submitted in payload.answers.items():
-        q = by_id.get(qid)
-        if not q:
-            continue
-        submitted_indices = list(submitted or [])
-        if perms and qid in perms:
-            # translate shuffled indices back to original
-            perm = perms[qid]
-            submitted_indices = [perm[i] for i in submitted_indices if 0 <= i < len(perm)]
-        if sorted(submitted_indices) == sorted(q["correct"]):
-            correct += 1
+    correct, total = _grade_answers(questions, payload.answers, perms)
 
     score = (correct / total * 100) if total else 0
-    passed = score >= course.get("passing_score", 65)
+    passing = course.get("passing_score", 65)
+    passed = score >= passing
 
     attempt = QuizAttempt(
         user_id=user_id,
@@ -192,40 +242,14 @@ async def submit_quiz(
     )
     await db.quiz_attempts.insert_one(attempt.model_dump())
 
-    cert = None
-    if passed:
-        user = await db.users.find_one({"id": user_id})
-        existing_cert = await db.certificates.find_one(
-            {"user_id": user_id, "course_id": course["id"]}
-        )
-        if not existing_cert:
-            cert_obj = Certificate(
-                certificate_id=gen_cert_id(),
-                user_id=user_id,
-                user_name=user["full_name"],
-                course_id=course["id"],
-                course_title=course["title"],
-                score=round(score, 1),
-                verification_url="",
-            )
-            cert_obj.verification_url = f"/verify/{cert_obj.certificate_id}"
-            await db.certificates.insert_one(cert_obj.model_dump())
-            await db.enrollments.update_one(
-                {"user_id": user_id, "course_id": course["id"]},
-                {"$set": {"completed": True, "completed_at": now_iso(), "progress_pct": 100.0}},
-            )
-            await db.users.update_one({"id": user_id}, {"$inc": {"xp": 500}})
-            cert = cert_obj.model_dump()
-        else:
-            cert = existing_cert
-            cert.pop("_id", None)
+    cert = await _issue_certificate_if_new(user_id, course, score) if passed else None
 
     return {
         "score": round(score, 1),
         "passed": passed,
         "correct": correct,
         "total": total,
-        "passing_score": course.get("passing_score", 65),
+        "passing_score": passing,
         "attempt_id": attempt.id,
         "certificate": cert,
     }
@@ -432,7 +456,7 @@ _CERT_PDF_TEMPLATE = r"""
         </div>
         <div>
           <div class="brand-name">ITHR <span class="accent">Academy</span></div>
-          <div class="brand-tag">Enterprise Agentic AI · Certification Authority</div>
+          <div class="brand-tag">Enterprise Agentic AI · Independent Issuer</div>
         </div>
       </div>
       <div class="award-block">

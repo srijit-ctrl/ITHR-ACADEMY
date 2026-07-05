@@ -1,20 +1,62 @@
-"""Auth routes: register, login, me, google callback."""
+"""Auth routes: register, login, me, google callback, refresh, logout.
+
+Token flow (in-memory access + httpOnly refresh cookie):
+- On register/login/google-callback the API returns a short-lived access token in the
+  JSON body AND sets an httpOnly Secure SameSite refresh cookie.
+- On /auth/refresh the API reads the cookie and returns a new access token.
+- On /auth/logout the API clears the refresh cookie.
+
+Access tokens are NEVER persisted client-side (browser memory only).
+"""
 import os
 import uuid
-from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 
-from auth import create_token, get_current_user_id, hash_password, verify_password
+from auth import (
+    JWT_REFRESH_EXPIRY_DAYS,
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    get_current_user_id,
+    hash_password,
+    verify_password,
+)
 from core import db, logger, now_iso, user_to_public
 from models import AuthResponse, UserLogin, UserPublic, UserRegister
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
+REFRESH_COOKIE_NAME = "ithr_refresh"
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() == "true"
+COOKIE_SAMESITE = os.environ.get("COOKIE_SAMESITE", "lax")
+
+
+def _set_refresh_cookie(response: Response, user_id: str) -> None:
+    refresh = create_refresh_token(user_id)
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=JWT_REFRESH_EXPIRY_DAYS * 24 * 60 * 60,
+        path="/api/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path="/api/auth",
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+    )
+
 
 @router.post("/auth/register", response_model=AuthResponse)
-async def register(payload: UserRegister):
+async def register(payload: UserRegister, response: Response):
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -34,17 +76,49 @@ async def register(payload: UserRegister):
         "created_at": now_iso(),
     }
     await db.users.insert_one(doc)
-    token = create_token(user_id, doc["email"], doc["role"])
-    return AuthResponse(token=token, user=UserPublic(**user_to_public(doc)))
+    access = create_access_token(user_id, doc["email"], doc["role"])
+    _set_refresh_cookie(response, user_id)
+    return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
 
 
 @router.post("/auth/login", response_model=AuthResponse)
-async def login(payload: UserLogin):
+async def login(payload: UserLogin, response: Response):
     doc = await db.users.find_one({"email": payload.email.lower()})
     if not doc or not verify_password(payload.password, doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    token = create_token(doc["id"], doc["email"], doc["role"])
-    return AuthResponse(token=token, user=UserPublic(**user_to_public(doc)))
+    access = create_access_token(doc["id"], doc["email"], doc["role"])
+    _set_refresh_cookie(response, doc["id"])
+    return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
+
+
+@router.post("/auth/refresh", response_model=AuthResponse)
+async def refresh(response: Response, ithr_refresh: str = Cookie(default=None)):
+    """Exchange a valid refresh cookie for a fresh access token.
+
+    Also rotates the refresh cookie (sliding expiry) so long-lived sessions
+    don't require a hard re-login every 7 days.
+    """
+    if not ithr_refresh:
+        raise HTTPException(status_code=401, detail="No refresh cookie")
+    try:
+        payload = decode_refresh_token(ithr_refresh)
+    except Exception:
+        _clear_refresh_cookie(response)
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+    user_id = payload["sub"]
+    doc = await db.users.find_one({"id": user_id})
+    if not doc:
+        _clear_refresh_cookie(response)
+        raise HTTPException(status_code=401, detail="User no longer exists")
+    access = create_access_token(doc["id"], doc["email"], doc["role"])
+    _set_refresh_cookie(response, doc["id"])
+    return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
+
+
+@router.post("/auth/logout")
+async def logout(response: Response):
+    _clear_refresh_cookie(response)
+    return {"ok": True}
 
 
 @router.get("/auth/me", response_model=UserPublic)
@@ -56,7 +130,7 @@ async def me(user_id: str = Depends(get_current_user_id)):
 
 
 @router.post("/auth/google/callback", response_model=AuthResponse)
-async def google_callback(payload: dict):
+async def google_callback(payload: dict, response: Response):
     session_id = payload.get("session_id")
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
@@ -100,5 +174,6 @@ async def google_callback(payload: dict):
         }
         await db.users.insert_one(user_doc)
 
-    token = create_token(user_doc["id"], user_doc["email"], user_doc["role"])
-    return AuthResponse(token=token, user=UserPublic(**user_to_public(user_doc)))
+    access = create_access_token(user_doc["id"], user_doc["email"], user_doc["role"])
+    _set_refresh_cookie(response, user_doc["id"])
+    return AuthResponse(token=access, user=UserPublic(**user_to_public(user_doc)))

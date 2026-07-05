@@ -291,8 +291,8 @@ export default function Landing() {
                             { impact: "Critical", cat: "Regulation", title: "EU AI Act Article 6 obligations take effect for enterprise deployers", action: "Refresh Module 11 within 14 days" },
                             { impact: "High", cat: "Model Release", title: "Anthropic ships Claude 4.6 with 500k-token task budgets", action: "Add coverage in Module 4 (LLMs Powering Agents)" },
                             { impact: "Medium", cat: "Framework", title: "MCP 2.0 adds signed capability manifests", action: "Update MCP examples in Module 3" },
-                        ].map((s, i) => (
-                            <div key={i} className="bg-surface border border-border rounded-2xl p-5 hover:border-brand hover:-translate-y-0.5 transition-all">
+                        ].map((s) => (
+                            <div key={s.title} className="bg-surface border border-border rounded-2xl p-5 hover:border-brand hover:-translate-y-0.5 transition-all">
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">{s.cat}</span>
                                     <span className={`text-[10px] font-mono uppercase tracking-[0.15em] px-2 py-0.5 rounded-full ${s.impact === "Critical" ? "bg-destructive text-white" : s.impact === "High" ? "bg-brand text-white" : "bg-surface-alt"}`}>{s.impact}</span>

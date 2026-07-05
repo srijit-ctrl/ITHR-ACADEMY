@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, setAccessToken } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -23,9 +23,9 @@ export default function AuthCallback() {
         (async () => {
             try {
                 const res = await api.post("/auth/google/callback", { session_id: sessionId });
-                localStorage.setItem("eaia_token", res.data.token);
-                localStorage.setItem("eaia_user", JSON.stringify(res.data.user));
-                // clear the hash and go to dashboard
+                // Access token → in-memory only. Refresh cookie was set server-side.
+                setAccessToken(res.data.token);
+                // Full reload so AuthProvider re-hydrates with the new session.
                 window.history.replaceState(null, "", window.location.pathname);
                 window.location.href = "/dashboard";
             } catch (e) {
