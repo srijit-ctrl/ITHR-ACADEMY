@@ -45,10 +45,17 @@ export default function CourseDetail() {
         <div>
             {/* Hero */}
             <section className="border-b border-border relative overflow-hidden">
-                {course.hero_url && (
+                {(course.hero_url || course.thumbnail_url) && (
                     <>
-                        <div className="absolute inset-0"><img src={course.hero_url} alt="" className="w-full h-full object-cover" /></div>
-                        <div className="absolute inset-0 bg-background/96 dark:bg-background/94" />
+                        <div className="absolute inset-0">
+                            <img
+                                src={course.hero_url || course.thumbnail_url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                        </div>
+                        <div className="absolute inset-0 bg-background/94 backdrop-blur-[2px]" />
                     </>
                 )}
                 <div className="relative container-page py-16 md:py-24 grid grid-cols-1 lg:grid-cols-12 gap-10">
