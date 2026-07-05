@@ -579,3 +579,13 @@ async def admin_create_user(payload: dict, user_id: str = Depends(get_current_us
         "temp_password": temp_pw,
         "must_reset_password": True,
     }
+
+
+# -------------------- Enterprise-scoped analytics --------------------
+@router.get("/organizations/analytics")
+async def org_analytics_endpoint(days: int = 30, user_id: str = Depends(get_current_user_id)):
+    """Analytics for the caller's org — visible only to org owners/admins."""
+    org, _member = await _resolve_org_for_user(user_id, require_admin=True)
+    from analytics import org_analytics
+    days = max(7, min(90, days))
+    return await org_analytics(org_id=org["id"], days=days)

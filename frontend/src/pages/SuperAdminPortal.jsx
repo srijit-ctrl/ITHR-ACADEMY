@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X } from "lucide-react";
+import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { PlatformAnalyticsPanel } from "@/components/AnalyticsPanels";
 
 /**
  * Super-Admin console.
@@ -21,7 +22,7 @@ export default function SuperAdminPortal() {
     const [busy, setBusy] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [tempCreds, setTempCreds] = useState(null); // {email, temp_password, org_name}
-    const [tab, setTab] = useState("orgs");
+    const [tab, setTab] = useState("analytics");
 
     const loadAll = async () => {
         setBusy(true);
@@ -105,9 +106,12 @@ export default function SuperAdminPortal() {
 
                 {/* Tabs */}
                 <div className="border-b border-border mb-6 flex gap-1">
+                    <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")} label="Analytics" count={""} testId="tab-analytics" />
                     <TabButton active={tab === "orgs"} onClick={() => setTab("orgs")} label="Organizations" count={orgs.length} testId="tab-orgs" />
                     <TabButton active={tab === "users"} onClick={() => setTab("users")} label="Users" count={totalUsers} testId="tab-users" />
                 </div>
+
+                {tab === "analytics" && <PlatformAnalyticsPanel />}
 
                 {tab === "orgs" && (
                     <div>

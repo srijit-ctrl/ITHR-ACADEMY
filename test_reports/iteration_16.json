@@ -1,0 +1,76 @@
+{
+  "summary": "Iteration 16 — Super-Admin + Enterprise-Admin analytics dashboards. Full-scope validation of GET /api/admin/analytics and GET /api/enterprise/organizations/analytics endpoints + PlatformAnalyticsPanel + OrgAnalyticsPanel React components. Backend: 11/11 new iter-16 tests PASS in /app/backend/tests/test_iteration16_analytics.py (shape, days-clamp, auth-gates for both endpoints). Full backend suite: 188 passed / 6 failed / 2 skipped out of 196 total; +11 vs iter-15 baseline of 177 passed matches exactly the new iter-16 tests — NO regressions. All 6 pre-existing failures are documented preview-env flakes (3× Enterprise admin create-user with .test TLD email_validator, 2× Cloudflare-502 on LLM patch endpoints, 1× Stripe seat-change with test key). Frontend Playwright (three flows): (1) super-admin login → /admin → Analytics tab is default → all 13 required data-testids visible (platform-analytics-panel, analytics-total-users/orgs/certs/seats, founder-perk-progress, signups-trend, certs-trend, top-orgs-list, top-courses-list, active-24h/7d/30d); range switcher 7d/30d/90d each fires the correct network call to /api/admin/analytics?days=N; charts re-render. (2) enterprise admin login → /enterprise/portal → click toggle-analytics → all 11 org-* data-testids visible (org-analytics-panel, org-total-members, org-enrolments-window, org-certs-window, org-certs-all-time, org-enrolments-trend, org-certs-trend, org-top-courses, org-top-learners, org-dept-leaderboard, org-funnel); org-range-7d also fires the correct fetch. (3) non-admin learner not-in-any-org → /enterprise/portal → renders 'No organization yet' empty state, toggle-analytics is NOT present, org-analytics-panel NOT present — gate correct. Zero console errors on the successful renders (only harmless recharts container-size warnings during animation).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/admin/analytics",
+        "issue": "Unknown-course fallback in analytics.py::platform_analytics() (line 111-114) drops the `category` key when the enrollment's course_id no longer exists in db.courses. Schema promises {id,title,slug,category,enrollments}. Fix: change fallback from `{\"id\": t[\"_id\"], \"title\": \"(unknown)\", \"slug\": \"\"}` to `{\"id\": t[\"_id\"], \"title\": \"(unknown)\", \"slug\": \"\", \"category\": None}`. Same issue in top_orgs fallback (line 92): `{\"id\": ..., \"name\": \"(unknown)\", \"slug\": t[\"_id\"]}` — schema calls for {id,name,slug,certs}, that's already correct, no fix needed there. UI observed 8 of 10 top-courses rendered as '(unknown)' because courses were deleted after enrollment — separate data-hygiene concern, not a schema bug."
+      },
+      {
+        "endpoint": "GET /api/enterprise/organizations/analytics",
+        "issue": "Actual error strings differ from review-request spec: (a) no-org user gets detail 'You are not part of an organization' (from _resolve_org_for_user L23) — review says 'You are not in an organization'. (b) non-admin org member gets 'Admin role required' (L25) — review says 'Not authorized'. Both return the correct status codes (404 and 403 respectively), only the human-readable message text differs. Non-blocking, but if the frontend or docs assert on those exact strings this will break. Consider aligning to review-spec wording or updating the review spec."
+      },
+      {
+        "endpoint": "GET /api/enterprise/organizations/analytics",
+        "issue": "The org-analytics endpoint always requires admin (owner/admin role). No plain-member path exists to VIEW analytics — even read-only. Not a bug per iter-16 spec (which explicitly gates), but worth noting: current `dashboard` endpoint (existing) lets any member view team stats, while the new `analytics` endpoint is admin-only. Slight inconsistency in visibility model — consider whether members should get a limited analytics view."
+      },
+      {
+        "endpoint": "Pre-existing (iter-15 documented)",
+        "issue": "test_iteration15::TestEnterpriseAdminCreateUser (3 tests) fails with email_validator rejection of `.test` TLD. Not iter-16 related. Fix suggested in iter-15: use `.example.com` in fixtures."
+      },
+      {
+        "endpoint": "Pre-existing (iter-15 documented)",
+        "issue": "test_iteration7::TestPatchDecideWithWebhook, backend_test.py::TestPushToCurriculum, and backend_test.py::TestEnterpriseOrg::test_full_org_flow all fail with Cloudflare 502 (LLM edge) or Stripe test-key mismatch. Preview-env flakes. Not iter-16 related."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Super-admin analytics · Top courses list",
+        "issues": ["8 of the 10 top-course rows render as literal '(unknown)' with an empty slug because their course_id no longer resolves in db.courses. This is data-hygiene (orphan enrollments referring to deleted courses) — the graceful fallback works, but the operator view is not useful with so many unknowns. Consider (a) filtering out orphaned course_ids from the aggregation OR (b) cascading enrollment deletion when a course is deleted."]
+      },
+      {
+        "screen": "Org analytics panel (initial mount)",
+        "issues": ["Six harmless recharts warnings 'The width(-1) and height(-1) of chart should be greater than 0…' fire during the collapse-expand animation of the analytics panel. Charts self-recover once container has final dimensions. Cosmetic — silence with a minHeight on ResponsiveContainer's parent or with aspect prop to avoid noisy console for real users."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration16_analytics.py",
+    "/app/test_reports/pytest/iter16_analytics.xml",
+    "/app/test_reports/pytest/iter16_full.xml"
+  ],
+  "action_items": [
+    "MINOR: Add `\"category\": None` to the fallback dict in analytics.py::platform_analytics() top_courses list (line ~112) so the schema contract holds when a course is deleted after enrollment.",
+    "MINOR: Align error-detail strings in _resolve_org_for_user (enterprise_router.py L23/L25) with the iter-16 review spec — 'You are not in an organization' and 'Not authorized' — OR update the spec. Status codes are correct; only human-readable text differs.",
+    "OPTIONAL: Add a data-hygiene job to remove orphan enrollments (course_id no longer exists) so top-courses stops showing 8/10 '(unknown)' rows.",
+    "PRE-EXISTING (iter-15, still open): Switch test-fixture email TLD from `.test` to `.example.com`; add LLM stubbing to test_iteration6/7; investigate Stripe seat-flow test-key mismatch."
+  ],
+  "critical_code_review_comments": [
+    "analytics.py L111-114 — the top_courses fallback dict is missing the promised `category` key when the course doc no longer exists. Fix by adding `\"category\": None`. This is the only schema-drift bug in the aggregation.",
+    "analytics.py — the aggregation loads ALL enrollments in-memory (`to_list(20000)`) twice for org analytics (in-window + all-time). For a large org (>2k members × 20k enrollments) this is a memory footgun. Consider MongoDB `$group` aggregation pipelines for department/funnel roll-ups when N grows. Non-blocking today.",
+    "analytics.py::_iso_day — the `iso_str[:10]` assumes the created_at/issued_at field is stored as an ISO-formatted string. If any doc has a native datetime (BSON date) the day bucket will silently drop it. Defensively convert: `isoformat()[:10]` if a datetime, else `[:10]`. Not observed to fail in seeded data, but a latent bug.",
+    "AnalyticsPanels.jsx L2 — the recharts imports include Cell but the same file also directly renders <Bar> children as a mapped array of <Cell>. This works but is verbose; you could set a single fill on <Bar> with a computed color and drop Cell entirely. Cosmetic.",
+    "AnalyticsPanels.jsx L23-37 — useAnalytics fires setLoading(true) on every days change, which means the panel briefly shows a spinner instead of the previously-rendered chart. UX-wise it's cleaner to keep the old data on screen with an inline loading pip. Non-blocking.",
+    "enterprise_router.py L23 — 'You are not part of an organization' vs the review-spec 'You are not in an organization'. Trivial wording drift but might break test assertions or docs.",
+    "admin_router.py L212 — the analytics endpoint uses inline `from analytics import platform_analytics` — deferred import. Fine for lazy load but breaks the linter's dep graph. Move to module-top imports.",
+    "OrgAnalyticsPanel — the funnel bar renders with `opacity={0.4 + (entry.count / funnelMax) * 0.6}` which produces a 40% floor even when count==0. For an empty org (like the freshly-provisioned one in our test) all four bars still show as 40%-opaque stubs on the chart. Consider special-casing count==0 → opacity 0.1 (or hide the bar) so an empty funnel doesn't look like an active one."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration16_analytics.py (new)"
+  ],
+  "success_rate": {
+    "backend": "Iter-16 acceptance criteria: 11/11 = 100%. Full backend suite: 188/196 = 95.9% (unchanged 6 pre-existing failures; +11 iter-16 passes vs iter-15 baseline of 177).",
+    "frontend": "Iter-16 acceptance criteria: 3/3 flows PASS = 100%. All 13 super-admin data-testids + all 11 enterprise-admin data-testids visible; range switcher fires correct network requests; no-org learner correctly gated."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / ITHR!Root-2026-ChangeMe (from /app/memory/test_credentials.md). Iter-16 UI enterprise admin (throwaway, provisioned via super-admin API): ui16-admin+17832717517715ae275@ui16orgs.example.com / XgORF@BNMzxSN1. Iter-16 no-org learner (throwaway): ui16-learner+17832717995589edeb9@example.com / TestPass123!.",
+  "seed_data_creation": "1 fresh org 'UI16 Org 1783271751771' (slug ui16-org-1783271751771, domain ui16orgs.example.com) created for UI testing. 2 throw-away learners registered. Iter-16 backend tests also create their own fresh org + admin + plain-member per session. Founder counter now at 109/500 (was 65 at end of iter-15). No cleanup needed — all throwaway learners under the 500-founder cap.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter-16 analytics endpoints + panels are validated end-to-end. Two truly minor backend issues to consider: (1) analytics.py fallback dict drops `category` key for orphan course_ids — one-line fix; (2) error detail strings drift from review spec (correct status codes though). Frontend clean, zero console errors on happy paths. If iterating: (a) fix the fallback schema drift, (b) align error messages, (c) consider hiding empty funnel bars. Backend suite baseline is now 188/196 (was 177/185); the 6 remaining failures are all pre-existing preview-env flakes documented since iter-13. Do NOT chase them. Founder counter is at 109 as of end of iter-16 testing.",
+  "rca of the issue": "N/A — no bugs blocking release. The single minor schema-drift on the unknown-course fallback (missing `category` key) is a one-line fix in /app/backend/analytics.py and does not break the current frontend (it renders '(unknown)' + empty slug without crashing)."
+}

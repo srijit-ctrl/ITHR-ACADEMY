@@ -203,3 +203,14 @@ async def admin_reset_password(user_id: str, _super_admin_id: str = Depends(get_
         {"$set": {"password_hash": hash_password(temp_pw), "must_reset_password": True}},
     )
     return {"user_id": user_id, "email": user["email"], "temp_password": temp_pw}
+
+
+# ---- Analytics -----------------------------------------------------------
+@router.get("/analytics")
+async def platform_analytics_endpoint(
+    days: int = 30,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    from analytics import platform_analytics
+    days = max(7, min(90, days))
+    return await platform_analytics(days=days)

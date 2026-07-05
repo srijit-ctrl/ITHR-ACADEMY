@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
-import { Building2, Users, Award, TrendingUp, Copy, Plus, Loader2, ArrowRight, Trash2, Settings, Receipt, Sparkles, UserPlus, X } from "lucide-react";
+import { Building2, Users, Award, TrendingUp, Copy, Plus, Loader2, ArrowRight, Trash2, Settings, Receipt, Sparkles, UserPlus, X, BarChart3 } from "lucide-react";
+import { OrgAnalyticsPanel } from "@/components/AnalyticsPanels";
 import { toast } from "sonner";
 import HeroBlobs from "@/components/HeroBlobs";
 
@@ -31,6 +32,7 @@ export default function EnterprisePortal() {
     const [createUserErr, setCreateUserErr] = useState("");
     const [creatingUser, setCreatingUser] = useState(false);
     const [tempCreds, setTempCreds] = useState(null); // {email, temp_password}
+    const [showAnalytics, setShowAnalytics] = useState(false);
 
     const load = () => {
         setLoading(true);
@@ -206,6 +208,13 @@ export default function EnterprisePortal() {
                                 {summary.seats_used} of {summary.seat_count} seats active · {summary.total_certificates} certifications earned by your team
                             </p>
                             <div className="mt-5 flex gap-3 flex-wrap">
+                                <button
+                                    onClick={() => setShowAnalytics((v) => !v)}
+                                    data-testid="toggle-analytics"
+                                    className={`text-xs ${showAnalytics ? "btn-primary" : "btn-outline"}`}
+                                >
+                                    <BarChart3 className="w-3 h-3" /> {showAnalytics ? "Hide analytics" : "View analytics"}
+                                </button>
                                 <Link to="/patches" data-testid="portal-patches-link" className="btn-outline text-xs">
                                     <Sparkles className="w-3 h-3" /> Curriculum patches
                                 </Link>
@@ -285,6 +294,13 @@ export default function EnterprisePortal() {
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Analytics panel — collapsed by default */}
+            {showAnalytics && isAdmin && (
+                <div className="container-page mb-10">
+                    <OrgAnalyticsPanel />
                 </div>
             )}
 
