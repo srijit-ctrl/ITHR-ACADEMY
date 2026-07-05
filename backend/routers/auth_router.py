@@ -47,11 +47,17 @@ def _set_refresh_cookie(response: Response, user_id: str) -> None:
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(
+    # Emit an explicit Set-Cookie with all the original flags so defence-in-depth
+    # is preserved on strict user agents (some UAs only match on name+path+domain
+    # when deleting, but re-emitting HttpOnly/Secure/SameSite avoids any ambiguity).
+    response.set_cookie(
         key=REFRESH_COOKIE_NAME,
-        path="/api/auth",
+        value="",
+        httponly=True,
         secure=COOKIE_SECURE,
         samesite=COOKIE_SAMESITE,
+        max_age=0,
+        path="/api/auth",
     )
 
 
@@ -143,9 +149,11 @@ async def google_callback(payload: dict, response: Response):
             )
             r.raise_for_status()
             profile = r.json()
-        except Exception as e:
+        except Exception:
             logger.exception("Emergent OAuth exchange failed")
-            raise HTTPException(status_code=401, detail=f"OAuth verification failed: {e}")
+            # Deliberately generic — do not leak upstream provider details in the
+            # HTTP body. Full context is captured server-side via logger.exception.
+            raise HTTPException(status_code=401, detail="OAuth verification failed")
 
     email = (profile.get("email") or "").lower()
     if not email:

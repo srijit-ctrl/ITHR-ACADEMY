@@ -6,6 +6,15 @@ fixtures (never a real account) and are documented as such.
 """
 import os
 import secrets
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Ensure backend/.env is loaded before any test imports auth.py / core.py
+# (they read env-vars at import time). This is a no-op when run via the running
+# supervisor process because os.environ is already populated, but makes standalone
+# `pytest tests/test_iteration14.py::TestX` invocations work too.
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Read from env-var; fall back to a fresh random per-run password. This keeps
 # the test suite hermetic while satisfying static security scanners that flag
