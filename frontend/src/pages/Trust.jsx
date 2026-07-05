@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
     ShieldCheck, Lock, Server, FileText, KeyRound, Users, Eye, AlertCircle,
-    ArrowRight, CheckCircle2, Clock, MapPin, Mail, Download
+    ArrowRight, CheckCircle2, Clock, MapPin, Mail, Download, Package, Loader2
 } from "lucide-react";
 import HeroBlobs from "@/components/HeroBlobs";
-import { api } from "@/lib/api";
+import { api, API_BASE } from "@/lib/api";
 
 /**
  * Public Trust Page — realistic-only claims.
@@ -126,6 +126,7 @@ const ISSUER_PILLARS = [
 
 export default function Trust() {
     const [buildInfo, setBuildInfo] = useState({ version: null, ts: null });
+    const [packLoading, setPackLoading] = useState(false);
 
     useEffect(() => {
         api.get("/health").then((r) => setBuildInfo({
@@ -133,6 +134,25 @@ export default function Trust() {
             ts: r.data?.timestamp || new Date().toISOString(),
         })).catch(() => {});
     }, []);
+
+    const downloadProcurementPack = async () => {
+        setPackLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/trust/procurement-pack`);
+            if (!res.ok) throw new Error("Download failed");
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `ITHR-Academy-Procurement-Pack-${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } finally {
+            setPackLoading(false);
+        }
+    };
 
     return (
         <div>
@@ -149,6 +169,18 @@ export default function Trust() {
                             Every claim on this page is labelled <b className="text-success">Live</b>, <b className="text-brand-gold-deep">In progress</b>, or <b>Planned</b>. If it isn&apos;t Live, we won&apos;t pretend otherwise.
                         </p>
                         <div className="mt-6 flex flex-wrap gap-3 text-xs">
+                            <button
+                                onClick={downloadProcurementPack}
+                                disabled={packLoading}
+                                data-testid="download-procurement-pack"
+                                className="btn-primary text-xs"
+                            >
+                                {packLoading ? (
+                                    <><Loader2 className="w-3 h-3 animate-spin" /> Generating pack…</>
+                                ) : (
+                                    <><Package className="w-3 h-3" /> Generate procurement pack</>
+                                )}
+                            </button>
                             <Link to="/verify" data-testid="trust-verify-cta" className="btn-outline text-xs">
                                 <ShieldCheck className="w-3 h-3" /> Verify a credential
                             </Link>
@@ -156,6 +188,9 @@ export default function Trust() {
                                 <Mail className="w-3 h-3" /> Contact security team
                             </a>
                         </div>
+                        <p className="mt-3 text-[11px] text-muted-foreground max-w-lg">
+                            The pack is a ZIP with a one-page security fact-sheet, sub-processor register, DPA template, and full compliance dossier — everything a vendor-review team typically asks for on day one.
+                        </p>
                     </div>
                 </div>
             </section>
@@ -343,11 +378,17 @@ export default function Trust() {
                         <Download className="w-5 h-5 text-brand mb-3" />
                         <div className="font-serif text-xl mb-2">Request a DPA</div>
                         <p className="text-sm text-muted-foreground mb-4">
-                            Enterprise Data Processing Addendum templates are available on request during procurement.
+                            The DPA template ships inside the procurement pack. Executed DPAs are exchanged during procurement.
                         </p>
-                        <a href="mailto:enterprise@ithr.ae" className="btn-outline text-xs">
-                            <Mail className="w-3 h-3" /> enterprise@ithr.ae
-                        </a>
+                        <button
+                            onClick={downloadProcurementPack}
+                            disabled={packLoading}
+                            data-testid="dpa-download-pack"
+                            className="btn-outline text-xs"
+                        >
+                            {packLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Package className="w-3 h-3" />}
+                            Download procurement pack
+                        </button>
                     </div>
                 </div>
             </section>
