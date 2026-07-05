@@ -27,13 +27,9 @@ def _iso_day(iso_str: str) -> str | None:
     if not iso_str:
         return None
     try:
-        return iso_str[:10]  # YYYY-MM-DD
+        return iso_str[:10]
     except Exception:
         return None
-
-
-def _empty_series(labels: list[str]) -> list[dict]:
-    return [{"date": d, "count": 0} for d in labels]
 
 
 def _fill_series(labels: list[str], docs: list[dict], date_field: str) -> list[dict]:
@@ -46,33 +42,12 @@ def _fill_series(labels: list[str], docs: list[dict], date_field: str) -> list[d
     return [{"date": d, "count": buckets[d]} for d in labels]
 
 
-# ---- platform-wide (super admin) ------------------------------------------
+# ---- platform helpers ------------------------------------------------------
 
 
-async def platform_analytics(days: int = 30) -> dict:
-    """Return aggregated metrics for the super-admin console."""
-    start, labels = _daterange(days)
-    start_iso = start.isoformat()
-
-    # Signups per day
-    signups_docs = await db.users.find(
-        {"created_at": {"$gte": start_iso}},
-        {"_id": 0, "created_at": 1},
-    ).to_list(50000)
-
-    # Certificates per day
-    certs_docs = await db.certificates.find(
-        {"issued_at": {"$gte": start_iso}},
-        {"_id": 0, "issued_at": 1},
-    ).to_list(50000)
-
-    # Founder code claim rate (all-time — 500 is a small cap)
-    founders_claimed = await db.users.count_documents({"founding_member_seq": {"$exists": True}})
-    founders_with_first_course = await db.users.count_documents({"founding_course_id": {"$exists": True}})
-    founders_cert_used = await db.users.count_documents({"founding_cert_used": True})
-
-    # Top 5 orgs by cert issuance (last {days})
-    org_pipeline = [
+async def _platform_top_orgs(start_iso: str) -> list[dict]:
+    """Top 5 organizations by certificates issued in the window."""
+    pipeline = [
         {"$match": {"issued_at": {"$gte": start_iso}}},
         {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "id", "as": "u"}},
         {"$unwind": {"path": "$u", "preserveNullAndEmptyArrays": True}},
@@ -81,141 +56,130 @@ async def platform_analytics(days: int = 30) -> dict:
         {"$sort": {"certs": -1}},
         {"$limit": 5},
     ]
-    top_orgs_raw = await db.certificates.aggregate(org_pipeline).to_list(10)
-    top_org_ids = [t["_id"] for t in top_orgs_raw]
+    raw = await db.certificates.aggregate(pipeline).to_list(10)
+    if not raw:
+        return []
+    ids = [t["_id"] for t in raw]
     org_docs = await db.organizations.find(
-        {"id": {"$in": top_org_ids}},
+        {"id": {"$in": ids}},
         {"_id": 0, "id": 1, "name": 1, "slug": 1},
-    ).to_list(20) if top_org_ids else []
-    org_lookup = {o["id"]: o for o in org_docs}
-    top_orgs = [
-        {**org_lookup.get(t["_id"], {"id": t["_id"], "name": "(unknown)", "slug": t["_id"]}),
+    ).to_list(20)
+    lookup = {o["id"]: o for o in org_docs}
+    return [
+        {**lookup.get(t["_id"], {"id": t["_id"], "name": "(unknown)", "slug": t["_id"]}),
          "certs": t["certs"]}
-        for t in top_orgs_raw
+        for t in raw
     ]
 
-    # Top 10 courses by enrollment (last {days})
-    top_course_pipeline = [
+
+async def _platform_top_courses(start_iso: str) -> list[dict]:
+    """Top 10 courses by enrollment in the window. Orphaned course_ids skipped."""
+    pipeline = [
         {"$match": {"enrolled_at": {"$gte": start_iso}}},
         {"$group": {"_id": "$course_id", "enrollments": {"$sum": 1}}},
         {"$sort": {"enrollments": -1}},
         {"$limit": 10},
     ]
-    top_courses_raw = await db.enrollments.aggregate(top_course_pipeline).to_list(20)
-    top_course_ids = [t["_id"] for t in top_courses_raw]
+    raw = await db.enrollments.aggregate(pipeline).to_list(20)
+    if not raw:
+        return []
+    ids = [t["_id"] for t in raw]
     course_docs = await db.courses.find(
-        {"id": {"$in": top_course_ids}},
+        {"id": {"$in": ids}},
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "category": 1},
-    ).to_list(20) if top_course_ids else []
-    course_lookup = {c["id"]: c for c in course_docs}
-    # Skip orphaned course_ids (enrollments pointing to deleted courses) so the
-    # operator view isn't polluted with "(unknown)" rows.
-    top_courses = [
-        {**course_lookup[t["_id"]], "enrollments": t["enrollments"]}
-        for t in top_courses_raw
-        if t["_id"] in course_lookup
+    ).to_list(20)
+    lookup = {c["id"]: c for c in course_docs}
+    return [
+        {**lookup[t["_id"]], "enrollments": t["enrollments"]}
+        for t in raw
+        if t["_id"] in lookup
     ]
 
-    # Active user counts (any activity in last 24h / 7d / 30d)
+
+async def _platform_active_users() -> dict:
     now = datetime.now(timezone.utc)
-    since_24h = (now - timedelta(days=1)).isoformat()
-    since_7d = (now - timedelta(days=7)).isoformat()
-    since_30d = (now - timedelta(days=30)).isoformat()
+    windows = {"last_24h": 1, "last_7d": 7, "last_30d": 30}
+    out: dict[str, int] = {}
+    for label, days in windows.items():
+        since = (now - timedelta(days=days)).isoformat()
+        out[label] = len(await db.enrollments.distinct("user_id", {"enrolled_at": {"$gte": since}}))
+    return out
 
-    active_24h = len(await db.enrollments.distinct("user_id", {"enrolled_at": {"$gte": since_24h}}))
-    active_7d = len(await db.enrollments.distinct("user_id", {"enrolled_at": {"$gte": since_7d}}))
-    active_30d = len(await db.enrollments.distinct("user_id", {"enrolled_at": {"$gte": since_30d}}))
 
-    # Totals
-    total_users = await db.users.count_documents({})
-    total_orgs = await db.organizations.count_documents({})
-    total_seats = await db.organizations.aggregate([
-        {"$group": {"_id": None, "s": {"$sum": "$seat_count"}}}
-    ]).to_list(1)
-    total_seats_val = total_seats[0]["s"] if total_seats else 0
-    total_certs_all_time = await db.certificates.count_documents({})
-
+async def _platform_founder_perk() -> dict:
+    claimed = await db.users.count_documents({"founding_member_seq": {"$exists": True}})
     return {
-        "window_days": days,
-        "totals": {
-            "users": total_users,
-            "orgs": total_orgs,
-            "seats_issued": total_seats_val,
-            "certs_all_time": total_certs_all_time,
-        },
-        "signups_per_day": _fill_series(labels, signups_docs, "created_at"),
-        "certs_per_day": _fill_series(labels, certs_docs, "issued_at"),
-        "founder_perk": {
-            "cap": 500,
-            "claimed": founders_claimed,
-            "remaining": max(0, 500 - founders_claimed),
-            "first_course_locked": founders_with_first_course,
-            "cert_used": founders_cert_used,
-        },
-        "top_orgs_by_certs": top_orgs,
-        "top_courses_by_enrollment": top_courses,
-        "active_users": {
-            "last_24h": active_24h,
-            "last_7d": active_7d,
-            "last_30d": active_30d,
-        },
+        "cap": 500,
+        "claimed": claimed,
+        "remaining": max(0, 500 - claimed),
+        "first_course_locked": await db.users.count_documents({"founding_course_id": {"$exists": True}}),
+        "cert_used": await db.users.count_documents({"founding_cert_used": True}),
     }
 
 
-# ---- org-scoped (enterprise admin) ----------------------------------------
+async def _platform_totals() -> dict:
+    total_seats = await db.organizations.aggregate(
+        [{"$group": {"_id": None, "s": {"$sum": "$seat_count"}}}]
+    ).to_list(1)
+    return {
+        "users": await db.users.count_documents({}),
+        "orgs": await db.organizations.count_documents({}),
+        "seats_issued": total_seats[0]["s"] if total_seats else 0,
+        "certs_all_time": await db.certificates.count_documents({}),
+    }
 
 
-async def org_analytics(org_id: str, days: int = 30) -> dict:
-    """Return aggregated metrics for a single org's admin dashboard."""
+# ---- platform-wide (super admin) ------------------------------------------
+
+
+async def platform_analytics(days: int = 30) -> dict:
+    """Return aggregated metrics for the super-admin console."""
     start, labels = _daterange(days)
     start_iso = start.isoformat()
 
-    # Members of this org
-    members = await db.org_members.find(
-        {"org_id": org_id},
-        {"_id": 0, "user_id": 1, "full_name": 1, "email": 1, "department": 1},
-    ).to_list(2000)
-    member_user_ids = [m["user_id"] for m in members]
+    signups_docs = await db.users.find(
+        {"created_at": {"$gte": start_iso}},
+        {"_id": 0, "created_at": 1},
+    ).to_list(50000)
+    certs_docs = await db.certificates.find(
+        {"issued_at": {"$gte": start_iso}},
+        {"_id": 0, "issued_at": 1},
+    ).to_list(50000)
 
-    # Enrollments in window
-    enrollments = await db.enrollments.find(
-        {"user_id": {"$in": member_user_ids}, "enrolled_at": {"$gte": start_iso}},
-        {"_id": 0, "user_id": 1, "course_id": 1, "enrolled_at": 1, "completed": 1, "completed_at": 1, "progress_pct": 1},
-    ).to_list(20000)
+    return {
+        "window_days": days,
+        "totals": await _platform_totals(),
+        "signups_per_day": _fill_series(labels, signups_docs, "created_at"),
+        "certs_per_day": _fill_series(labels, certs_docs, "issued_at"),
+        "founder_perk": await _platform_founder_perk(),
+        "top_orgs_by_certs": await _platform_top_orgs(start_iso),
+        "top_courses_by_enrollment": await _platform_top_courses(start_iso),
+        "active_users": await _platform_active_users(),
+    }
 
-    # All enrollments (for funnel)
-    all_enrollments = await db.enrollments.find(
-        {"user_id": {"$in": member_user_ids}},
-        {"_id": 0, "user_id": 1, "course_id": 1, "completed": 1, "progress_pct": 1},
-    ).to_list(20000)
 
-    # Certificates in window
-    certs = await db.certificates.find(
-        {"user_id": {"$in": member_user_ids}, "issued_at": {"$gte": start_iso}},
-        {"_id": 0, "user_id": 1, "course_id": 1, "issued_at": 1},
-    ).to_list(20000)
-    all_certs = await db.certificates.find(
-        {"user_id": {"$in": member_user_ids}},
-        {"_id": 0, "user_id": 1, "course_id": 1},
-    ).to_list(20000)
+# ---- org helpers -----------------------------------------------------------
 
-    # Top 5 courses by enrollment in-window
-    course_counts: dict[str, int] = {}
+
+def _org_top_courses(enrollments: list[dict], course_lookup: dict) -> list[dict]:
+    counts: dict[str, int] = {}
     for e in enrollments:
-        course_counts[e["course_id"]] = course_counts.get(e["course_id"], 0) + 1
-    top_course_ids = sorted(course_counts, key=lambda k: -course_counts[k])[:5]
-    course_docs = await db.courses.find(
-        {"id": {"$in": top_course_ids}},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "category": 1, "thumbnail_url": 1},
-    ).to_list(20) if top_course_ids else []
-    course_lookup = {c["id"]: c for c in course_docs}
-    top_courses = [
-        {**course_lookup[cid], "enrollments": course_counts[cid]}
-        for cid in top_course_ids
-        if cid in course_lookup  # skip orphaned course_ids
+        counts[e["course_id"]] = counts.get(e["course_id"], 0) + 1
+    top_ids = sorted(counts, key=lambda k: -counts[k])[:5]
+    return [
+        {**course_lookup[cid], "enrollments": counts[cid]}
+        for cid in top_ids
+        if cid in course_lookup
     ]
 
-    # Top 5 most active learners (by enrollments in-window then all-time certs)
+
+def _org_per_user_stats(
+    members: list[dict],
+    enrollments_window: list[dict],
+    all_enrollments: list[dict],
+    all_certs: list[dict],
+) -> dict[str, dict]:
+    """Build per-user stats keyed by user_id."""
     per_user: dict[str, dict] = {}
     for m in members:
         per_user[m["user_id"]] = {
@@ -223,7 +187,7 @@ async def org_analytics(org_id: str, days: int = 30) -> dict:
             "department": m.get("department"), "enrollments_window": 0, "certs_all_time": 0,
             "avg_progress": 0.0, "_progress_sum": 0.0, "_all_enroll_count": 0,
         }
-    for e in enrollments:
+    for e in enrollments_window:
         p = per_user.get(e["user_id"])
         if p:
             p["enrollments_window"] += 1
@@ -236,45 +200,94 @@ async def org_analytics(org_id: str, days: int = 30) -> dict:
         p = per_user.get(c["user_id"])
         if p:
             p["certs_all_time"] += 1
-    for _uid, p in per_user.items():
-        p["avg_progress"] = round(p["_progress_sum"] / p["_all_enroll_count"], 1) if p["_all_enroll_count"] else 0.0
+    for p in per_user.values():
+        p["avg_progress"] = (
+            round(p["_progress_sum"] / p["_all_enroll_count"], 1)
+            if p["_all_enroll_count"] else 0.0
+        )
         p.pop("_progress_sum")
         p.pop("_all_enroll_count")
-    top_learners = sorted(
-        per_user.values(),
-        key=lambda x: (-x["enrollments_window"], -x["certs_all_time"]),
-    )[:5]
+    return per_user
 
-    # Department leaderboard
-    dept_stats: dict[str, dict] = {}
+
+def _org_departments(members: list[dict], per_user: dict[str, dict]) -> list[dict]:
+    stats: dict[str, dict] = {}
     for m in members:
         dept = m.get("department") or "Unassigned"
-        d = dept_stats.setdefault(dept, {"name": dept, "members": 0, "certs": 0, "progress_sum": 0.0})
+        d = stats.setdefault(dept, {"name": dept, "members": 0, "certs": 0, "progress_sum": 0.0})
         d["members"] += 1
-        stats = per_user.get(m["user_id"], {})
-        d["certs"] += stats.get("certs_all_time", 0)
-        d["progress_sum"] += stats.get("avg_progress", 0.0)
-    departments = []
-    for d in dept_stats.values():
-        avg = round(d["progress_sum"] / d["members"], 1) if d["members"] else 0.0
-        departments.append({
-            "name": d["name"], "members": d["members"],
-            "certs": d["certs"], "avg_progress": avg,
-            "cert_coverage_pct": round(d["certs"] / d["members"] * 100, 1) if d["members"] else 0.0,
+        u = per_user.get(m["user_id"], {})
+        d["certs"] += u.get("certs_all_time", 0)
+        d["progress_sum"] += u.get("avg_progress", 0.0)
+    out = []
+    for d in stats.values():
+        n = d["members"] or 1
+        out.append({
+            "name": d["name"], "members": d["members"], "certs": d["certs"],
+            "avg_progress": round(d["progress_sum"] / n, 1),
+            "cert_coverage_pct": round(d["certs"] / n * 100, 1),
         })
-    departments.sort(key=lambda d: -d["cert_coverage_pct"])
+    out.sort(key=lambda d: -d["cert_coverage_pct"])
+    return out
 
-    # Completion funnel (all-time within the org)
+
+def _org_funnel(all_enrollments: list[dict], all_certs: list[dict]) -> list[dict]:
     enrolled_ids = {e["user_id"] for e in all_enrollments}
     in_progress_ids = {e["user_id"] for e in all_enrollments if 0 < (e.get("progress_pct") or 0) < 100}
     completed_ids = {e["user_id"] for e in all_enrollments if e.get("completed")}
     certified_ids = {c["user_id"] for c in all_certs}
-    funnel = [
-        {"stage": "Enrolled",     "count": len(enrolled_ids)},
-        {"stage": "In progress",  "count": len(in_progress_ids)},
-        {"stage": "Completed",    "count": len(completed_ids)},
-        {"stage": "Certified",    "count": len(certified_ids)},
+    return [
+        {"stage": "Enrolled",    "count": len(enrolled_ids)},
+        {"stage": "In progress", "count": len(in_progress_ids)},
+        {"stage": "Completed",   "count": len(completed_ids)},
+        {"stage": "Certified",   "count": len(certified_ids)},
     ]
+
+
+# ---- org-scoped (enterprise admin) ----------------------------------------
+
+
+async def org_analytics(org_id: str, days: int = 30) -> dict:
+    """Return aggregated metrics for a single org's admin dashboard."""
+    start, labels = _daterange(days)
+    start_iso = start.isoformat()
+
+    members = await db.org_members.find(
+        {"org_id": org_id},
+        {"_id": 0, "user_id": 1, "full_name": 1, "email": 1, "department": 1},
+    ).to_list(2000)
+    member_user_ids = [m["user_id"] for m in members]
+
+    enrollments = await db.enrollments.find(
+        {"user_id": {"$in": member_user_ids}, "enrolled_at": {"$gte": start_iso}},
+        {"_id": 0, "user_id": 1, "course_id": 1, "enrolled_at": 1, "completed": 1, "completed_at": 1, "progress_pct": 1},
+    ).to_list(20000)
+    all_enrollments = await db.enrollments.find(
+        {"user_id": {"$in": member_user_ids}},
+        {"_id": 0, "user_id": 1, "course_id": 1, "completed": 1, "progress_pct": 1},
+    ).to_list(20000)
+    certs = await db.certificates.find(
+        {"user_id": {"$in": member_user_ids}, "issued_at": {"$gte": start_iso}},
+        {"_id": 0, "user_id": 1, "course_id": 1, "issued_at": 1},
+    ).to_list(20000)
+    all_certs = await db.certificates.find(
+        {"user_id": {"$in": member_user_ids}},
+        {"_id": 0, "user_id": 1, "course_id": 1},
+    ).to_list(20000)
+
+    # Course lookup for orphan-skipping in top-courses
+    top_course_ids = list({e["course_id"] for e in enrollments})
+    course_docs = await db.courses.find(
+        {"id": {"$in": top_course_ids}},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "category": 1, "thumbnail_url": 1},
+    ).to_list(50) if top_course_ids else []
+    course_lookup = {c["id"]: c for c in course_docs}
+
+    per_user = _org_per_user_stats(members, enrollments, all_enrollments, all_certs)
+    top_learners = sorted(
+        per_user.values(),
+        key=lambda x: (-x["enrollments_window"], -x["certs_all_time"]),
+    )[:5]
 
     return {
         "window_days": days,
@@ -286,8 +299,8 @@ async def org_analytics(org_id: str, days: int = 30) -> dict:
         },
         "enrollments_per_day": _fill_series(labels, enrollments, "enrolled_at"),
         "certs_per_day": _fill_series(labels, certs, "issued_at"),
-        "top_courses": top_courses,
+        "top_courses": _org_top_courses(enrollments, course_lookup),
         "top_learners": top_learners,
-        "departments": departments,
-        "funnel": funnel,
+        "departments": _org_departments(members, per_user),
+        "funnel": _org_funnel(all_enrollments, all_certs),
     }

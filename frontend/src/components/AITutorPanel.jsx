@@ -8,6 +8,7 @@ export default function AITutorPanel({ courseSlug = null }) {
     const [open, setOpen] = useState(false);
     const [messages, setMessages] = useState([
         {
+            id: "welcome",
             role: "assistant",
             content: "I'm Aletheia — your AI tutor. Ask me anything about agentic AI, course material, or your certification path.",
         },
@@ -27,7 +28,11 @@ export default function AITutorPanel({ courseSlug = null }) {
         if (!input.trim() || streaming) return;
         const msg = input.trim();
         setInput("");
-        setMessages((m) => [...m, { role: "user", content: msg }, { role: "assistant", content: "" }]);
+        setMessages((m) => [
+            ...m,
+            { id: `u-${Date.now()}-${m.length}`, role: "user", content: msg },
+            { id: `a-${Date.now()}-${m.length + 1}`, role: "assistant", content: "" },
+        ]);
         setStreaming(true);
 
         await streamTutor({
@@ -101,7 +106,7 @@ export default function AITutorPanel({ courseSlug = null }) {
 
                     <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                         {messages.map((m, i) => (
-                            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div key={m.id || `msg-${i}`} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                                 <div
                                     className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed rounded-sm ${
                                         m.role === "user"

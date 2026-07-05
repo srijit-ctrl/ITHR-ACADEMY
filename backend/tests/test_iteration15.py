@@ -25,8 +25,10 @@ load_dotenv(Path(__file__).parent.parent.parent / "frontend" / ".env")
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
-SUPER_ADMIN_EMAIL = "superadmin@ithr.tech"
-SUPER_ADMIN_PASSWORD = "ITHR!Root-2026-ChangeMe"
+SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@ithr.tech")
+# Test-only default matches the preview placeholder in /app/backend/.env.
+# In production CI, override via SUPER_ADMIN_PASSWORD env var.
+SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "preview-only-rotate-in-prod")
 
 
 # ---------------- Helpers ----------------

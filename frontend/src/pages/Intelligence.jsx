@@ -198,8 +198,8 @@ export default function Intelligence() {
                                 </div>
 
                                 <div className="card-flat divide-y divide-border">
-                                    {briefing.course_refresh_priorities.map((p, i) => (
-                                        <div key={p.course_slug + i} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-6 items-center hover:bg-surface-alt/40 transition-colors" data-testid={`priority-${p.course_slug}`}>
+                                    {briefing.course_refresh_priorities.map((p) => (
+                                        <div key={p.course_slug} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-6 items-center hover:bg-surface-alt/40 transition-colors" data-testid={`priority-${p.course_slug}`}>
                                             <div className="md:col-span-2">
                                                 <span className={`badge-mono ${p.priority === "Now" ? "border-brand text-brand" : p.priority === "This Quarter" ? "border-warning text-warning" : ""}`}>
                                                     {p.priority}

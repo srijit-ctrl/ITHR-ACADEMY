@@ -37,7 +37,7 @@ export default function Mentor() {
             const r = await api.get(`/mentor/sessions/${id}`);
             setSessionId(id);
             setMessages(r.data.messages || []);
-        } catch (e) { void e; }
+        } catch (e) { console.debug("[Mentor] openSession failed:", e?.message); }
     };
 
     const newSession = () => {
@@ -51,7 +51,7 @@ export default function Mentor() {
             await api.delete(`/mentor/sessions/${id}`);
             setSessions((s) => s.filter((x) => x.id !== id));
             if (sessionId === id) newSession();
-        } catch (err) { void err; }
+        } catch (err) { console.debug("[Mentor] removeSession failed:", err?.message); }
     };
 
     const send = async (text) => {

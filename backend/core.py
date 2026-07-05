@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-import random
+import secrets
 import string
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,12 +33,16 @@ def now_iso() -> str:
 
 
 def gen_cert_id() -> str:
-    suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    # Cryptographically-random suffix (secrets, not random) — cert IDs are
+    # publicly verifiable and must be unpredictable.
+    alphabet = string.ascii_uppercase + string.digits
+    suffix = "".join(secrets.choice(alphabet) for _ in range(6))
     return f"EAIA-2026-{suffix}"
 
 
 def gen_invite_code() -> str:
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(8))
 
 
 def user_to_public(doc: dict) -> dict:

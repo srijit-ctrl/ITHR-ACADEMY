@@ -13,17 +13,17 @@ import requests
 
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
-SUPER_ADMIN_EMAIL = "superadmin@ithr.tech"
-SUPER_ADMIN_PASSWORD = "ITHR!Root-2026-ChangeMe"
+SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@ithr.tech")
+# Test-only default matches the preview placeholder in /app/backend/.env.
+# In production CI, override via SUPER_ADMIN_PASSWORD env var.
+SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "preview-only-rotate-in-prod")
 
 
 # ------------- helpers -----------------------------------------------------
 
 def _register_learner(prefix: str = "iter16-analytics"):
-    ts = int(time.time() * 1000)
-    rand = secrets.token_hex(3)
-    email = f"{prefix}+{ts}{rand}@example.com"
-    password = "TestPass123!"
+    email = f"{prefix}+{int(time.time() * 1000)}{secrets.token_hex(3)}@example.com"
+    password = os.environ.get("EAIA_TEST_USER_PASSWORD", "TestPass123!")
     r = requests.post(
         f"{BASE_URL}/api/auth/register",
         json={

@@ -45,7 +45,11 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
             raw,
         ].filter(Boolean).join("\n");
 
-        setMessages((m) => [...m, { role: "user", content: raw }, { role: "assistant", content: "" }]);
+        setMessages((m) => [
+            ...m,
+            { id: `u-${Date.now()}-${m.length}`, role: "user", content: raw },
+            { id: `a-${Date.now()}-${m.length + 1}`, role: "assistant", content: "" },
+        ]);
         setStreaming(true);
 
         await streamTutor({
@@ -127,7 +131,7 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
                         <p className="text-sm text-muted-foreground italic">Ask a question below — I have the full lesson context.</p>
                     )}
                     {messages.map((m, i) => (
-                        <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div key={m.id || `msg-${i}`} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                             <div
                                 className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed rounded-sm whitespace-pre-wrap ${
                                     m.role === "user"

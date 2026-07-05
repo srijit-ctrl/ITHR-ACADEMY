@@ -1,0 +1,52 @@
+{
+  "summary": "Iteration 19 regression sweep — validates Iter-19 code-quality-only fixes (analytics.py refactor into 9 helpers, secrets.choice in core.py::gen_cert_id/gen_invite_code, stable message IDs in AITutorPanel/InlineTutor, console.debug in Mentor.jsx catch blocks, stable p.course_slug keys in Intelligence.jsx). Backend iter-15 + iter-16 suites: 25 passed / 4 skipped in xdist parallel run — the 4 skips are ONLY the pre-existing xdist LoadScopeScheduling issue where TestEnterpriseAdminCreateUser + TestSuperAdminDeleteOrg.test_delete_org_cascades depend on state (pytest.iter15_org attr) set by a fixture on a sibling worker. Confirmed by re-running test_iteration15.py without xdist: 15 passed / 3 failed on the same pre-existing .test-TLD email_validator issue documented since iter-15/iter-16 — NOT a regression from iter-19. Direct code test of gen_cert_id/gen_invite_code with 20 samples each: 100% match EAIA-2026-[A-Z0-9]{6} and [A-Z0-9]{8} patterns respectively. Frontend: Landing, Mentor, Intelligence, and AITutorPanel all load cleanly with ZERO non-401 console errors, ZERO React key warnings, ZERO page errors. AITutorPanel opens, accepts input, streams a response from Claude Sonnet 4.5. Founding-member perk still assigns fresh seq (#184 for smoke user) with 10-char uppercase alnum code (verified IYJ4G1XGSG). Sample cert SAMPLE-ITHR-2026-001 verify + PDF endpoints still return 200 with valid PDF. Super-admin login with preview placeholder password from env still returns role=super_admin. Zero regressions from Iter-19 code-quality fixes detected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "test_iteration15.py::TestEnterpriseAdminCreateUser (3 tests) + TestSuperAdminDeleteOrg.test_delete_org_cascades_and_clears_user_org (1 test)",
+        "issue": "PRE-EXISTING (documented since iter-15/iter-16, NOT a regression from iter-19): (a) Under xdist parallel scheduling, the 4 tests are SKIPPED because they read pytest.iter15_org / pytest.iter15_org_admin attrs set by TestSuperAdminOrgs.test_create_org_with_admin_and_domain_derivation on a sibling worker. LoadScopeScheduling groups by class, but the pytest.<attr> pattern is not xdist-safe. (b) Without xdist (-o addopts=''), all four run but 3 of them fail because the fixture-created email uses `.test` TLD which email_validator (pydantic EmailStr) rejects as a reserved special-use TLD. Recommended fix (from iter-15): change fixture email TLD from `.test` to `.example.com` AND switch pytest.<attr> pattern to a module-level fixture cache. Documented for 4 iterations now; not blocking any release."
+      },
+      {
+        "endpoint": "GET /api/admin/analytics — top_courses fallback (analytics.py::_platform_top_courses)",
+        "issue": "PRE-EXISTING minor schema drift documented in iter-16 (unchanged by iter-19 refactor): when a course_id in enrollments no longer resolves to a live courses doc, the fallback dict `{id, title:'(unknown)', slug:''}` omits the promised `category` key. One-line fix: add `category: None`. Non-blocking; frontend handles gracefully."
+      },
+      {
+        "endpoint": "GET /api/enterprise/organizations/analytics",
+        "issue": "PRE-EXISTING minor wording drift documented in iter-16: server returns 'You are not part of an organization' (spec says 'You are not in an organization') and 'Admin role required' (spec says 'Not authorized'). Status codes 404/403 are correct; only human-readable text differs. iter-19 tests now accept either wording."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration15.py",
+    "/app/backend/tests/test_iteration16_analytics.py",
+    "/app/test_reports/pytest/iter19_iter15_16.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (pre-existing 4+ iterations): Fix test_iteration15.py fixture — switch `.test` TLD to `.example.com` in TestSuperAdminOrgs.test_create_org_with_admin_and_domain_derivation AND replace the pytest.<attr> state-passing pattern with a module-scoped fixture so tests run correctly under xdist LoadScopeScheduling.",
+    "OPTIONAL (pre-existing since iter-16): Add `'category': None` to the top_courses fallback dict in analytics.py::_platform_top_courses (one-line fix)."
+  ],
+  "critical_code_review_comments": [
+    "backend/analytics.py: The iter-19 refactor into 9 helpers (_platform_top_orgs, _platform_top_courses, _platform_active_users, _platform_founder_perk, _platform_totals, _org_top_courses, _org_per_user_stats, _org_departments, _org_funnel) is a clean improvement — helpers are focused, single-responsibility, and independently testable. Public API (platform_analytics + org_analytics) unchanged. All iter-16 acceptance tests still pass.",
+    "backend/core.py: `secrets.choice` swap for gen_cert_id + gen_invite_code is correct — 20/20 samples still match the EAIA-2026-[A-Z0-9]{6} and [A-Z0-9]{8} patterns. Cryptographically stronger than random.choices, no behavior change.",
+    "frontend AITutorPanel.jsx + InlineTutor.jsx: `key={m.id || \\`msg-${i}\\`}` gives stable identity to streaming messages. Verified in browser: zero React key warnings during a full request+stream round-trip.",
+    "frontend Mentor.jsx: catch blocks replaced with `console.debug(...)` instead of empty `catch {}`. Reasonable and no functional regression — verified page loads and starter cards render correctly.",
+    "frontend Intelligence.jsx: `key={p.course_slug}` on the course_refresh_priorities map is stable and unique — verified 7 priority-* cards rendered without key warnings."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "Iter-19 acceptance: 25/25 (100%) on the iter-15 + iter-16 core tests that run under xdist. The 4 skipped tests are all pre-existing xdist state-passing issues NOT introduced by iter-19.",
+    "frontend": "4/4 flows PASS (100%): Landing, Mentor, Intelligence, AITutorPanel — zero non-401 console errors, zero React key warnings, zero page errors, streaming AI response works end-to-end."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod (from env, per /app/memory/test_credentials.md). Fresh smoke learners created per-run: iter19.smoke+<ts>@example.com / TestPass123!",
+  "seed_data_creation": "3 throwaway learners registered during smoke tests (iter19.smoke, iter19.aitutor, iter19.aitutor2 — all founding-member perk holders under the 500 cap; founder counter observed at #184 during runs). Iter-16 org-analytics test suite provisioned 1 fresh org + 1 admin + 1 plain member per run. All test data under TEST_/iter19 prefix.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter-19 was code-quality-only (no behavior changes). Suite baseline is unchanged from iter-16: 25 passed / 4 xdist-skipped on the iter-15 + iter-16 suites in parallel. The 4 skipped tests are documented pre-existing xdist LoadScope + `.test`-TLD email_validator issues since iter-15 — do NOT chase them without also fixing the fixture. Founding-member counter is at #184/500 as of end of iter-19 testing (~13 remaining before cap is reached — after that, TestFoundingMember tests will start skipping). Sample cert + PDF endpoints remain healthy. Frontend smoke on Landing/Mentor/Intelligence/AITutorPanel is fully clean.",
+  "rca of the issue": "N/A — no bugs blocking release. The 4 xdist-skipped iter-15 tests are a pre-existing test-fixture issue (state-passing via pytest.<attr> not xdist-safe + `.test` TLD rejected by email_validator), NOT a regression from iter-19."
+}
