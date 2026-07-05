@@ -338,3 +338,35 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)
 - Auth playbook: `/app/auth_testing.md`
 - Test credentials memo: `/app/memory/test_credentials.md`
+
+### Iteration 19 — Code-Quality Sweep (Feb 2026)
+
+Surgical fixes applied to the real (non-false-positive) findings from the earlier code review:
+
+**Backend**
+- **`core.py`**: `random.choices` → `secrets.choice` for `gen_cert_id()` and `gen_invite_code()`. Certificate IDs and invite codes are now cryptographically-random. Format unchanged: `EAIA-2026-[A-Z0-9]{6}` and `[A-Z0-9]{8}`.
+- **`analytics.py`**: split the two large functions (`platform_analytics`, `org_analytics`) into 9 focused helpers — `_platform_totals`, `_platform_founder_perk`, `_platform_active_users`, `_platform_top_orgs`, `_platform_top_courses`, `_org_top_courses`, `_org_per_user_stats`, `_org_departments`, `_org_funnel`. Behaviour identical; complexity per function down ~4x. Orphan-course skipping preserved.
+- **`tests/test_iteration15.py`** + **`tests/test_iteration16_analytics.py`**: hard-coded `SUPER_ADMIN_PASSWORD = "ITHR!Root-2026-ChangeMe"` (stale) replaced with `os.environ.get("SUPER_ADMIN_PASSWORD", "preview-only-rotate-in-prod")`. Hard-coded `TestPass123!` in iter-16 helper also moved behind `EAIA_TEST_USER_PASSWORD` env var (matches the pattern already in `conftest.py`).
+
+**Frontend**
+- **`AITutorPanel.jsx`** + **`InlineTutor.jsx`**: chat messages now carry a stable `id` field at creation time; `key={m.id || \`msg-${i}\`}` replaces `key={i}` in the render map. Prevents React reconciliation glitches during streaming updates.
+- **`Mentor.jsx`**: two empty `catch (e) { void e; }` blocks replaced with `console.debug("[Mentor] …", e?.message)` — errors now leave a diagnostic trail without breaking the UX.
+- **`Intelligence.jsx`**: `course_refresh_priorities.map` now uses `key={p.course_slug}` (was `key={p.course_slug + i}`) — slug is already unique per row.
+
+**Testing verdict (iteration_19.json)**
+- Backend: 25/25 (100%) on iter-15 + iter-16 core acceptance tests.
+- Frontend: 4/4 (100%) — Landing, Mentor, Intelligence, AITutorPanel all render with zero non-401 console errors, zero React key warnings.
+- No regressions detected. The 4 xdist-parallel skips (documented since iter-15) and the `.test`-TLD email validator quirk are pre-existing and unchanged by this iteration.
+
+**Deliberately skipped (all documented as false positives from the code review)**
+- `eval()` in seed_assessments.py — no eval anywhere in the backend (grep-verified iter-14).
+- `DOMPurify` missing in LessonViewer/Intelligence/TryALesson — all three already use `DOMPurify.sanitize()` (fixed iter-11).
+- `is` vs `==` on `is None` checks — idiomatic Python, not bugs.
+- Reactor Quiz.jsx / LessonViewer.jsx stale-closure claims — both files already use `useCallback` correctly with the right deps (verified this iteration).
+
+**Backlog (P1/P2) — unchanged**
+- P1: Stripe webhook proration hardening during seat adjustments.
+- P2: Print CSS + WeasyPrint template palette alignment to ITHR Teal/Navy.
+- P2: Resend API key wiring (blocked on user-provided key — currently graceful bypass).
+- P2: Platform hardening for production (K8s config, caching, CI/CD, full test suite).
+
