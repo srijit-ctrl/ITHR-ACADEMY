@@ -27,7 +27,7 @@ export default function HeroBlobs({ variant = "warm" }) {
         <>
             {blobs.map((b, i) => (
                 <div
-                    key={i}
+                    key={`blob-${b.cls}-${i}`}
                     className={`blob ${b.cls}`}
                     style={{
                         width: b.w, height: b.h,

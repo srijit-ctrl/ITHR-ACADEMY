@@ -34,8 +34,66 @@ def _difficulty_rank(d: str) -> int:
         return 2  # default to Intermediate
 
 
+def _learner_posture(completed_courses: list[dict]) -> tuple[set, set, int]:
+    """Aggregate industry, category, and max-difficulty-rank across completed courses."""
+    industries: set = set()
+    categories: set = set()
+    max_rank = -1
+    for c in completed_courses:
+        industries.update(c.get("industries", []))
+        categories.add(c.get("category"))
+        max_rank = max(max_rank, _difficulty_rank(c.get("difficulty", "Beginner")))
+    return industries, categories, max_rank
+
+
+def _difficulty_score(c_rank: int, learner_max_rank: int) -> float:
+    """Reward next-step difficulty progression; penalize regression / huge jump."""
+    if learner_max_rank == -1:
+        return max(0, 12 - abs(c_rank - 1) * 5)
+    delta = c_rank - learner_max_rank
+    if delta == 1:
+        return 18
+    if delta == 0:
+        return 10
+    if delta == 2:
+        return 6
+    if delta < 0:
+        return 2
+    return 0  # jump >= 3
+
+
+def _score_one_course(
+    course: dict,
+    learner_industries: set,
+    learner_categories: set,
+    learner_max_rank: int,
+) -> tuple[float, dict]:
+    """Return (score, signals) tuple for a single course against learner posture."""
+    overlap_ind = len(set(course.get("industries", [])) & learner_industries)
+    overlap_cat = 1 if course.get("category") in learner_categories else 0
+    c_rank = _difficulty_rank(course.get("difficulty", "Beginner"))
+    freshness, _ = compute_freshness(course)
+
+    score = 0.0
+    score += overlap_ind * 8 + overlap_cat * 12
+    score += _difficulty_score(c_rank, learner_max_rank)
+    score += min(10, (course.get("enrolled_count", 0) / 3000))
+    score += (course.get("rating", 4.5) - 4.0) * 4
+    score += (freshness - 60) * 0.1
+    if course.get("has_full_content"):
+        score += 6
+
+    signals = {
+        "industry_overlap": overlap_ind,
+        "category_overlap": overlap_cat,
+        "difficulty_delta": c_rank - learner_max_rank if learner_max_rank >= 0 else None,
+        "has_full_content": course.get("has_full_content", False),
+        "freshness": freshness,
+    }
+    return score, signals
+
+
 async def _score_courses(user_id: str) -> list[dict]:
-    user = await db.users.find_one({"id": user_id}, {"_id": 0})
     enrollments = await db.enrollments.find({"user_id": user_id}, {"_id": 0}).to_list(200)
     certs = await db.certificates.find({"user_id": user_id}, {"_id": 0}).to_list(200)
     enrolled_course_ids = {e["course_id"] for e in enrollments}
@@ -45,64 +103,15 @@ async def _score_courses(user_id: str) -> list[dict]:
         {"id": {"$in": list(cert_course_ids)}}, {"_id": 0}
     ).to_list(200) if cert_course_ids else []
 
-    # Aggregate learner posture
-    learner_industries = set()
-    learner_categories = set()
-    learner_max_rank = -1
-    if user and user.get("organization"):
-        # try to infer industry from stored courses/enrollments
-        pass
-    for c in completed_courses:
-        learner_industries.update(c.get("industries", []))
-        learner_categories.add(c.get("category"))
-        learner_max_rank = max(learner_max_rank, _difficulty_rank(c.get("difficulty", "Beginner")))
+    learner_industries, learner_categories, learner_max_rank = _learner_posture(completed_courses)
 
     all_courses = await db.courses.find({}, {"_id": 0}).to_list(200)
     scored: list[dict] = []
     for c in all_courses:
         if c["id"] in enrolled_course_ids or c["id"] in cert_course_ids:
             continue
-        s = 0.0
-        # Industry / category overlap
-        overlap_ind = len(set(c.get("industries", [])) & learner_industries)
-        overlap_cat = 1 if c.get("category") in learner_categories else 0
-        s += overlap_ind * 8 + overlap_cat * 12
-        # Difficulty progression: reward next-step, penalize regression / huge jump
-        c_rank = _difficulty_rank(c.get("difficulty", "Beginner"))
-        if learner_max_rank == -1:
-            # fresh learner: favor Beginner/Intermediate
-            s += max(0, 12 - abs(c_rank - 1) * 5)
-        else:
-            delta = c_rank - learner_max_rank
-            if delta == 1:
-                s += 18
-            elif delta == 0:
-                s += 10
-            elif delta == 2:
-                s += 6
-            elif delta < 0:
-                s += 2
-        # Popularity + rating priors
-        s += min(10, (c.get("enrolled_count", 0) / 3000))
-        s += (c.get("rating", 4.5) - 4.0) * 4
-        # Freshness bonus
-        freshness, _ = compute_freshness(c)
-        s += (freshness - 60) * 0.1
-        # Full content boost — real curriculum is more likely to hook
-        if c.get("has_full_content"):
-            s += 6
-
-        scored.append({
-            "course": c,
-            "score": round(s, 2),
-            "signals": {
-                "industry_overlap": overlap_ind,
-                "category_overlap": overlap_cat,
-                "difficulty_delta": c_rank - learner_max_rank if learner_max_rank >= 0 else None,
-                "has_full_content": c.get("has_full_content", False),
-                "freshness": freshness,
-            },
-        })
+        score, signals = _score_one_course(c, learner_industries, learner_categories, learner_max_rank)
+        scored.append({"course": c, "score": round(score, 2), "signals": signals})
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored

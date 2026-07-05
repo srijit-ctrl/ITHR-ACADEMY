@@ -300,67 +300,49 @@ async def preview_seats(payload: dict, user_id: str = Depends(get_current_user_i
     return result
 
 
-@router.post("/organizations/seats")
-async def update_seats(payload: dict, request: Request, user_id: str = Depends(get_current_user_id)):
-    """Adjust seat count (owner only).
-
-    Owner-side flow:
-      - INCREASE: returns a Stripe Checkout URL for the incremental cost.
-        Seats are NOT bumped until webhook / status check flags the txn paid.
-      - DECREASE: seat_count is set immediately, prorated credit line noted.
-      - NOOP: returns unchanged.
-    """
-    org, member = await _resolve_org_for_user(user_id, require_admin=True)
-    if member["role"] != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner may adjust seats")
-
-    new_count = int(payload.get("seat_count", 0))
-    origin_url = (payload.get("origin_url") or "").rstrip("/")
-    if new_count < org.get("seats_used", 0):
+def _validate_seat_change(current: int, seats_used: int, new_count: int) -> None:
+    """Reject out-of-range or below-usage seat changes. Raises HTTPException."""
+    if new_count < seats_used:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot reduce below current usage ({org.get('seats_used', 0)} seats used)",
+            detail=f"Cannot reduce below current usage ({seats_used} seats used)",
         )
     if new_count > 5000:
         raise HTTPException(status_code=400, detail="Contact ITHR sales for >5000 seats")
     if new_count < 10:
         raise HTTPException(status_code=400, detail="Team plans require minimum 10 seats")
 
-    current = org.get("seat_count", 25)
-    delta = new_count - current
 
-    # DECREASE — apply immediately + record prorated credit line
-    if delta < 0:
-        credit_amount = round(abs(delta) * SEAT_PRICE_PER_MONTH, 2)
-        await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
-        credit_doc = {
-            "id": uuid.uuid4().hex,
-            "org_id": org["id"],
-            "type": "prorated_credit",
-            "seats_removed": abs(delta),
-            "amount": credit_amount,
-            "currency": "usd",
-            "note": f"Prorated credit for removing {abs(delta)} seats.",
-            "created_by": user_id,
-            "created_at": now_iso(),
-        }
-        await db.org_billing_events.insert_one(credit_doc)
-        credit_doc.pop("_id", None)
-        org["seat_count"] = new_count
-        return {
-            "organization": org,
-            "action": "credit",
-            "message": f"Seat count reduced to {new_count}. Prorated credit of ${credit_amount:.2f} will apply on next renewal.",
-            "credit_note": credit_doc,
-        }
+async def _apply_seat_decrease(org: dict, delta: int, new_count: int, user_id: str) -> dict:
+    """Apply an immediate seat decrease and record a prorated credit line."""
+    credit_amount = round(abs(delta) * SEAT_PRICE_PER_MONTH, 2)
+    await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
+    credit_doc = {
+        "id": uuid.uuid4().hex,
+        "org_id": org["id"],
+        "type": "prorated_credit",
+        "seats_removed": abs(delta),
+        "amount": credit_amount,
+        "currency": "usd",
+        "note": f"Prorated credit for removing {abs(delta)} seats.",
+        "created_by": user_id,
+        "created_at": now_iso(),
+    }
+    await db.org_billing_events.insert_one(credit_doc)
+    credit_doc.pop("_id", None)
+    org["seat_count"] = new_count
+    return {
+        "organization": org,
+        "action": "credit",
+        "message": f"Seat count reduced to {new_count}. Prorated credit of ${credit_amount:.2f} will apply on next renewal.",
+        "credit_note": credit_doc,
+    }
 
-    if delta == 0:
-        return {"organization": org, "action": "noop", "message": "No change."}
 
-    # INCREASE — create a Stripe checkout for the incremental amount
-    if not origin_url:
-        raise HTTPException(status_code=400, detail="origin_url required for seat increases")
-
+async def _start_seat_increment_checkout(
+    org: dict, delta: int, new_count: int, user_id: str, origin_url: str, request: Request
+) -> dict:
+    """Create a Stripe Checkout session for a seat increase; persist a pending txn record."""
     from core import get_stripe
     from emergentintegrations.payments.stripe.checkout import CheckoutSessionRequest
 
@@ -388,7 +370,6 @@ async def update_seats(payload: dict, request: Request, user_id: str = Depends(g
         logger.exception("Stripe seat-increment session failed")
         raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
 
-    # Track the pending seat purchase so status webhook can fulfill it
     await db.payment_transactions.insert_one({
         "session_id": session.session_id,
         "user_id": user_id,
@@ -412,6 +393,37 @@ async def update_seats(payload: dict, request: Request, user_id: str = Depends(g
         "seats_delta": delta,
         "message": f"Complete checkout to add {delta} seats (${amount:.2f}/month).",
     }
+
+
+@router.post("/organizations/seats")
+async def update_seats(payload: dict, request: Request, user_id: str = Depends(get_current_user_id)):
+    """Adjust seat count (owner only).
+
+    Owner-side flow:
+      - INCREASE: returns a Stripe Checkout URL for the incremental cost.
+        Seats are NOT bumped until webhook / status check flags the txn paid.
+      - DECREASE: seat_count is set immediately, prorated credit line noted.
+      - NOOP: returns unchanged.
+    """
+    org, member = await _resolve_org_for_user(user_id, require_admin=True)
+    if member["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner may adjust seats")
+
+    new_count = int(payload.get("seat_count", 0))
+    origin_url = (payload.get("origin_url") or "").rstrip("/")
+    _validate_seat_change(org.get("seat_count", 25), org.get("seats_used", 0), new_count)
+
+    current = org.get("seat_count", 25)
+    delta = new_count - current
+
+    if delta < 0:
+        return await _apply_seat_decrease(org, delta, new_count, user_id)
+    if delta == 0:
+        return {"organization": org, "action": "noop", "message": "No change."}
+
+    if not origin_url:
+        raise HTTPException(status_code=400, detail="origin_url required for seat increases")
+    return await _start_seat_increment_checkout(org, delta, new_count, user_id, origin_url, request)
 
 
 @router.post("/organizations/seats/fulfill/{session_id}")
@@ -499,18 +511,8 @@ def _generate_temp_password(length: int = 14) -> str:
     return "".join(secrets.choice(_TEMP_PW_ALPHABET) for _ in range(length))
 
 
-@router.post("/organizations/users")
-async def admin_create_user(payload: dict, user_id: str = Depends(get_current_user_id)):
-    """Enterprise admin creates a user directly in their org.
-
-    Enforces:
-    - Caller is org owner/admin.
-    - New user's email domain matches the org's domain (set at org creation).
-    - Seat availability.
-    Returns the temp password exactly once — the admin passes it to the user
-    via a secure channel and the user is prompted to change it on first login.
-    """
-    org, _member = await _resolve_org_for_user(user_id, require_admin=True)
+def _validate_admin_user_payload(payload: dict, org: dict) -> tuple[str, str, str | None, str]:
+    """Validate admin-create-user payload against org domain + seat rules."""
     email = (payload.get("email") or "").lower().strip()
     full_name = (payload.get("full_name") or "").strip()
     department = payload.get("department")
@@ -522,23 +524,33 @@ async def admin_create_user(payload: dict, user_id: str = Depends(get_current_us
         raise HTTPException(status_code=400, detail="full_name required")
 
     org_domain = (org.get("domain") or "").lower().strip()
-    if org_domain:
-        user_domain = email.split("@", 1)[1]
-        if user_domain != org_domain:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Email domain must be @{org_domain} (matches your organization's domain).",
-            )
-
+    if org_domain and email.split("@", 1)[1] != org_domain:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Email domain must be @{org_domain} (matches your organization's domain).",
+        )
     if org.get("seats_used", 0) >= org.get("seat_count", 25):
         raise HTTPException(status_code=400, detail="No seats available. Purchase more seats first.")
+    return email, full_name, department, role
+
+
+@router.post("/organizations/users")
+async def admin_create_user(payload: dict, user_id: str = Depends(get_current_user_id)):
+    """Enterprise admin creates a user directly in their org.
+
+    Enforces caller-is-admin, matching email domain, and seat availability.
+    Returns temp password exactly once — the admin passes it to the user via a
+    secure channel and the user is prompted to change it on first login.
+    """
+    org, _member = await _resolve_org_for_user(user_id, require_admin=True)
+    email, full_name, department, role = _validate_admin_user_payload(payload, org)
 
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="A user with this email already exists")
 
     temp_pw = _generate_temp_password()
     new_user_id = str(uuid.uuid4())
-    user_doc = {
+    await db.users.insert_one({
         "id": new_user_id,
         "email": email,
         "password_hash": hash_password(temp_pw),
@@ -552,20 +564,19 @@ async def admin_create_user(payload: dict, user_id: str = Depends(get_current_us
         "created_at": now_iso(),
         "must_reset_password": True,
         "org_id": org["id"],
-    }
-    await db.users.insert_one(user_doc)
+    })
 
-    member_doc = {
+    member_role = role if role in ("admin", "member") else "member"
+    await db.org_members.insert_one({
         "id": uuid.uuid4().hex,
         "org_id": org["id"],
         "user_id": new_user_id,
         "email": email,
         "full_name": full_name,
-        "role": role if role in ("admin", "member") else "member",
+        "role": member_role,
         "department": department,
         "joined_at": now_iso(),
-    }
-    await db.org_members.insert_one(member_doc)
+    })
     await db.organizations.update_one({"id": org["id"]}, {"$inc": {"seats_used": 1}})
 
     return {
@@ -573,7 +584,7 @@ async def admin_create_user(payload: dict, user_id: str = Depends(get_current_us
             "id": new_user_id,
             "email": email,
             "full_name": full_name,
-            "role": member_doc["role"],
+            "role": member_role,
             "department": department,
         },
         "temp_password": temp_pw,

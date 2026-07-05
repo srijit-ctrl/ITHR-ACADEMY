@@ -48,8 +48,9 @@ export function AuthProvider({ children }) {
     const logout = useCallback(async () => {
         try {
             await api.post("/auth/logout");
-        } catch {
-            /* ignore — we still clear local state */
+        } catch (e) {
+            // Server-side logout is best-effort; local state is cleared below.
+            console.debug("[Auth] logout POST failed (non-fatal):", e?.message);
         }
         setAccessToken(null);
         setUser(null);

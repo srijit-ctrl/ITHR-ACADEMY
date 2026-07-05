@@ -47,20 +47,8 @@ def _extract_domain(email: str) -> str:
     return email.strip().lower().split("@", 1)[1] if "@" in email else ""
 
 
-# ---------- Org + first-admin provisioning ---------------------------------
-@router.post("/orgs")
-async def create_org_with_admin(
-    payload: dict,
-    _super_admin_id: str = Depends(get_current_super_admin),
-):
-    """Provision a new enterprise org and its first admin user in one call.
-
-    Body: { name, admin_email, admin_full_name, industry?, seat_count? }
-    Response: { organization, admin: { id, email, full_name, temp_password } }
-
-    The temp_password is returned exactly once — the super-admin is
-    expected to hand it to the enterprise admin over a secure channel.
-    """
+def _validate_create_org_payload(payload: dict) -> tuple[str, str, str, str | None, int]:
+    """Validate and normalize the create-org payload. Raises HTTPException on invalid."""
     name = (payload.get("name") or "").strip()
     admin_email = (payload.get("admin_email") or "").lower().strip()
     admin_full_name = (payload.get("admin_full_name") or "").strip()
@@ -73,41 +61,59 @@ async def create_org_with_admin(
         raise HTTPException(status_code=400, detail="valid admin_email required")
     if not admin_full_name:
         raise HTTPException(status_code=400, detail="admin_full_name required")
+    return name, admin_email, admin_full_name, industry, seat_count
 
-    if await db.users.find_one({"email": admin_email}):
-        raise HTTPException(status_code=400, detail="Admin email already registered")
 
-    # slug uniqueness
-    base_slug = _slugify(name)
-    slug = base_slug
+async def _unique_org_slug(name: str) -> str:
+    base = _slugify(name)
+    slug = base
     counter = 1
     while await db.organizations.find_one({"slug": slug}):
         counter += 1
-        slug = f"{base_slug}-{counter}"
+        slug = f"{base}-{counter}"
+    return slug
 
-    # Domain is derived from the admin's email — enforced for all future users
-    domain = _extract_domain(admin_email)
 
-    # 1) Create the admin user
-    temp_pw = _generate_temp_password()
+async def _insert_admin_user(admin_email: str, admin_full_name: str, org_name: str, temp_pw: str) -> str:
     admin_user_id = str(uuid.uuid4())
-    admin_doc = {
+    await db.users.insert_one({
         "id": admin_user_id,
         "email": admin_email,
         "password_hash": hash_password(temp_pw),
         "full_name": admin_full_name,
-        "role": "learner",  # user-level role stays learner; org membership grants admin powers
-        "organization": name,
+        "role": "learner",
+        "organization": org_name,
         "title": "Enterprise Admin",
         "avatar_url": None,
         "xp": 0,
         "streak_days": 0,
         "created_at": now_iso(),
         "must_reset_password": True,
-    }
-    await db.users.insert_one(admin_doc)
+    })
+    return admin_user_id
 
-    # 2) Create the org
+
+# ---------- Org + first-admin provisioning ---------------------------------
+@router.post("/orgs")
+async def create_org_with_admin(
+    payload: dict,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Provision a new enterprise org and its first admin user in one call.
+
+    Body: { name, admin_email, admin_full_name, industry?, seat_count? }
+    Response: { organization, admin: { id, email, full_name, temp_password } }
+    """
+    name, admin_email, admin_full_name, industry, seat_count = _validate_create_org_payload(payload)
+
+    if await db.users.find_one({"email": admin_email}):
+        raise HTTPException(status_code=400, detail="Admin email already registered")
+
+    slug = await _unique_org_slug(name)
+    domain = _extract_domain(admin_email)
+    temp_pw = _generate_temp_password()
+    admin_user_id = await _insert_admin_user(admin_email, admin_full_name, name, temp_pw)
+
     org_obj = Organization(
         name=name,
         slug=slug,
@@ -122,8 +128,7 @@ async def create_org_with_admin(
     await db.organizations.insert_one(org_doc)
     org_doc.pop("_id", None)
 
-    # 3) Attach admin as owner member
-    member_doc = {
+    await db.org_members.insert_one({
         "id": uuid.uuid4().hex,
         "org_id": org_doc["id"],
         "user_id": admin_user_id,
@@ -132,10 +137,7 @@ async def create_org_with_admin(
         "role": "owner",
         "department": "Leadership",
         "joined_at": now_iso(),
-    }
-    await db.org_members.insert_one(member_doc)
-
-    # 4) Attach user → org
+    })
     await db.users.update_one(
         {"id": admin_user_id},
         {"$set": {"org_id": org_doc["id"]}},

@@ -1,0 +1,49 @@
+{
+  "summary": "Iter-20 non-regression sweep for pure-refactor changes: 3 backend routers split into helpers (admin_router.create_org_with_admin -> _validate_create_org_payload + _unique_org_slug + _insert_admin_user; enterprise_router.admin_create_user -> _validate_admin_user_payload; enterprise_router.update_seats -> _validate_seat_change + _apply_seat_decrease + _start_seat_increment_checkout; recommendation_router._score_courses -> _learner_posture + _difficulty_score + _score_one_course) and 4 frontend files (CourseDetail.jsx learning-objectives key, CourseCatalog.jsx skeleton key, HeroBlobs.jsx blob key, AuthContext.jsx logout catch console.debug, SuperAdminPortal.jsx useCallback loadAll). Backend: created /app/backend/tests/test_iteration20_refactors.py — 14/14 PASS covering full create-org + admin-provisioning shape (14-char temp_password, must_reset_password=true, domain derived from admin_email), domain enforcement + rejection wording ('Email domain must be @<domain>'), seat noop/decrease/increase paths (decrease returns credit_note doc with prorated amount 18*|delta|; increase returns 200 checkout OR 502 acceptable in preview; noop returns 'No change.'), recommendations shape ({generated_at,count,recommendations:[{course,score,signals}]}), and next-best shape ({recommendation:{course,score,signals,rationale}). Baseline suites iter-15 + iter-16 re-run without xdist: 26/29 PASS + 3 FAIL — the 3 fails are the SAME PRE-EXISTING .test-TLD email_validator issue documented for 5+ iterations (TestEnterpriseAdminCreateUser fixture uses acme-*.test which pydantic EmailStr rejects). NOT a regression from iter-20. Frontend Playwright on 4 public pages (/, /courses, /courses/agentic-ai-foundations, /intelligence) + SuperAdmin portal: ZERO React key warnings (HeroBlobs, CourseCatalog skeleton, CourseDetail objectives all clean), ZERO non-401 console errors, ZERO page errors, ZERO 'Maximum update depth' warnings on /admin (loadAll useCallback stable). SuperAdmin login with superadmin@ithr.tech / preview-only-rotate-in-prod succeeds, /admin renders Operator Console with 51 orgs / 546 users / 1011 seats, Analytics/Organizations/Users tab switching all functional with no re-render warnings. Logout catch now emits '[Auth] logout POST failed (non-fatal)' console.debug on failure — no functional regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "test_iteration15.py::TestEnterpriseAdminCreateUser (3 tests)",
+        "issue": "PRE-EXISTING (5+ iterations, NOT iter-20 regression): fixture uses .test TLD (acme-<suffix>.test) which pydantic EmailStr rejects as a reserved special-use TLD ('The part after the @-sign is a special-use or reserved name'). Fix long-documented: switch fixture domain to .example.com. iter-20 test file already uses .example.com and all 3 equivalent tests PASS there."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration20_refactors.py",
+    "/app/test_reports/pytest/iter20_refactors.xml",
+    "/app/test_reports/pytest/iter20_iter15_16.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (pre-existing 5+ iterations): Fix test_iteration15.py::TestEnterpriseAdminCreateUser fixture — switch acme-<suffix>.test to acme-<suffix>.example.com so the 3 tests pass under non-xdist runs. iter-20 test file demonstrates the fix works."
+  ],
+  "critical_code_review_comments": [
+    "admin_router.py — the 3-helper split (_validate_create_org_payload, _unique_org_slug, _insert_admin_user) is clean, single-responsibility, and behaviour-preserving. Public POST /api/admin/orgs still returns the exact same {organization, admin:{...,temp_password,must_reset_password}} shape verified in 3 iter-20 tests.",
+    "enterprise_router.py — update_seats split into _validate_seat_change + _apply_seat_decrease + _start_seat_increment_checkout is a strong readability win. The 'origin_url required' check has been correctly moved AFTER the noop branch so noop with no origin_url still succeeds — verified in test_noop_returns_no_change_message.",
+    "enterprise_router.py — _validate_admin_user_payload extracts all validation into a testable pure function. Domain mismatch error string still says 'Email domain must be @<domain>' as expected. seat check + full_name + email format checks all preserved.",
+    "recommendation_router.py — the _score_courses split is the biggest readability win: _learner_posture + _difficulty_score + _score_one_course each do one thing. All three take primitive inputs (list, int) and return primitive outputs, so they're now unit-testable in isolation. GET /api/recommendations + /api/recommendations/next-best shape verified unchanged.",
+    "frontend CourseDetail.jsx — key={`objective-${i}-${o.slice(0,24)}`} is a semantic hybrid (index + text slice) which is stable across renders for a given course and safe when two objectives happen to share a 24-char prefix (falls back to index). Verified zero key warnings on /courses/agentic-ai-foundations.",
+    "frontend CourseCatalog.jsx — key={`skeleton-${i}`} on the 6 loading skeletons is a semantic wrapper on the same index. Acceptable because skeletons are homogeneous and short-lived (unmounted the moment data arrives).",
+    "frontend HeroBlobs.jsx — key={`blob-${b.cls}-${i}`} composites the class + index for stable identity across variant changes. Zero key warnings observed on landing.",
+    "frontend AuthContext.jsx — the console.debug('[Auth] logout POST failed (non-fatal):', e?.message) inside the logout catch is the right pattern (silent by default, observable when devtools filter=debug). No functional regression.",
+    "frontend SuperAdminPortal.jsx — loadAll wrapped in useCallback([]) with useEffect([user, loadAll]) is correct: the empty deps on useCallback + user in useEffect prevents infinite re-renders and satisfies exhaustive-deps. Verified live: 4 tab bounces (analytics->orgs->users->orgs->users) with zero 'Maximum update depth' or extra network calls."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration20_refactors.py (new — 14 tests)"
+  ],
+  "success_rate": {
+    "backend": "iter-20 acceptance: 14/14 (100%) on the new refactor suite. iter-15+iter-16 baseline: 26/29 (89.7%) — the 3 failures are the PRE-EXISTING .test-TLD email_validator issue, NOT iter-20 regressions.",
+    "frontend": "5/5 flows PASS (100%): Landing, Catalog, Course Detail, Intelligence, SuperAdmin Portal. Zero React key warnings, zero non-401 console errors, zero page errors, zero infinite re-render warnings."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod (env-backed placeholder per /app/memory/test_credentials.md). Fresh smoke users registered per-run: iter20+*, iter20.rec+*, iter20.nb+* @example.com / TestPass123!. Org admins provisioned per-run: cto+<hex>@iter20-<hex>.example.com with backend-generated 14-char temp password.",
+  "seed_data_creation": "1 fresh enterprise org per test-run (~'Iter20 Org <hex>', slug iter20-org-<hex>, domain iter20-<hex>.example.com, 25->20 seats after decrease test). 1 org owner + 1 employee (Emp One) member per run. 3 throwaway learners for recommendation tests. All under TEST_/iter20 naming — safe to leave.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter-20 was pure-refactor (backend + frontend). Zero behavioural regressions detected. The new /app/backend/tests/test_iteration20_refactors.py (14 tests) is a robust regression suite for the 3 backend refactors and can be re-run in future iterations. iter-15 TestEnterpriseAdminCreateUser .test-TLD issue is now 5 iterations old — recommend either fixing the fixture OR removing the tests since iter-20 covers the same behaviour with .example.com. Super-admin operator console is data-rich (51 orgs, 546 users, 1011 seats) so future UI tests will have plenty to assert on. Founding-member counter is high (~500 cap approaching); future founding-perk tests may need reset.",
+  "rca of the issue": "N/A — no bugs blocking release. All refactors are behaviour-preserving as designed. The 3 iter-15 test failures are a pre-existing test-fixture issue (not code): pydantic EmailStr's underlying email_validator library treats .test as a reserved special-use TLD (RFC 2606) and rejects it. Fix is a one-line fixture change to .example.com, demonstrated working in iter-20's own test file."
+}

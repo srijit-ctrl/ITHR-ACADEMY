@@ -132,7 +132,7 @@ export default function CourseDetail() {
                             "Practical skills through labs and exercises",
                             "Ability to articulate business impact to executive stakeholders",
                         ]).map((o, i) => (
-                            <li key={i} className="flex gap-4">
+                            <li key={`objective-${i}-${o.slice(0, 24)}`} className="flex gap-4">
                                 <span className="font-mono text-xs text-brand pt-1">{String(i + 1).padStart(2, "0")}</span>
                                 <span className="text-base">{o}</span>
                             </li>

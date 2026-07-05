@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -24,7 +24,7 @@ export default function SuperAdminPortal() {
     const [tempCreds, setTempCreds] = useState(null); // {email, temp_password, org_name}
     const [tab, setTab] = useState("analytics");
 
-    const loadAll = async () => {
+    const loadAll = useCallback(async () => {
         setBusy(true);
         try {
             const [o, u] = await Promise.all([
@@ -39,11 +39,11 @@ export default function SuperAdminPortal() {
         } finally {
             setBusy(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         if (user?.role === "super_admin") loadAll();
-    }, [user]);
+    }, [user, loadAll]);
 
     if (loading) return <FullScreenLoader />;
     if (!user) return <Navigate to="/login" replace />;
