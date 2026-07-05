@@ -18,7 +18,7 @@ export default function Footer() {
             <div className="container-page py-14 grid grid-cols-2 md:grid-cols-5 gap-10">
                 <div className="col-span-2">
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
-                        The Enterprise Agentic AI Academy is designed, curated, and continuously refreshed by <span className="text-foreground font-medium">ITHR Technologies Consulting LLC</span>. Trusted by Fortune 500 workforces to master autonomous AI systems.
+                        The Enterprise Agentic AI Academy is designed, curated, and operated by <span className="text-foreground font-medium">ITHR Technologies Consulting LLC</span> — a UAE consulting firm publishing structured learning and verifiable credentials for agentic-AI competence.
                     </p>
                 </div>
 
@@ -38,6 +38,7 @@ export default function Footer() {
                         <li><Link to="/pricing" className="hover:text-brand" data-testid="footer-pricing">Pricing</Link></li>
                         <li><Link to="/enterprise" className="hover:text-brand" data-testid="footer-teams">For teams</Link></li>
                         <li><Link to="/verify" className="hover:text-brand" data-testid="footer-verify">Verify a credential</Link></li>
+                        <li><Link to="/trust" className="hover:text-brand" data-testid="footer-trust">Trust &amp; security</Link></li>
                     </ul>
                 </div>
 
@@ -54,11 +55,15 @@ export default function Footer() {
             <div className="border-t border-border">
                 <div className="container-page py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs text-muted-foreground">
                     <div className="font-mono uppercase tracking-[0.15em]">© 2026 ITHR Technologies Consulting LLC · All Rights Reserved</div>
-                    <div className="flex gap-6 font-mono uppercase tracking-[0.15em]">
-                        <span>SOC 2 Type II</span>
-                        <span>ISO 27001</span>
-                        <span>GDPR</span>
-                    </div>
+                    <Link to="/trust" data-testid="footer-madeinuae" className="inline-flex items-center gap-2.5 hover:text-brand" title="Made in the UAE — for the world">
+                        <svg viewBox="0 0 12 6" aria-hidden="true" className="w-6 h-3.5 rounded-[2px] shadow-sm">
+                            <rect x="0" y="0" width="12" height="6" fill="#000" />
+                            <rect x="0" y="0" width="12" height="4" fill="#FFF" />
+                            <rect x="0" y="0" width="12" height="2" fill="#00732F" />
+                            <rect x="0" y="0" width="3" height="6" fill="#FF0000" />
+                        </svg>
+                        <span className="font-mono uppercase tracking-[0.15em]">Made in the UAE — for the world</span>
+                    </Link>
                 </div>
             </div>
         </footer>

@@ -31,6 +31,7 @@ import Paths from "@/pages/Paths";
 import PathDetail from "@/pages/PathDetail";
 import Passport from "@/pages/Passport";
 import PatchReview from "@/pages/PatchReview";
+import Trust from "@/pages/Trust";
 
 function AppShell() {
     const location = useLocation();
@@ -62,6 +63,7 @@ function AppShell() {
                     <Route path="/enterprise" element={<Enterprise />} />
                     <Route path="/verify" element={<Verify />} />
                     <Route path="/verify/:certId" element={<Verify />} />
+                    <Route path="/trust" element={<Trust />} />
 
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />

@@ -102,7 +102,7 @@ const ENTERPRISE = [
         seats: "5,000+ seats",
         price: "Custom",
         period: "engagement",
-        description: "For Fortune 500 workforce-scale transformation.",
+        description: "For enterprise workforce-scale transformation.",
         features: [
             "Everything in Enterprise",
             "White-label branding on the portal",

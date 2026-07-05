@@ -42,20 +42,20 @@ export default function Enterprise() {
                         {/* Stat pips */}
                         <div className="flex flex-wrap justify-center gap-x-14 gap-y-6 pt-8 border-t border-border">
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none text-brand">2.3×</div>
-                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Higher AI ROI</div>
+                                <div className="font-serif text-3xl leading-none text-brand">15</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Modules per track</div>
                             </div>
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none text-brand">68%</div>
-                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Faster upskilling</div>
+                                <div className="font-serif text-3xl leading-none text-brand">3</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Difficulty levels</div>
                             </div>
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none text-brand">128k</div>
-                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Certified · Q1 2026</div>
+                                <div className="font-serif text-3xl leading-none text-brand">24</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Courses in catalog</div>
                             </div>
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none text-brand">400+</div>
-                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Enterprises</div>
+                                <div className="font-serif text-3xl leading-none text-brand">100%</div>
+                                <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Publicly verifiable</div>
                             </div>
                         </div>
                     </div>

@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+/* Font stack:
+   - Body:     Calibre (if self-hosted / licensed) → Manrope (Google Fonts, closest OSS analogue) → system-ui
+   - Serif:    Cormorant Garamond (kept for editorial headlines)
+   - Mono:     IBM Plex Mono
+   To ship licensed Calibre webfont, add @font-face declarations to /public/fonts/calibre.css
+   and include a <link> in index.html — the font stack below will pick it up automatically. */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;

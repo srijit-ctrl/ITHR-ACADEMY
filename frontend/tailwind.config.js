@@ -8,8 +8,10 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
+                /* Body stack: Calibre (licensed, self-hosted) → Manrope (OSS Google Font, closest match) → system.
+                   Do NOT reorder — Calibre must remain first so a future self-hosted @font-face binding wins. */
                 serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-                sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+                sans: ['"Calibre"', '"Manrope"', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
                 mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
             },
             borderRadius: {

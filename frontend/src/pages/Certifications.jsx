@@ -25,7 +25,7 @@ export default function Certifications() {
                         One <span className="italic text-brand">global standard</span>.
                     </h1>
                     <p className="text-lg text-muted-foreground leading-relaxed">
-                        Our certifications are the reference credential for agentic AI competence &mdash; recognized by hiring managers, procurement teams, and boards across 400+ enterprises.
+                        Our certifications are designed as a reference credential for agentic AI competence &mdash; publicly verifiable, structured across eight tiers, and issued by a named UAE consulting firm that stands behind every award.
                     </p>
                 </div>
             </section>
