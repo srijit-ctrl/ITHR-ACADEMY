@@ -111,7 +111,7 @@ class TestCatalog:
         assert r.status_code == 200
         paths = r.json()["paths"]
         assert isinstance(paths, list)
-        assert len(paths) == 8, f"expected 8 tiers, got {len(paths)}"
+        assert len(paths) == 8, f"expected 8 learning paths, got {len(paths)}"
 
 
 # ---------------- Courses ----------------
