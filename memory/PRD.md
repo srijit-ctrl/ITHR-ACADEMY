@@ -246,6 +246,23 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Verified 6-tier ladder is consistent across Landing, Certifications page copy, and stat pips.
 - Renamed a misleading test assertion (`expected 8 tiers` → `expected 8 learning paths`) — the "8" referred to Learning Paths, not credential tiers.
 
+### Iteration 15 (retest + fix) — Founding-Member Bug Squash + Warning Log (Feb 2026)
+
+**Critical bug found + fixed post-testing-agent handoff:**
+- `/app/backend/founding_member.py::assign_if_eligible` treated Mongo's empty projection dict (`{}`) as "user not found" — `if not existing:` fired on every fresh user because the `_id`-stripped projection returns `{}` when the projected fields don't yet exist on the doc. **Fix:** `if existing is None:` (explicit None check).
+- `/app/backend/routers/auth_router.py::register` did not re-hydrate the local `doc` after `assign_if_eligible()` returned the newly-assigned seq/code, so the register-response body left `founding_member_seq: null` even though the DB was updated. **Fix:** re-hydrate local doc from `result` before building `AuthResponse`.
+- Silent-failure hardening: the `try/except` around `assign_if_eligible` now logs via `logger.exception` instead of swallowing (catches this class of regression in future).
+- Test infra: `tests/conftest.py` now also loads `frontend/.env` so `REACT_APP_BACKEND_URL` is available for standalone `pytest` runs.
+
+**Verified via testing subagent (iteration_15.json):**
+- Iter-15 founding-member acceptance criteria: **4/4 = 100%**.
+- Dashboard FoundingMemberBadge Playwright acceptance: **4/4 = 100%** (badge visible, seq matches "#N of 500", code matches register response, copy-to-clipboard button present).
+- Full backend suite: **177/185 = 95.7%** (all 8 remaining failures are pre-existing preview-env flakes documented in earlier iterations).
+
+**Non-blocking test-brittleness noted for future cleanup** (pre-existing, not regressions):
+- `TestEnterpriseAdminCreateUser` skips 3/6 tests under xdist parallel run due to worker-scope leakage of module attributes; test should use a session-scoped fixture instead of `pytest.attr`.
+- LLM-dependent tests in `test_iteration6`/`_7` occasionally 502 on Cloudflare pass-through.
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)

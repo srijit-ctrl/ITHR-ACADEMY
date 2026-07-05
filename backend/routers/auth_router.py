@@ -94,8 +94,9 @@ async def register(payload: UserRegister, response: Response):
             doc["signup_discount_code"] = result["code"]
             doc["founding_cert_used"] = False
     except Exception:
-        # Non-fatal — user is still registered.
-        pass
+        # Non-fatal — user is still registered. Log loudly so future silent
+        # regressions of the "seq/code stay null" class don't slip through.
+        logger.exception("Founding-member allocation raised during registration")
     access = create_access_token(user_id, doc["email"], doc["role"])
     _set_refresh_cookie(response, user_id)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
