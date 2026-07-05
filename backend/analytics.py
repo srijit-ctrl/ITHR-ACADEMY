@@ -108,10 +108,12 @@ async def platform_analytics(days: int = 30) -> dict:
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "category": 1},
     ).to_list(20) if top_course_ids else []
     course_lookup = {c["id"]: c for c in course_docs}
+    # Skip orphaned course_ids (enrollments pointing to deleted courses) so the
+    # operator view isn't polluted with "(unknown)" rows.
     top_courses = [
-        {**course_lookup.get(t["_id"], {"id": t["_id"], "title": "(unknown)", "slug": ""}),
-         "enrollments": t["enrollments"]}
+        {**course_lookup[t["_id"]], "enrollments": t["enrollments"]}
         for t in top_courses_raw
+        if t["_id"] in course_lookup
     ]
 
     # Active user counts (any activity in last 24h / 7d / 30d)
@@ -208,9 +210,9 @@ async def org_analytics(org_id: str, days: int = 30) -> dict:
     ).to_list(20) if top_course_ids else []
     course_lookup = {c["id"]: c for c in course_docs}
     top_courses = [
-        {**course_lookup.get(cid, {"id": cid, "title": "(unknown)", "slug": ""}),
-         "enrollments": course_counts[cid]}
+        {**course_lookup[cid], "enrollments": course_counts[cid]}
         for cid in top_course_ids
+        if cid in course_lookup  # skip orphaned course_ids
     ]
 
     # Top 5 most active learners (by enrollments in-window then all-time certs)

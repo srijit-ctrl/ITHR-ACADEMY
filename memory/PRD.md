@@ -263,6 +263,44 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - `TestEnterpriseAdminCreateUser` skips 3/6 tests under xdist parallel run due to worker-scope leakage of module attributes; test should use a session-scoped fixture instead of `pytest.attr`.
 - LLM-dependent tests in `test_iteration6`/`_7` occasionally 502 on Cloudflare pass-through.
 
+### Iteration 16 — Super-Admin + Enterprise-Admin Analytics Dashboards (Feb 2026)
+
+**Backend**
+- New module `/app/backend/analytics.py` with two aggregators:
+  - `platform_analytics(days)` → GET `/api/admin/analytics` (super-admin only).
+  - `org_analytics(org_id, days)` → GET `/api/enterprise/organizations/analytics` (org owner/admin only).
+- Both accept `days ∈ [7, 90]`, default 30; auto-clamp.
+- Shared day-bucketing (`_fill_series`) so the two dashboards can't drift.
+
+**Platform analytics returns:**
+- `totals { users, orgs, seats_issued, certs_all_time }`
+- `signups_per_day[]`, `certs_per_day[]` (day-bucketed series)
+- `founder_perk { cap:500, claimed, remaining, first_course_locked, cert_used }`
+- `top_orgs_by_certs[]` (5), `top_courses_by_enrollment[]` (10) — orphan `course_id`s filtered
+- `active_users { last_24h, last_7d, last_30d }` from distinct enrollments
+
+**Org analytics returns:**
+- `totals { members, enrollments_window, certs_window, certs_all_time }`
+- `enrollments_per_day[]`, `certs_per_day[]`
+- `top_courses[]` (5, orphan-filtered), `top_learners[]` (5, ranked by window enrolments + all-time certs + avg progress)
+- `departments[]` sorted by cert_coverage_pct desc
+- `funnel[]` — Enrolled → In progress → Completed → Certified
+
+**Frontend**
+- New `/app/frontend/src/components/AnalyticsPanels.jsx` — `PlatformAnalyticsPanel` + `OrgAnalyticsPanel`, using recharts 3.6.0.
+- Range switcher (7d / 30d / 90d) with keyboard-friendly buttons.
+- `SuperAdminPortal` adds an "Analytics" tab (**default active**).
+- `EnterprisePortal` adds a "View analytics" toggle in the hero and a collapsible panel above the readiness stats. Only visible to org owner/admin.
+- Reusable widgets: `StatPip`, `TrendCard` (line chart), `TopList` (bar-in-list ranking), and a horizontal-bar funnel.
+
+**Testing subagent verdict:**
+- Iter-16 acceptance criteria: **100% (11/11 backend + 3/3 frontend flows)**.
+- Full backend suite: **188/196** = 95.9% (+11 net-new passes vs iter-15 baseline; unchanged 6 pre-existing flakes).
+- All 24 new data-testids visible in Playwright; range switcher fires correct network calls; non-admin learner correctly gated.
+
+**Minor post-test polish applied:**
+- `platform_analytics` + `org_analytics` now **skip** orphaned course_ids (enrollments pointing to deleted courses) — top-courses list is now real courses only.
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)
