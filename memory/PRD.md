@@ -129,6 +129,15 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Certifications + Pricing hero styling already matched — re-verified 0 console errors.
 - 2/2 backend pytest (`test_iteration8_pdf.py`) + 4/4 frontend hero pages pass (iteration_8.json).
 
+### Iteration 12 — Official ITHR Brand Kit Rollout (Feb 2026)
+- **Brand assets shipped** — copied official ITHR brand kit into `/app/frontend/public/brand/` (5 SVGs: FullColor, Mono_Navy, Mono_White, Reverse_OnDark, Mark) + `/app/frontend/public/` (favicon.ico + 6 favicon PNGs + apple-touch-icon + site.webmanifest). Brand guidelines PDF saved to `/app/docs/brand/`.
+- **Color palette swapped to exact ITHR** — Teal `#00A78B` leads (~60%), Navy `#16335E` for foreground text, Bright Blue `#2E7FC1` + Sky Blue `#3FA9E0` for accents. Background shifted from pure white to soft off-white `#F6F8FB` for eye-comfort. Legacy `--brand-gold / --brand-purple / --brand-orange` variable names remapped to nearest ITHR palette values so existing className usages render in brand colors automatically.
+- **Font stack** — `['Calibre', 'Manrope', 'Tahoma', -apple-system, ...]` per user directive. Calibre self-hosted (deferred licensing) → Manrope from Google Fonts (renders today) → Tahoma universal fallback.
+- **ITHR Logo component** — `ITHRLockup` and `ITHRMark` in `components/brand/ITHRBrand.jsx` now render the official SVGs directly. No filters, no recolour, no rotation (brand-guideline compliant). Header + Footer pick them up automatically.
+- **Meta + title** — `<meta theme-color="#16335E">`, favicon links, apple-touch-icon, site.webmanifest all wired in `index.html`. Title updated to "ITHR Enterprise Agentic AI Academy".
+- **Intelligence hero** — swapped `bg-foreground` (near-black) → `bg-brand-navy` (#16335E) with teal italic accent — consistent with the eye-soothing theme.
+- Testing: 12 acceptance criteria pass, 0 console errors across 7 public routes, computed styles match exact HEX targets (iteration_12.json).
+
 ### Iteration 10 — One-click Procurement Pack (Feb 2026)
 - **New endpoint `GET /api/trust/procurement-pack`** (public, `/app/backend/routers/trust_router.py`) returns an ~88KB ZIP with 5 entries:
   - `README.txt` — usage instructions + contacts
