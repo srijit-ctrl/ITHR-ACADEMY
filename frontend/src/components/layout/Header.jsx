@@ -3,7 +3,11 @@ import { useAuth } from "@/context/AuthContext";
 import { Sparkles, LogOut, User as UserIcon } from "lucide-react";
 import { ITHRLockup } from "@/components/brand/ITHRBrand";
 
-export const ITHR_LOGO_URL = "https://customer-assets.emergentagent.com/job_enterprise-ai-learn-2/artifacts/8f0fkfxa_ITHR_Logo_FullColor_1500px.png";
+// Official ITHR brand kit assets (do NOT modify these files — brand-guideline compliant)
+export const ITHR_LOGO_URL = "/brand/ITHR_Logo_FullColor.svg";
+export const ITHR_LOGO_WHITE_URL = "/brand/ITHR_Logo_Mono_White.svg";
+export const ITHR_LOGO_NAVY_URL = "/brand/ITHR_Logo_Mono_Navy.svg";
+export const ITHR_MARK_URL = "/brand/ITHR_Mark.svg";
 
 const navItems = [
     { to: "/paths", label: "Learning paths" },
@@ -25,11 +29,11 @@ export default function Header() {
     };
 
     return (
-        <header className="glass-header sticky top-0 z-40 border-b-2 border-b-transparent" style={{ borderImage: "linear-gradient(90deg, transparent, hsl(var(--brand-gold) / 0.4), transparent) 1" }}>
+        <header className="glass-header sticky top-0 z-40 border-b border-b-border" data-testid="site-header">
             <div className="container-page flex items-center justify-between h-20 gap-6">
                 <Link to="/" className="shrink-0" data-testid="brand-home-link">
-                    <ITHRLockup size={44} className="hidden md:inline-flex" />
-                    <ITHRLockup size={38} variant="compact" className="md:hidden" />
+                    <ITHRLockup size={36} className="hidden md:inline-flex" />
+                    <ITHRLockup size={30} variant="compact" className="md:hidden" />
                 </Link>
 
                 <nav className="hidden lg:flex items-center gap-5 flex-1 justify-center min-w-0">

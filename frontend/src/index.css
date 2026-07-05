@@ -1,9 +1,7 @@
-/* Font stack:
-   - Body:     Calibre (if self-hosted / licensed) → Manrope (Google Fonts, closest OSS analogue) → system-ui
-   - Serif:    Cormorant Garamond (kept for editorial headlines)
-   - Mono:     IBM Plex Mono
-   To ship licensed Calibre webfont, add @font-face declarations to /public/fonts/calibre.css
-   and include a <link> in index.html — the font stack below will pick it up automatically. */
+/* Font stack (user directive: Tahoma + Calibre):
+   - Body/Label:   Tahoma (native across Windows/macOS/Linux) → system-ui — reliable, no CDN needed
+   - Headings:     Calibre (if self-hosted / licensed) → Manrope (Google, closest OSS analogue) → Tahoma
+   - Serif:        Cormorant Garamond (editorial-only accents, kept from aiilm.me look) */
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @tailwind base;
@@ -12,43 +10,53 @@
 
 @layer base {
     :root {
-        /* ITHR Academy — aiilm-inspired palette */
-        --background: 0 0% 100%;              /* pure white main */
-        --foreground: 224 22% 15%;            /* deep navy (aiilm rgb(31,36,48)) */
-        --surface: 0 0% 100%;
-        --surface-alt: 213 40% 96%;           /* aiilm section tint rgb(245,248,253) */
+        /* ITHR Technologies — Official brand palette (source: ITHR_Brand_Guidelines.pdf)
+           Teal #00A78B (leads ~60%) · Navy #16335E · Bright Blue #2E7FC1 · Sky Blue #3FA9E0
+           Background is a soft off-white for eye comfort (not pure white). */
+        --background: 210 33% 98%;            /* #F6F8FB — soft off-white, easy on eyes */
+        --foreground: 217 62% 22%;            /* Navy #16335E — text primary */
+        --surface: 0 0% 100%;                 /* pure white for cards on soft bg */
+        --surface-alt: 210 40% 96%;           /* subtle blue-tinted panel */
         --card: 0 0% 100%;
-        --card-foreground: 224 22% 15%;
+        --card-foreground: 217 62% 22%;
         --popover: 0 0% 100%;
-        --popover-foreground: 224 22% 15%;
-        --primary: 224 22% 15%;
+        --popover-foreground: 217 62% 22%;
+        --primary: 217 62% 22%;               /* Navy for primary buttons */
         --primary-foreground: 0 0% 100%;
-        --secondary: 213 40% 96%;
-        --secondary-foreground: 224 22% 15%;
-        --muted: 213 40% 96%;
-        --muted-foreground: 218 15% 42%;
-        --accent: 217 58% 43%;                /* aiilm blue rgb(46,90,172) */
+        --secondary: 210 40% 96%;
+        --secondary-foreground: 217 62% 22%;
+        --muted: 210 40% 96%;
+        --muted-foreground: 217 20% 42%;      /* muted navy */
+        --accent: 168 100% 33%;               /* ITHR Teal #00A78B */
         --accent-foreground: 0 0% 100%;
-        --brand: 217 58% 43%;                 /* primary blue */
-        --brand-hover: 217 58% 35%;
-        --brand-ink: 224 22% 15%;
-        --brand-purple: 273 43% 44%;          /* aiilm purple rgb(107,63,160) */
-        --brand-purple-light: 273 60% 88%;
-        --brand-blue: 217 58% 43%;
-        --brand-blue-light: 213 100% 92%;
-        --brand-orange: 22 76% 47%;
-        --brand-orange-light: 22 100% 92%;
-        --brand-teal: 174 100% 33%;
-        --brand-gold: 41 80% 52%;
-        --brand-gold-deep: 36 70% 40%;
+        --brand: 168 100% 33%;                /* Teal — the leading brand color */
+        --brand-hover: 168 100% 27%;
+        --brand-ink: 217 62% 22%;             /* Navy for ink text on brand */
+        --brand-navy: 217 62% 22%;            /* #16335E */
+        --brand-navy-deep: 217 62% 15%;
+        --brand-teal: 168 100% 33%;           /* #00A78B */
+        --brand-teal-light: 168 60% 90%;
+        --brand-bright: 210 62% 47%;          /* #2E7FC1 Bright Blue */
+        --brand-sky: 202 74% 56%;             /* #3FA9E0 Sky Blue */
+        --brand-sky-light: 202 74% 92%;
+        /* Legacy aliases kept for now so existing className usage keeps rendering
+           until we do a full search-replace across pages. Mapped to brand. */
+        --brand-blue: 210 62% 47%;
+        --brand-blue-light: 210 62% 92%;
+        --brand-purple: 217 62% 22%;
+        --brand-purple-light: 210 40% 92%;
+        --brand-orange: 168 100% 33%;
+        --brand-orange-light: 168 60% 92%;
+        --brand-gold: 202 74% 56%;
+        --brand-gold-deep: 210 62% 47%;
         --destructive: 356 63% 44%;
         --destructive-foreground: 0 0% 100%;
-        --success: 154 61% 34%;
-        --warning: 38 92% 50%;
-        --border: 213 25% 90%;
-        --input: 213 25% 90%;
-        --ring: 217 58% 43%;
-        --radius: 1rem;                        /* 16px — aiilm-like rounded */
+        --success: 168 100% 33%;              /* teal-tinted success matches brand */
+        --warning: 202 74% 56%;               /* sky blue for warning (subtle) */
+        --border: 210 25% 88%;
+        --input: 210 25% 88%;
+        --ring: 168 100% 33%;                 /* teal focus ring */
+        --radius: 1rem;                        /* 16px — soft rounded */
     }
     .dark {
         /* ITHR Technologies — Dark theme (matches logo's black canvas) */

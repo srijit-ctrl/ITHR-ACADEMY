@@ -8,10 +8,12 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                /* Body stack: Calibre (licensed, self-hosted) → Manrope (OSS Google Font, closest match) → system.
-                   Do NOT reorder — Calibre must remain first so a future self-hosted @font-face binding wins. */
+                /* User directive: Tahoma + Calibre. Calibre is a licensed webfont —
+                   Manrope is loaded as its closest OSS analogue. Tahoma is a
+                   universal fallback available on every OS. */
                 serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-                sans: ['"Calibre"', '"Manrope"', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                sans: ['"Calibre"', '"Manrope"', 'Tahoma', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                label: ['Tahoma', '"Segoe UI"', 'system-ui', 'sans-serif'],
                 mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
             },
             borderRadius: {
@@ -37,6 +39,12 @@ module.exports = {
                     orange: 'hsl(var(--brand-orange))',
                     'orange-light': 'hsl(var(--brand-orange-light))',
                     teal: 'hsl(var(--brand-teal))',
+                    'teal-light': 'hsl(var(--brand-teal-light))',
+                    navy: 'hsl(var(--brand-navy))',
+                    'navy-deep': 'hsl(var(--brand-navy-deep))',
+                    bright: 'hsl(var(--brand-bright))',
+                    sky: 'hsl(var(--brand-sky))',
+                    'sky-light': 'hsl(var(--brand-sky-light))',
                     gold: 'hsl(var(--brand-gold))',
                     'gold-deep': 'hsl(var(--brand-gold-deep))',
                 },

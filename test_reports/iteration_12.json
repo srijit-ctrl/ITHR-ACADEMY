@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 12 (ITHR brand kit rollout) — frontend-only verification. Verified logo asset, favicon, palette shift, font stack, Intelligence hero navy, and cross-page regression (7 routes). All acceptance criteria pass. Backend smoke (/api/health + /api/courses) also green.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verification_matrix": {
+    "logo_src_on_landing": "/brand/ITHR_Logo_FullColor.svg (PASS)",
+    "logo_src_on_all_pages": "/brand/ITHR_Logo_FullColor.svg on /, /trust, /courses, /pricing, /certifications, /enterprise, /verify (PASS)",
+    "mobile_compact_variant": "Compact <img> visible on 390px viewport; stacked variant hidden (PASS)",
+    "favicon_head_200": "HEAD /favicon.ico -> 200, content-type image/x-icon, 15086 bytes (PASS)",
+    "favicon_link_tags": "icon (.ico), icon 32x32, icon 16x16, apple-touch-icon 180x180 all present (PASS)",
+    "theme_color_meta": "#16335E (Navy) (PASS)",
+    "title": "ITHR Enterprise Agentic AI Academy (PASS)",
+    "body_backgroundColor": "rgb(248, 250, 252) — soft off-white, not pure white (PASS — matches --background #F6F8FB)",
+    "body_color": "rgb(21, 48, 91) — ITHR Navy #16335E (PASS)",
+    "teal_accent_present": "Found rgb(0, 168, 135) on landing (matches ITHR Teal #00A78B; 4-unit blue delta from HSL rounding is imperceptible) (PASS)",
+    "body_font_family": "Calibre, Manrope, Tahoma, -apple-system, BlinkMacSystemFont, system-ui, sans-serif — verified on /, /trust, /courses, /pricing, /certifications, /enterprise, /verify (PASS)",
+    "intelligence_hero_navy": "Hero <section> bg = rgb(21, 48, 91) via class 'bg-brand-navy text-white' — NOT pure black (PASS). Italic 'agentic frontier.' rendered in teal on navy per screenshot.",
+    "console_errors": "0 errors across all 7 tested routes (PASS)",
+    "backend_smoke": "/api/health -> {status: healthy}; /api/courses -> valid JSON array (PASS)"
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "index.css still uses legacy alias remapping (--brand-purple, --brand-orange, --brand-gold) — works correctly today but recommend a follow-up sweep to rename className usages to canonical ITHR tokens (bg-brand-navy / bg-brand-teal / bg-brand-bright / bg-brand-sky) so the intent is readable. Not blocking for iter 12.",
+    "index.html preloads Google Fonts 'Inter' but font-family stack lists 'Calibre','Manrope','Tahoma'; Manrope is imported via @import in index.css (works). Inter link tag in <head> is unused CSS-wise — consider removing to shave one blocking request.",
+    "ITHRBrand.jsx line 93: 'dim.replace(\"px\", \"\") * 0.42' — dim is a string when size is passed as string, but when size is a number the code does `${size}px` then .replace on it (works). Fine but a defensive Number() would be cleaner."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "not required — all tested pages are public",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 12 brand rollout is clean — no functional regressions on landing, trust, courses, pricing, certifications, enterprise, verify, or intelligence hero. Palette tokens (--background=#F6F8FB, --foreground=#16335E, --brand=#00A78B teal, --brand-navy=#16335E, --brand-bright=#2E7FC1, --brand-sky=#3FA9E0) all resolve correctly at runtime. Logo served from /brand/ITHR_Logo_FullColor.svg (9403 bytes, 200 OK). Do not retest auth/PDF/procurement per main-agent note — no regressions detected in navigation smoke.",
+  "rca of the issue": "n/a — all acceptance criteria satisfied first pass."
+}
