@@ -8,12 +8,15 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                /* User directive: Tahoma + Calibre. Calibre is a licensed webfont —
-                   Manrope is loaded as its closest OSS analogue. Tahoma is a
-                   universal fallback available on every OS. */
-                serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-                sans: ['"Calibre"', '"Manrope"', 'Tahoma', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-                label: ['Tahoma', '"Segoe UI"', 'system-ui', 'sans-serif'],
+                /* User directive: Calibri (Microsoft-installed) or Tahoma.
+                   No CDN webfonts — both ship natively on Windows/macOS/Linux
+                   (Calibri on Windows/Office installs, Tahoma everywhere).
+                   Headings/subheadings use Tahoma (font-serif kept as an alias
+                   so all existing font-serif className usages resolve to Tahoma
+                   without a global sweep). */
+                serif: ['Tahoma', 'Calibri', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
+                sans: ['Calibri', 'Tahoma', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
+                label: ['Calibri', 'Tahoma', '"Segoe UI"', 'system-ui', 'sans-serif'],
                 mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
             },
             borderRadius: {

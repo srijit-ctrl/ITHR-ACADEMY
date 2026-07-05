@@ -484,3 +484,98 @@ async def remove_member(member_id: str, user_id: str = Depends(get_current_user_
     await db.organizations.update_one({"id": org["id"]}, {"$inc": {"seats_used": -1}})
     await db.users.update_one({"id": target["user_id"]}, {"$set": {"organization": None, "org_id": None}})
     return {"removed": True, "member_id": member_id}
+
+
+# -------------------- Admin creates a user directly --------------------
+import secrets
+import string
+
+from auth import hash_password
+
+_TEMP_PW_ALPHABET = string.ascii_letters + string.digits + "!@#$%^&*"
+
+
+def _generate_temp_password(length: int = 14) -> str:
+    return "".join(secrets.choice(_TEMP_PW_ALPHABET) for _ in range(length))
+
+
+@router.post("/organizations/users")
+async def admin_create_user(payload: dict, user_id: str = Depends(get_current_user_id)):
+    """Enterprise admin creates a user directly in their org.
+
+    Enforces:
+    - Caller is org owner/admin.
+    - New user's email domain matches the org's domain (set at org creation).
+    - Seat availability.
+    Returns the temp password exactly once — the admin passes it to the user
+    via a secure channel and the user is prompted to change it on first login.
+    """
+    org, _member = await _resolve_org_for_user(user_id, require_admin=True)
+    email = (payload.get("email") or "").lower().strip()
+    full_name = (payload.get("full_name") or "").strip()
+    department = payload.get("department")
+    role = payload.get("role", "member")
+
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="valid email required")
+    if not full_name:
+        raise HTTPException(status_code=400, detail="full_name required")
+
+    org_domain = (org.get("domain") or "").lower().strip()
+    if org_domain:
+        user_domain = email.split("@", 1)[1]
+        if user_domain != org_domain:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email domain must be @{org_domain} (matches your organization's domain).",
+            )
+
+    if org.get("seats_used", 0) >= org.get("seat_count", 25):
+        raise HTTPException(status_code=400, detail="No seats available. Purchase more seats first.")
+
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="A user with this email already exists")
+
+    temp_pw = _generate_temp_password()
+    new_user_id = str(uuid.uuid4())
+    user_doc = {
+        "id": new_user_id,
+        "email": email,
+        "password_hash": hash_password(temp_pw),
+        "full_name": full_name,
+        "role": "learner",
+        "organization": org["name"],
+        "title": department,
+        "avatar_url": None,
+        "xp": 0,
+        "streak_days": 0,
+        "created_at": now_iso(),
+        "must_reset_password": True,
+        "org_id": org["id"],
+    }
+    await db.users.insert_one(user_doc)
+
+    member_doc = {
+        "id": uuid.uuid4().hex,
+        "org_id": org["id"],
+        "user_id": new_user_id,
+        "email": email,
+        "full_name": full_name,
+        "role": role if role in ("admin", "member") else "member",
+        "department": department,
+        "joined_at": now_iso(),
+    }
+    await db.org_members.insert_one(member_doc)
+    await db.organizations.update_one({"id": org["id"]}, {"$inc": {"seats_used": 1}})
+
+    return {
+        "user": {
+            "id": new_user_id,
+            "email": email,
+            "full_name": full_name,
+            "role": member_doc["role"],
+            "department": department,
+        },
+        "temp_password": temp_pw,
+        "must_reset_password": True,
+    }

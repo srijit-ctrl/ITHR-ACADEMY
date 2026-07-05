@@ -1,0 +1,405 @@
+import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
+
+/**
+ * Super-Admin console.
+ *
+ * Deliberately unlinked from the public site chrome — the URL /admin is
+ * only shared with ITHR internal operators. All requests are gated by the
+ * backend `get_current_super_admin` guard, so a stray visit without the
+ * correct role returns 403.
+ */
+export default function SuperAdminPortal() {
+    const { user, loading } = useAuth();
+    const [orgs, setOrgs] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [totalUsers, setTotalUsers] = useState(0);
+    const [busy, setBusy] = useState(false);
+    const [showCreate, setShowCreate] = useState(false);
+    const [tempCreds, setTempCreds] = useState(null); // {email, temp_password, org_name}
+    const [tab, setTab] = useState("orgs");
+
+    const loadAll = async () => {
+        setBusy(true);
+        try {
+            const [o, u] = await Promise.all([
+                api.get("/admin/orgs"),
+                api.get("/admin/users?limit=100"),
+            ]);
+            setOrgs(o.data.organizations || []);
+            setUsers(u.data.users || []);
+            setTotalUsers(u.data.total || 0);
+        } catch (e) {
+            toast.error(e.response?.data?.detail || "Failed to load admin data");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    useEffect(() => {
+        if (user?.role === "super_admin") loadAll();
+    }, [user]);
+
+    if (loading) return <FullScreenLoader />;
+    if (!user) return <Navigate to="/login" replace />;
+    if (user.role !== "super_admin") return <Navigate to="/dashboard" replace />;
+
+    const handleDeleteOrg = async (orgId, orgName) => {
+        if (!window.confirm(`Delete "${orgName}"? Members become detached from the org (users are kept).`)) return;
+        try {
+            await api.delete(`/admin/orgs/${orgId}`);
+            toast.success(`Deleted ${orgName}`);
+            loadAll();
+        } catch (e) {
+            toast.error(e.response?.data?.detail || "Delete failed");
+        }
+    };
+
+    const handleResetPassword = async (userId, userEmail) => {
+        if (!window.confirm(`Force-reset password for ${userEmail}?`)) return;
+        try {
+            const res = await api.post(`/admin/users/${userId}/reset-password`);
+            setTempCreds({
+                email: res.data.email,
+                temp_password: res.data.temp_password,
+                headline: "Password reset",
+                subhead: "Share this temp password with the user via a secure channel.",
+            });
+        } catch (e) {
+            toast.error(e.response?.data?.detail || "Reset failed");
+        }
+    };
+
+    return (
+        <div className="min-h-screen">
+            {/* Very intentionally minimal chrome — this is an operator surface. */}
+            <div className="container-page py-10">
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <div className="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-brand-teal">
+                            <Shield className="w-3.5 h-3.5" /> Internal · Super Admin
+                        </div>
+                        <h1 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none mt-2">
+                            ITHR Operator Console
+                        </h1>
+                        <p className="text-muted-foreground mt-2 text-sm">
+                            Provision enterprise orgs, manage their first admin user, and act on password / access requests.
+                        </p>
+                    </div>
+                    <div className="text-right text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                        <div>Signed in as</div>
+                        <div className="text-foreground mt-1">{user.email}</div>
+                    </div>
+                </div>
+
+                {/* Stat row */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                    <StatCard label="Enterprise orgs" value={orgs.length} icon={Building2} testId="stat-orgs" />
+                    <StatCard label="Total users" value={totalUsers} icon={Users} testId="stat-users" />
+                    <StatCard label="Total seats issued" value={orgs.reduce((s, o) => s + (o.seat_count || 0), 0)} icon={Users} testId="stat-seats" />
+                </div>
+
+                {/* Tabs */}
+                <div className="border-b border-border mb-6 flex gap-1">
+                    <TabButton active={tab === "orgs"} onClick={() => setTab("orgs")} label="Organizations" count={orgs.length} testId="tab-orgs" />
+                    <TabButton active={tab === "users"} onClick={() => setTab("users")} label="Users" count={totalUsers} testId="tab-users" />
+                </div>
+
+                {tab === "orgs" && (
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-serif text-2xl">Enterprise organizations</h2>
+                            <button
+                                onClick={() => setShowCreate(true)}
+                                data-testid="create-org-btn"
+                                className="btn-primary text-sm"
+                            >
+                                <Plus className="w-4 h-4" /> New enterprise org
+                            </button>
+                        </div>
+                        <OrgTable orgs={orgs} onDelete={handleDeleteOrg} busy={busy} />
+                    </div>
+                )}
+
+                {tab === "users" && (
+                    <UserTable users={users} totalUsers={totalUsers} onResetPassword={handleResetPassword} />
+                )}
+            </div>
+
+            {showCreate && (
+                <CreateOrgModal
+                    onClose={() => setShowCreate(false)}
+                    onCreated={(res) => {
+                        setTempCreds({
+                            email: res.admin.email,
+                            temp_password: res.admin.temp_password,
+                            headline: `Org "${res.organization.name}" created`,
+                            subhead: `Domain is @${res.organization.domain}. Share the temp password with the admin via a secure channel.`,
+                        });
+                        setShowCreate(false);
+                        loadAll();
+                    }}
+                />
+            )}
+
+            {tempCreds && <TempCredsModal creds={tempCreds} onClose={() => setTempCreds(null)} />}
+        </div>
+    );
+}
+
+function StatCard({ label, value, icon: Icon, testId }) {
+    return (
+        <div className="card-flat p-5" data-testid={testId}>
+            <Icon className="w-4 h-4 mb-2 text-muted-foreground" />
+            <div className="font-serif text-3xl leading-none">{value}</div>
+            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-2">{label}</div>
+        </div>
+    );
+}
+
+function TabButton({ active, onClick, label, count, testId }) {
+    return (
+        <button
+            onClick={onClick}
+            data-testid={testId}
+            className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                active ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+        >
+            {label} <span className="ml-1 text-[10px] font-mono text-muted-foreground">{count}</span>
+        </button>
+    );
+}
+
+function OrgTable({ orgs, onDelete, busy }) {
+    if (busy) return <div className="card-flat p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></div>;
+    if (orgs.length === 0) return <div className="card-flat p-8 text-center text-sm text-muted-foreground">No enterprise organizations yet. Click "New enterprise org" to provision one.</div>;
+    return (
+        <div className="card-flat divide-y divide-border" data-testid="orgs-table">
+            <div className="grid grid-cols-12 gap-3 p-4 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                <div className="col-span-4">Name</div>
+                <div className="col-span-2">Domain</div>
+                <div className="col-span-2">Industry</div>
+                <div className="col-span-2">Seats</div>
+                <div className="col-span-1">Invite</div>
+                <div className="col-span-1 text-right">Actions</div>
+            </div>
+            {orgs.map((o) => (
+                <div key={o.id} className="grid grid-cols-12 gap-3 p-4 items-center text-sm" data-testid={`org-row-${o.slug}`}>
+                    <div className="col-span-4">
+                        <div className="font-serif text-base leading-tight">{o.name}</div>
+                        <div className="text-xs text-muted-foreground">{o.slug}</div>
+                    </div>
+                    <div className="col-span-2 font-mono text-xs">@{o.domain || "—"}</div>
+                    <div className="col-span-2 text-xs">{o.industry || "—"}</div>
+                    <div className="col-span-2 text-xs"><b>{o.seats_used}</b> / {o.seat_count}</div>
+                    <div className="col-span-1 font-mono text-xs text-brand">{o.invite_code}</div>
+                    <div className="col-span-1 text-right">
+                        <button
+                            onClick={() => onDelete(o.id, o.name)}
+                            data-testid={`delete-org-${o.slug}`}
+                            className="p-1.5 text-muted-foreground hover:text-destructive"
+                            title="Delete organization"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function UserTable({ users, totalUsers, onResetPassword }) {
+    return (
+        <div>
+            <h2 className="font-serif text-2xl mb-4">All users <span className="text-xs font-mono text-muted-foreground">({users.length} of {totalUsers} shown)</span></h2>
+            <div className="card-flat divide-y divide-border" data-testid="users-table">
+                <div className="grid grid-cols-12 gap-3 p-4 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                    <div className="col-span-4">Name / Email</div>
+                    <div className="col-span-2">Role</div>
+                    <div className="col-span-3">Organization</div>
+                    <div className="col-span-2">Joined</div>
+                    <div className="col-span-1 text-right">Actions</div>
+                </div>
+                {users.map((u) => (
+                    <div key={u.id} className="grid grid-cols-12 gap-3 p-4 items-center text-sm" data-testid={`user-row-${u.id}`}>
+                        <div className="col-span-4">
+                            <div className="font-serif text-base leading-tight">{u.full_name}</div>
+                            <div className="text-xs text-muted-foreground">{u.email}</div>
+                        </div>
+                        <div className="col-span-2 text-xs">
+                            <span className={`badge-mono ${u.role === "super_admin" ? "border-brand text-brand" : ""}`}>{u.role || "learner"}</span>
+                        </div>
+                        <div className="col-span-3 text-xs">{u.organization || <span className="text-muted-foreground">—</span>}</div>
+                        <div className="col-span-2 text-xs text-muted-foreground">
+                            {u.created_at ? new Date(u.created_at).toLocaleDateString("en-US", { year: "2-digit", month: "short", day: "numeric" }) : "—"}
+                        </div>
+                        <div className="col-span-1 text-right">
+                            {u.role !== "super_admin" && (
+                                <button
+                                    onClick={() => onResetPassword(u.id, u.email)}
+                                    data-testid={`reset-pw-${u.id}`}
+                                    className="p-1.5 text-muted-foreground hover:text-brand"
+                                    title="Reset password"
+                                >
+                                    <KeyRound className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function CreateOrgModal({ onClose, onCreated }) {
+    const [name, setName] = useState("");
+    const [adminEmail, setAdminEmail] = useState("");
+    const [adminName, setAdminName] = useState("");
+    const [industry, setIndustry] = useState("");
+    const [seatCount, setSeatCount] = useState(25);
+    const [submitting, setSubmitting] = useState(false);
+    const [err, setErr] = useState("");
+
+    const domainPreview = useMemo(() => {
+        const at = adminEmail.indexOf("@");
+        return at >= 0 ? adminEmail.slice(at + 1).toLowerCase() : "";
+    }, [adminEmail]);
+
+    const submit = async (e) => {
+        e.preventDefault();
+        setErr("");
+        setSubmitting(true);
+        try {
+            const res = await api.post("/admin/orgs", {
+                name, admin_email: adminEmail, admin_full_name: adminName,
+                industry: industry || null, seat_count: parseInt(seatCount, 10) || 25,
+            });
+            onCreated(res.data);
+        } catch (e) {
+            setErr(e.response?.data?.detail || "Provisioning failed");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="card-flat max-w-xl w-full bg-surface" onClick={(e) => e.stopPropagation()} data-testid="create-org-modal">
+                <div className="flex items-center justify-between p-6 border-b border-border">
+                    <div>
+                        <div className="overline mb-1">New enterprise</div>
+                        <h3 className="font-serif text-2xl">Provision org + admin</h3>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-surface-alt rounded-sm"><X className="w-4 h-4" /></button>
+                </div>
+                <form onSubmit={submit} className="p-6 space-y-4">
+                    <Field label="Company name" required>
+                        <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Corp" data-testid="org-name-input"
+                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                    </Field>
+                    <Field label="Admin email (defines org domain)" required>
+                        <input type="email" required value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="cto@acme.com" data-testid="admin-email-input"
+                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                        {domainPreview && (
+                            <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand mt-1">
+                                All future users must have @{domainPreview} emails.
+                            </p>
+                        )}
+                    </Field>
+                    <Field label="Admin full name" required>
+                        <input type="text" required value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Priya Iyer" data-testid="admin-name-input"
+                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Industry">
+                            <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Technology" data-testid="industry-input"
+                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                        </Field>
+                        <Field label="Initial seat count">
+                            <input type="number" min="10" max="5000" value={seatCount} onChange={(e) => setSeatCount(e.target.value)} data-testid="seat-count-input"
+                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                        </Field>
+                    </div>
+                    {err && <div className="text-sm text-destructive">{err}</div>}
+                    <div className="flex gap-3 justify-end pt-2">
+                        <button type="button" onClick={onClose} className="btn-outline">Cancel</button>
+                        <button type="submit" disabled={submitting} data-testid="submit-create-org" className="btn-primary">
+                            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4" /> Provision</>}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function Field({ label, required, children }) {
+    return (
+        <div>
+            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">
+                {label}{required && <span className="text-destructive"> *</span>}
+            </label>
+            {children}
+        </div>
+    );
+}
+
+/**
+ * One-time credentials modal — shown right after provisioning or a password reset.
+ * The temp password is displayed once and never persisted client-side beyond the
+ * lifetime of this modal.
+ */
+function TempCredsModal({ creds, onClose }) {
+    const [copied, setCopied] = useState(false);
+    const copy = () => {
+        navigator.clipboard.writeText(`Email: ${creds.email}\nTemp password: ${creds.temp_password}`);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+    return (
+        <div className="fixed inset-0 z-50 bg-foreground/60 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="card-flat max-w-lg w-full bg-surface" onClick={(e) => e.stopPropagation()} data-testid="temp-creds-modal">
+                <div className="flex items-start justify-between p-6 border-b border-border">
+                    <div>
+                        <div className="overline mb-1 text-brand">{creds.headline}</div>
+                        <p className="text-sm text-muted-foreground max-w-sm">{creds.subhead}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-surface-alt rounded-sm"><X className="w-4 h-4" /></button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="bg-brand/5 border border-brand p-4 rounded-sm space-y-2">
+                        <div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Email</div>
+                            <div className="font-mono text-sm break-all" data-testid="temp-creds-email">{creds.email}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Temp password (shown once)</div>
+                            <div className="font-mono text-base break-all select-all" data-testid="temp-creds-password">{creds.temp_password}</div>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 justify-end">
+                        <button onClick={copy} data-testid="copy-temp-creds" className="btn-outline">
+                            <Copy className="w-4 h-4" /> {copied ? "Copied" : "Copy both"}
+                        </button>
+                        <button onClick={onClose} data-testid="close-temp-creds" className="btn-primary">Done</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function FullScreenLoader() {
+    return (
+        <div className="min-h-screen flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-brand" />
+        </div>
+    );
+}

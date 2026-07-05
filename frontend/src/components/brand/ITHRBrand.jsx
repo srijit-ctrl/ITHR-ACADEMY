@@ -59,11 +59,10 @@ export function ITHRLockup({ variant = "stacked", size = 44, className = "", onD
             />
             <div
                 className={`pl-3 border-l leading-tight ${onDark ? "border-white/25 text-white" : "border-border text-foreground"}`}
-                style={{ height: `${Math.round(logoH * 0.7)}px` }}
+                style={{ minHeight: `${Math.round(logoH * 0.7)}px` }}
             >
-                <div className="font-sans font-semibold text-sm tracking-tight">Academy</div>
-                <div className={`text-[9px] font-mono uppercase tracking-[0.2em] mt-0.5 ${onDark ? "text-white/70" : "text-muted-foreground"}`}>
-                    Independent Issuer
+                <div className="font-sans font-semibold text-xs md:text-sm tracking-tight leading-snug max-w-[9.5rem]">
+                    Enterprise Agentic AI Academy
                 </div>
             </div>
         </div>

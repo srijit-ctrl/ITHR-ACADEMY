@@ -32,6 +32,7 @@ import PathDetail from "@/pages/PathDetail";
 import Passport from "@/pages/Passport";
 import PatchReview from "@/pages/PatchReview";
 import Trust from "@/pages/Trust";
+import SuperAdminPortal from "@/pages/SuperAdminPortal";
 
 function AppShell() {
     const location = useLocation();
@@ -78,6 +79,8 @@ function AppShell() {
                     <Route path="/enterprise/portal" element={<ProtectedRoute><EnterprisePortal /></ProtectedRoute>} />
                     <Route path="/enterprise/setup" element={<ProtectedRoute><EnterpriseSetup /></ProtectedRoute>} />
                     <Route path="/enterprise/join" element={<ProtectedRoute><EnterpriseJoin /></ProtectedRoute>} />
+                    {/* Super-admin console — deliberately unlinked from public nav. */}
+                    <Route path="/admin" element={<ProtectedRoute><SuperAdminPortal /></ProtectedRoute>} />
                 </Routes>
             </main>
             {!isLesson && <Footer />}

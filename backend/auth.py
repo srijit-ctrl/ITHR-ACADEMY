@@ -106,3 +106,29 @@ async def get_current_user_optional(
         return payload["sub"]
     except Exception:
         return None
+
+
+async def get_current_super_admin(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> str:
+    """Guards super-admin-only endpoints. Returns user_id when the caller's
+    JWT claims role='super_admin' AND the DB record still says so (defence
+    in depth against a stolen token whose role was later downgraded)."""
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    try:
+        payload = decode_token(credentials.credentials)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    if payload.get("role") != "super_admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin only")
+
+    # Double-check the DB in case the role was revoked after token issue.
+    from core import db  # local import to avoid circular
+    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "role": 1})
+    if not user or user.get("role") != "super_admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin only")
+    return payload["sub"]

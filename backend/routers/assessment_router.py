@@ -201,6 +201,14 @@ async def _issue_certificate_if_new(
         {"$set": {"completed": True, "completed_at": now_iso(), "progress_pct": 100.0}},
     )
     await db.users.update_one({"id": user_id}, {"$inc": {"xp": 500}})
+    # If this is the founder's free-cert course, flag it as claimed so future
+    # certs on other courses are billable as usual.
+    try:
+        from founding_member import can_claim_free_cert, mark_cert_claimed
+        if can_claim_free_cert(user, course["id"]):
+            await mark_cert_claimed(user_id)
+    except Exception:
+        pass
     return cert_obj.model_dump()
 
 

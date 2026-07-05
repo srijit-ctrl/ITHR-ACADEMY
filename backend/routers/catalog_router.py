@@ -87,6 +87,12 @@ async def enroll(slug: str, user_id: str = Depends(get_current_user_id)):
     enrollment = Enrollment(user_id=user_id, course_id=course["id"])
     await db.enrollments.insert_one(enrollment.model_dump())
     await db.courses.update_one({"id": course["id"]}, {"$inc": {"enrolled_count": 1}})
+    # Founding-member first-course perk (idempotent, no-op for non-founders)
+    try:
+        from founding_member import claim_first_course
+        await claim_first_course(user_id, course["id"])
+    except Exception:
+        pass
     return {"enrollment_id": enrollment.id, "already_enrolled": False}
 
 

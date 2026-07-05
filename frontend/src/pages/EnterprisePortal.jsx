@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
-import { Building2, Users, Award, TrendingUp, Copy, Plus, Loader2, ArrowRight, Trash2, Settings, Receipt, Sparkles } from "lucide-react";
+import { Building2, Users, Award, TrendingUp, Copy, Plus, Loader2, ArrowRight, Trash2, Settings, Receipt, Sparkles, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import HeroBlobs from "@/components/HeroBlobs";
 
@@ -22,6 +22,15 @@ export default function EnterprisePortal() {
     const [seatPreview, setSeatPreview] = useState(null);
     const [seatBusy, setSeatBusy] = useState(false);
     const [billing, setBilling] = useState([]);
+    // Direct user-creation flow (admin creates user with temp password)
+    const [showCreateUser, setShowCreateUser] = useState(false);
+    const [newUserEmail, setNewUserEmail] = useState("");
+    const [newUserName, setNewUserName] = useState("");
+    const [newUserDept, setNewUserDept] = useState("");
+    const [newUserRole, setNewUserRole] = useState("member");
+    const [createUserErr, setCreateUserErr] = useState("");
+    const [creatingUser, setCreatingUser] = useState(false);
+    const [tempCreds, setTempCreds] = useState(null); // {email, temp_password}
 
     const load = () => {
         setLoading(true);
@@ -111,6 +120,34 @@ export default function EnterprisePortal() {
             setInviteError(e.response?.data?.detail || "Invite failed");
         } finally {
             setInviting(false);
+        }
+    };
+
+    const createUserDirect = async (e) => {
+        e.preventDefault();
+        setCreateUserErr("");
+        setCreatingUser(true);
+        try {
+            const res = await api.post("/enterprise/organizations/users", {
+                email: newUserEmail,
+                full_name: newUserName,
+                department: newUserDept || null,
+                role: newUserRole,
+            });
+            setTempCreds({
+                email: res.data.user.email,
+                temp_password: res.data.temp_password,
+                name: res.data.user.full_name,
+            });
+            setNewUserEmail("");
+            setNewUserName("");
+            setNewUserDept("");
+            setShowCreateUser(false);
+            load();
+        } catch (e) {
+            setCreateUserErr(e.response?.data?.detail || "Create failed");
+        } finally {
+            setCreatingUser(false);
         }
     };
 
@@ -294,10 +331,121 @@ export default function EnterprisePortal() {
                         ))}
                     </div>
 
+                    {/* Add-user modal */}
+                    {isAdmin && showCreateUser && (
+                        <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={() => setShowCreateUser(false)}>
+                            <div className="card-flat max-w-lg w-full bg-surface" onClick={(e) => e.stopPropagation()} data-testid="create-user-modal">
+                                <div className="p-6 border-b border-border flex items-start justify-between">
+                                    <div>
+                                        <div className="overline mb-1">Add team member</div>
+                                        <h3 className="font-serif text-2xl">Create user directly</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">A temp password will be shown once. Share it with the user via a secure channel.</p>
+                                    </div>
+                                    <button onClick={() => setShowCreateUser(false)} className="p-2 hover:bg-surface-alt rounded-sm"><X className="w-4 h-4" /></button>
+                                </div>
+                                <form onSubmit={createUserDirect} className="p-6 space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Email <span className="text-destructive">*</span></label>
+                                        <input type="email" required value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)}
+                                            placeholder={org.domain ? `employee@${org.domain}` : "employee@company.com"}
+                                            data-testid="new-user-email"
+                                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                                        {org.domain && (
+                                            <p className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand mt-1">Must be @{org.domain}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Full name <span className="text-destructive">*</span></label>
+                                        <input type="text" required value={newUserName} onChange={(e) => setNewUserName(e.target.value)}
+                                            data-testid="new-user-name"
+                                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Department</label>
+                                            <input type="text" value={newUserDept} onChange={(e) => setNewUserDept(e.target.value)}
+                                                placeholder="HR / Finance / Sales…"
+                                                data-testid="new-user-dept"
+                                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand" />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Role</label>
+                                            <select value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)}
+                                                data-testid="new-user-role"
+                                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 focus:outline-none focus:border-brand">
+                                                <option value="member">Member</option>
+                                                <option value="admin">Admin</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {createUserErr && <div className="text-sm text-destructive" data-testid="create-user-error">{createUserErr}</div>}
+                                    <div className="flex gap-3 justify-end pt-2">
+                                        <button type="button" onClick={() => setShowCreateUser(false)} className="btn-outline">Cancel</button>
+                                        <button type="submit" disabled={creatingUser || summary.seats_remaining <= 0} data-testid="submit-create-user" className="btn-primary">
+                                            {creatingUser ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserPlus className="w-4 h-4" /> Create user</>}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Temp creds shown once after user creation */}
+                    {tempCreds && (
+                        <div className="fixed inset-0 z-50 bg-foreground/60 flex items-center justify-center p-4" onClick={() => setTempCreds(null)}>
+                            <div className="card-flat max-w-lg w-full bg-surface" onClick={(e) => e.stopPropagation()} data-testid="temp-creds-modal">
+                                <div className="p-6 border-b border-border flex items-start justify-between">
+                                    <div>
+                                        <div className="overline mb-1 text-brand">User created</div>
+                                        <h3 className="font-serif text-2xl">{tempCreds.name}</h3>
+                                        <p className="text-xs text-muted-foreground mt-1">Share this temp password over a secure channel — it will not be shown again.</p>
+                                    </div>
+                                    <button onClick={() => setTempCreds(null)} className="p-2 hover:bg-surface-alt rounded-sm"><X className="w-4 h-4" /></button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div className="bg-brand/5 border border-brand p-4 rounded-sm space-y-2">
+                                        <div>
+                                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Email</div>
+                                            <div className="font-mono text-sm break-all" data-testid="temp-creds-email">{tempCreds.email}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Temp password</div>
+                                            <div className="font-mono text-base break-all select-all" data-testid="temp-creds-password">{tempCreds.temp_password}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 justify-end">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(`Email: ${tempCreds.email}\nTemp password: ${tempCreds.temp_password}`);
+                                                toast.success("Credentials copied");
+                                            }}
+                                            data-testid="copy-temp-creds"
+                                            className="btn-outline"
+                                        >
+                                            <Copy className="w-4 h-4" /> Copy both
+                                        </button>
+                                        <button onClick={() => setTempCreds(null)} data-testid="close-temp-creds" className="btn-primary">Done</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Invite */}
                     {isAdmin && (
                         <div className="mt-8">
-                            <h3 className="font-serif text-xl mb-4">Invite team member</h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-serif text-xl">Add team members</h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateUser(true)}
+                                    data-testid="open-create-user"
+                                    className="btn-outline text-xs"
+                                    disabled={summary.seats_remaining <= 0}
+                                >
+                                    <UserPlus className="w-3.5 h-3.5" /> Create user directly
+                                </button>
+                            </div>
                             <form onSubmit={invite} className="card-flat p-6 space-y-3">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <input type="email" required placeholder="employee@company.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} data-testid="invite-email" className="bg-surface border border-border rounded-sm px-3 py-2 text-sm md:col-span-2 focus:outline-none focus:border-brand" />

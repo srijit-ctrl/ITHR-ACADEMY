@@ -82,6 +82,14 @@ async def register(payload: UserRegister, response: Response):
         "created_at": now_iso(),
     }
     await db.users.insert_one(doc)
+    # Founding-member perk allocation (first 500 signups get a lifetime perk on
+    # their first enrolled course — free modules 6-15 + free certificate).
+    try:
+        from founding_member import assign_if_eligible
+        await assign_if_eligible(user_id)
+    except Exception:
+        # Non-fatal — user is still registered.
+        pass
     access = create_access_token(user_id, doc["email"], doc["role"])
     _set_refresh_cookie(response, user_id)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))

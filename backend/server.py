@@ -11,7 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from core import db, logger, mongo_client, now_iso
 from routers import (
-    assessment_router, auth_router, catalog_router, checkout_router,
+    admin_router, assessment_router, auth_router, catalog_router, checkout_router,
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, paths_router,
     recommendation_router, trust_router, tutor_router,
@@ -133,6 +133,7 @@ for r in (
     intelligence_router.router,
     checkout_router.router,
     enterprise_router.router,
+    admin_router.router,
     digest_router.router,
     demo_router.router,
     trust_router.router,
@@ -187,6 +188,11 @@ async def security_headers(request, call_next):
 @app.on_event("startup")
 async def on_startup():
     await seed_database()
+    from seed_super_admin import seed_super_admin
+    try:
+        await seed_super_admin()
+    except Exception:
+        logger.exception("Super-admin seed failed (non-fatal)")
 
 
 @app.on_event("shutdown")

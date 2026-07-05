@@ -14,9 +14,9 @@ const CERT_TIERS = [
     { title: "Foundation", tier: "I", desc: "For all professionals entering the agentic AI economy.", color: "color-card-blue" },
     { title: "Practitioner", tier: "II", desc: "Hands-on credential for those building production agents.", color: "color-card-teal" },
     { title: "Professional", tier: "III", desc: "Advanced credential with capstone project.", color: "color-card-purple" },
-    { title: "Architect", tier: "VI", desc: "System-design credential for senior technologists.", color: "color-card-orange" },
-    { title: "Enterprise Leader", tier: "VII", desc: "For CXOs steering organization-wide transformation.", color: "color-card-gold" },
-    { title: "Chief AI Officer", tier: "VIII", desc: "The definitive CAIO credential.", color: "color-card-navy" },
+    { title: "Architect", tier: "IV", desc: "System-design credential for senior technologists.", color: "color-card-orange" },
+    { title: "Enterprise Leader", tier: "V", desc: "For CXOs steering organization-wide transformation.", color: "color-card-gold" },
+    { title: "Chief AI Officer", tier: "VI", desc: "The definitive CAIO credential.", color: "color-card-navy" },
 ];
 
 export default function Landing() {
@@ -43,9 +43,6 @@ export default function Landing() {
 
                 <div className="relative container-page pt-14 pb-20 md:pt-20 md:pb-28 z-10">
                     <div className="max-w-4xl mx-auto text-center">
-                        <span className="section-kicker" data-testid="hero-kicker">
-                            ITHR Academy · Est. 2026 · An Independent Issuer
-                        </span>
                         <div className="mt-3 inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground" data-testid="hero-uae-badge">
                             <svg viewBox="0 0 12 6" aria-hidden="true" className="w-4 h-2.5 rounded-[2px] shadow-sm">
                                 <rect x="0" y="0" width="12" height="6" fill="#000" />
@@ -59,7 +56,7 @@ export default function Landing() {
                             Where the world&apos;s workforce learns to <span className="italic text-brand">command</span> AI.
                         </h1>
                         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10">
-                            The <span className="text-foreground font-semibold">ITHR Enterprise Agentic AI Academy</span> is a credentialing platform for enterprise workforces &mdash; ten tiers, twenty industries, one standard, refreshed continuously.
+                            The <span className="text-foreground font-semibold">ITHR Enterprise Agentic AI Academy</span> is a credentialing platform for enterprise workforces &mdash; six tiers, twenty industries, one standard, refreshed continuously.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
                             <Link to="/courses" data-testid="hero-browse-catalog" className="btn-primary text-base">
@@ -74,7 +71,7 @@ export default function Landing() {
                         {/* Structural stat pips — only claim what is factually verifiable */}
                         <div className="flex flex-wrap justify-center gap-x-14 gap-y-6 pt-8 border-t border-border">
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none">10</div>
+                                <div className="font-serif text-3xl leading-none">6</div>
                                 <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Credential tiers</div>
                             </div>
                             <div className="text-left">
@@ -97,7 +94,7 @@ export default function Landing() {
             {/* CURRICULUM SOURCES — realistic phrasing */}
             <section className="border-b border-border py-10 bg-surface-alt/40">
                 <div className="container-page">
-                    <div className="overline mb-6 text-center">Curriculum informed by public research &amp; standards from</div>
+                    <div className="overline mb-6 text-center">Curriculum curated by public research &amp; standards from</div>
                     <div className="flex flex-wrap justify-center items-center gap-x-10 gap-y-4 text-lg font-serif text-muted-foreground/80">
                         {PARTNERS.map((p) => (
                             <span key={p} className="italic">{p}</span>
@@ -180,7 +177,7 @@ export default function Landing() {
                         <div className="md:col-span-6">
                             <span className="section-kicker">The Certification Ladder</span>
                             <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">
-                                Eight tiers.<br />
+                                Six tiers.<br />
                                 From analyst to <span className="italic text-brand">CAIO</span>.
                             </h2>
                         </div>

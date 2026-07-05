@@ -1,8 +1,14 @@
-/* Font stack (user directive: Tahoma + Calibre):
-   - Body/Label:   Tahoma (native across Windows/macOS/Linux) → system-ui — reliable, no CDN needed
-   - Headings:     Calibre (if self-hosted / licensed) → Manrope (Google, closest OSS analogue) → Tahoma
-   - Serif:        Cormorant Garamond (editorial-only accents, kept from aiilm.me look) */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+/* Font stack (user directive: Calibri or Tahoma — no CDN dependency).
+   Calibri ships with Windows/Microsoft Office; Tahoma is a universal
+   fallback on every OS. -apple-system + BlinkMacSystemFont let macOS/iOS
+   render San Francisco natively instead of falling back to pixelated
+   Tahoma on Retina screens.
+   - Body / Headings / Subheadings: Tahoma → Calibri → system UI
+     (headings use font-serif utility, which is aliased in tailwind.config
+      to Tahoma so hierarchy is preserved without a global sweep)
+   - Mono (technical / kicker): IBM Plex Mono
+*/
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -189,7 +195,7 @@
             linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(220 60% 8%) 100%);
     }
     .brand-wordmark {
-        font-family: 'Cormorant Garamond', serif;
+        font-family: Tahoma, Calibri, sans-serif;
         font-weight: 600;
         letter-spacing: -0.02em;
     }
@@ -261,7 +267,7 @@
 .section-warm-cream { background: hsl(38 50% 96%); }
 
 .step-numeral {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: Tahoma, Calibri, sans-serif;
     font-size: 88px;
     line-height: 0.8;
     color: hsl(var(--brand));
@@ -285,7 +291,7 @@
     position: absolute;
     top: 20px;
     right: 24px;
-    font-family: 'Cormorant Garamond', serif;
+    font-family: Tahoma, Calibri, sans-serif;
     font-size: 64px;
     line-height: 1;
     color: hsl(var(--brand) / 0.2);
