@@ -105,13 +105,15 @@ export default function Certificate() {
                     >
                         <Linkedin className="w-4 h-4" /> Add to LinkedIn
                     </a>
-                    <button
-                        onClick={() => window.print()}
+                    <a
+                        href={`${API_BASE}/certificates/${cert.certificate_id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         data-testid="download-certificate"
                         className="btn-outline"
                     >
-                        <Download className="w-4 h-4" /> Print / Save PDF
-                    </button>
+                        <Download className="w-4 h-4" /> Download PDF
+                    </a>
                     <button
                         onClick={copyLink}
                         data-testid="share-certificate"
