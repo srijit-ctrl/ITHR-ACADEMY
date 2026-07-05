@@ -403,3 +403,22 @@
         display: contents !important;
     }
 }
+
+/* Legal / policy page typography — plain prose with strong hierarchy. */
+.legal-prose h1 { font-family: Tahoma, Calibri, sans-serif; font-size: 1.875rem; font-weight: 600; margin: 2rem 0 1rem; letter-spacing: -0.02em; }
+.legal-prose h2 { font-family: Tahoma, Calibri, sans-serif; font-size: 1.5rem; font-weight: 600; margin: 2rem 0 0.75rem; letter-spacing: -0.015em; padding-bottom: 0.4rem; border-bottom: 1px solid hsl(var(--border)); }
+.legal-prose h3 { font-family: Tahoma, Calibri, sans-serif; font-size: 1.15rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }
+.legal-prose p { margin: 0.9rem 0; color: hsl(var(--foreground)); }
+.legal-prose ul, .legal-prose ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+.legal-prose li { margin: 0.35rem 0; }
+.legal-prose ul li { list-style-type: disc; }
+.legal-prose ol li { list-style-type: decimal; }
+.legal-prose strong { font-weight: 600; color: hsl(var(--foreground)); }
+.legal-prose em { color: hsl(var(--muted-foreground)); font-style: italic; }
+.legal-prose a { color: hsl(var(--brand)); text-decoration: underline; text-underline-offset: 3px; }
+.legal-prose code { font-family: 'IBM Plex Mono', monospace; font-size: 0.9em; background: hsl(var(--surface-alt)); padding: 0.1em 0.4em; border-radius: 3px; }
+.legal-prose table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+.legal-prose th, .legal-prose td { border: 1px solid hsl(var(--border)); padding: 0.6rem 0.85rem; text-align: left; vertical-align: top; }
+.legal-prose th { background: hsl(var(--surface-alt)); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+.legal-prose blockquote { border-left: 3px solid hsl(var(--brand)); background: hsl(var(--brand) / 0.03); padding: 0.75rem 1rem; margin: 1rem 0; color: hsl(var(--muted-foreground)); font-style: italic; }
+.legal-prose hr { border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }

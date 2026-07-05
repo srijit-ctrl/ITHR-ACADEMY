@@ -15,7 +15,7 @@ export default function Footer() {
                 </div>
             </div>
 
-            <div className="container-page py-14 grid grid-cols-2 md:grid-cols-5 gap-10">
+            <div className="container-page py-14 grid grid-cols-2 md:grid-cols-6 gap-10">
                 <div className="col-span-2">
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
                         The Enterprise Agentic AI Academy is designed, curated, and operated by <span className="text-foreground font-medium">ITHR Technologies Consulting LLC</span> — a UAE consulting firm publishing structured learning and verifiable credentials for agentic-AI competence.
@@ -48,6 +48,16 @@ export default function Footer() {
                         <li>About ITHR</li>
                         <li>Consulting</li>
                         <li>Contact</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal mb-4">Legal</div>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                        <li><Link to="/legal/disclaimer" className="hover:text-brand" data-testid="footer-disclaimer">Disclaimer</Link></li>
+                        <li><Link to="/legal/terms" className="hover:text-brand" data-testid="footer-terms">Terms of Service</Link></li>
+                        <li><Link to="/legal/security" className="hover:text-brand" data-testid="footer-security">Cyber Security</Link></li>
+                        <li><Link to="/legal/compliance" className="hover:text-brand" data-testid="footer-compliance">Compliance</Link></li>
                     </ul>
                 </div>
             </div>

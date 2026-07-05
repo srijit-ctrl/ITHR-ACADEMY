@@ -53,6 +53,11 @@ def user_to_public(doc: dict) -> dict:
         "avatar_url": doc.get("avatar_url"),
         "xp": doc.get("xp", 0),
         "streak_days": doc.get("streak_days", 0),
+        # Founding-member perk — only surfaced when the user actually earned it.
+        "founding_member_seq": doc.get("founding_member_seq"),
+        "signup_discount_code": doc.get("signup_discount_code"),
+        "founding_course_id": doc.get("founding_course_id"),
+        "founding_cert_used": doc.get("founding_cert_used", False),
     }
 
 

@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { Award, ArrowRight } from "lucide-react";
+import { Award, ArrowRight, Eye, Download } from "lucide-react";
 import HeroBlobs from "@/components/HeroBlobs";
 
 const TIER_COLORS = [
     "color-card-blue", "color-card-teal", "color-card-purple", "color-card-orange",
     "color-card-gold", "color-card-navy", "color-card-blue", "color-card-purple",
 ];
+
+// Fixed sample-cert id, seeded on backend startup (see seed_sample_cert.py).
+const SAMPLE_CERT_ID = "SAMPLE-ITHR-2026-001";
 
 export default function Certifications() {
     const [paths, setPaths] = useState([]);
@@ -27,6 +30,24 @@ export default function Certifications() {
                     <p className="text-lg text-muted-foreground leading-relaxed">
                         Our certifications are designed as a reference credential for agentic AI competence &mdash; publicly verifiable, structured across six tiers, and issued by a named UAE consulting firm that stands behind every award.
                     </p>
+                    <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <Link
+                            to={`/verify/${SAMPLE_CERT_ID}`}
+                            data-testid="view-sample-certificate"
+                            className="btn-outline text-sm"
+                        >
+                            <Eye className="w-4 h-4" /> See a sample certificate
+                        </Link>
+                        <a
+                            href={`${process.env.REACT_APP_BACKEND_URL}/api/certificates/${SAMPLE_CERT_ID}/pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-testid="download-sample-pdf"
+                            className="btn-outline text-sm"
+                        >
+                            <Download className="w-4 h-4" /> Download sample PDF
+                        </a>
+                    </div>
                 </div>
             </section>
 

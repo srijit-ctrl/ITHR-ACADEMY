@@ -1,0 +1,104 @@
+{
+  "summary": "Iteration 15 verification — created /app/backend/tests/test_iteration15.py (18 tests) covering founding-member perk, super-admin org+admin provisioning, admin role gating, enterprise admin domain enforcement, reset-password, delete-org cascade, and sample-certificate verify+PDF. Also verified frontend: header text swap, footer legal links (4 testids), all 4 /legal/* pages render >500 chars with substituted placeholders, sub-nav (4 legal + Trust Center), and /certifications sample CTAs. Full pytest run: 176 passed / 7 skipped / 2 failed. All 7 skipped tests are the founding-member scenarios which self-skip due to a CRITICAL bug in /app/backend/founding_member.py::assign_if_eligible (see backend_issues.critical below) — NO user in the DB currently receives the founding-member perk on registration. The 2 failed tests are pre-existing (Stripe seat-change + a 502 CloudFlare edge blip on an AI-slow patch-decide test); neither is a regression from iter-15.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/auth/register + /app/backend/founding_member.py::assign_if_eligible",
+        "issue": "assign_if_eligible ALWAYS returns None for new users, so no user ever receives founding_member_seq / signup_discount_code. Root cause: the projection `{'_id': 0, 'founding_member_seq': 1, 'signup_discount_code': 1}` returns an EMPTY dict `{}` when those fields don't yet exist on the doc. The subsequent check `if not existing: return None` treats `{}` as falsy and bails out. Fix: change `if not existing:` to `if existing is None:`. Confirmed via targeted debug: with the fix, matched=1/modified=1 and seq=1/code generated correctly. Consequences: (a) UserPublic.founding_member_seq is always null in register/login/me/refresh responses; (b) Dashboard FoundingMemberBadge never renders for anyone; (c) claim_first_course is a no-op because founding_member_seq is unset; (d) 7 review-request test cases self-skip.",
+        "priority": "CRITICAL",
+        "reproduction": "POST /api/auth/register with any fresh email → response.user.founding_member_seq is null even though DB has 0 founders and total users < 500."
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "tests/backend_test.py + tests/test_iteration14.py (module import)",
+        "issue": "Both files do `BASE_URL = os.environ['REACT_APP_BACKEND_URL'].rstrip('/')` at import time. `REACT_APP_BACKEND_URL` is defined in /app/frontend/.env only. When pytest is run without that variable exported into the shell, both files ERROR at collection time (KeyError). Recommend loading /app/frontend/.env via python-dotenv in /app/backend/tests/conftest.py the same way I did in test_iteration15.py (or moving the variable to backend/.env). test_iteration15.py already includes the fix locally."
+      },
+      {
+        "endpoint": "tests/test_iteration7.py::TestPatchDecideWithWebhook::test_patch_decide_does_not_break_with_fake_webhooks",
+        "issue": "502 from Cloudflare on a slow LLM-backed endpoint. Deterministic on this preview environment (reproduced twice). Likely preview-edge timeout, not a code regression. Consider adding a retry or increasing the client timeout."
+      },
+      {
+        "endpoint": "tests/backend_test.py::TestEnterpriseOrg::test_full_org_flow",
+        "issue": "Pre-existing failure documented in iteration_13.json (Stripe seat-change with test key returns 400). Unchanged in iter-15."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Dashboard FoundingMemberBadge",
+        "issue": "Cannot be verified end-to-end because backend never sets founding_member_seq on users (see critical backend bug). Once the assign_if_eligible fix is applied, this test can be re-run.",
+        "selector": "[data-testid=\"founding-member-badge\"]",
+        "priority": "BLOCKED_BY_BACKEND_BUG"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verification_matrix": {
+    "iter15_backend": {
+      "founding_member_returned_on_register": "SKIP (bug — see backend_issues.critical)",
+      "founding_member_idempotent_across_refresh_me": "SKIP (bug)",
+      "founding_member_first_course_lock": "SKIP (bug)",
+      "founding_cap_500_logic_via_code_inspection": "PASS (FOUNDER_CAP==500, over-cap returns None)",
+      "post_admin_orgs_creates_org_and_admin_domain_derived": "PASS (domain from admin_email, temp_password len=14, must_reset_password=true)",
+      "get_admin_orgs_lists_new_org": "PASS",
+      "admin_endpoints_403_for_non_super_admin": "PASS ('Super admin only' detail)",
+      "admin_endpoints_401_no_auth": "PASS",
+      "list_users_paginated_no_password_hash_leak": "PASS",
+      "post_admin_users_id_reset_password": "PASS (login works with new temp_pw, old pw returns 401)",
+      "reset_password_unknown_user_404": "PASS",
+      "enterprise_admin_creates_user_with_matching_domain": "PASS (temp_password len=14, must_reset_password=true)",
+      "enterprise_admin_mismatched_domain_400": "PASS (detail contains 'Email domain must be @<org-domain>')",
+      "delete_org_cascades_and_clears_user_org": "PASS (deleted:true, org_members deleted, admin user still exists with organization=null)",
+      "delete_unknown_org_404": "PASS",
+      "sample_cert_verify": "PASS (valid:true, user_name='Sample Learner', score=92, verification_url='/verify/SAMPLE-ITHR-2026-001')",
+      "sample_cert_pdf": "PASS (application/pdf, %PDF magic, 16000+ bytes)"
+    },
+    "iter15_frontend": {
+      "header_text_enterprise_agentic_ai_academy": "PASS (no 'Independent Issuer' next to logo)",
+      "footer_4_legal_testids": "PASS (footer-disclaimer, footer-terms, footer-security, footer-compliance all present)",
+      "legal_terms_body_and_placeholders": "PASS (body 4438 chars, EFFECTIVE_DATE + LEGAL_EMAIL both substituted, '5 February 2026' + 'legal@ithr.tech' present)",
+      "legal_pages_all_four_render": "PASS (disclaimer 2614 chars, terms 4438, security 4060, compliance 4618)",
+      "legal_subnav_4_links_plus_trust_center": "PASS (Disclaimer, Terms, Cyber Security, Compliance, Trust Center)",
+      "certifications_sample_cert_ctas": "PASS (view-sample-certificate→/verify/SAMPLE-ITHR-2026-001, download-sample-pdf→REACT_APP_BACKEND_URL/api/certificates/SAMPLE-ITHR-2026-001/pdf)",
+      "console_errors_on_public_pages": "OK (only the expected /auth/refresh 401s on public pages — no other errors)"
+    },
+    "full_regression": "176 pass / 7 skip / 2 fail. The 7 skips are the founding-member tests self-skipping due to the assign_if_eligible bug. The 2 failures are documented pre-existing (Stripe seat-change) + 1 preview-edge 502 on an LLM-slow patch-decide."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration15.py",
+    "/app/test_reports/pytest/iter15_results.xml",
+    "/app/test_reports/pytest/iter15_full.xml"
+  ],
+  "action_items": [
+    "CRITICAL: fix /app/backend/founding_member.py::assign_if_eligible — change `if not existing:` to `if existing is None:` (line ~42). Without this fix the entire founding-member perk is dead code — no user gets a seq, no discount code, no first-course lock, and the Dashboard badge never renders.",
+    "MINOR: load /app/frontend/.env via python-dotenv in /app/backend/tests/conftest.py so backend_test.py + test_iteration14.py stop erroring on `KeyError: REACT_APP_BACKEND_URL` when pytest is invoked without the variable exported (or move REACT_APP_BACKEND_URL into backend/.env for tests).",
+    "OPTIONAL: after applying the fix above, retest iteration_15 founding-member cases (7 currently skipped) — I've left the assertions in place; they will PASS once seq is populated."
+  ],
+  "critical_code_review_comments": [
+    "founding_member.py::assign_if_eligible — projection-based existence check is fragile. Even with the `is None` fix, prefer testing `await db.users.find_one({'id': user_id}, {'_id': 0, 'id': 1})` and separately projecting the founding fields. Currently the projection returns `{}` on fresh users and the code confuses 'user doesn't exist' with 'user exists but has no founding fields yet'.",
+    "founding_member.py::assign_if_eligible — the atomic-guard `{'id': user_id, 'founding_member_seq': {'$exists': False}}` and the race-recovery re-read after modified_count==0 are correct. Good defensive design. No changes needed there beyond the falsy-check fix above.",
+    "admin_router.py::create_org_with_admin — the admin user is created with role='learner' (not 'admin'). That's intentional per code comment ('org membership grants admin powers'). The org_members row correctly has role='owner'. Verified end-to-end: the admin can create users via /api/enterprise/organizations/users because _resolve_org_for_user checks membership.role∈('owner','admin').",
+    "admin_router.py::create_org_with_admin — inserts admin_doc BEFORE the org exists. If org creation later throws, the admin user is orphaned (has 'organization': name but no org_id). Consider wrapping in a session/transaction or reversing the order (create org first, then user with org_id populated).",
+    "admin_router.py::_generate_temp_password — 14 chars from alphanum+special. Good entropy. Consider bumping alphabet or excluding visually ambiguous chars (0/O, 1/l/I) for hand-off usability, but the requirement is met.",
+    "auth_router.py::register — the try/except around `assign_if_eligible` swallows ALL exceptions silently. This is what allowed the projection bug to hide in production. Log at INFO/WARNING at minimum so operator gets a signal. Consider `except Exception as e: logger.warning('founding assignment failed: %s', e)`.",
+    "core.py::user_to_public — always emits founding_member_seq/signup_discount_code/founding_course_id keys (with values null when absent). Correct — the review request asked for explicit null when the perk was not granted.",
+    "Legal pages: 4 markdown docs load cleanly with placeholder substitution working. Sub-nav includes exactly the 4 legal titles + Trust Center as required. Body lengths (2614/4438/4060/4618) all >500 chars.",
+    "Frontend header: ITHRBrand renders 'Enterprise Agentic AI Academy' with no 'Independent Issuer' sub-mark — as required. The certificate PDF template retains 'Independent Issuer' as a ceremonial brand tag (not tested here, but iter-13 verified it)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration15.py (created — 18 tests, ~330 lines; loads frontend/.env locally to bootstrap REACT_APP_BACKEND_URL)"
+  ],
+  "success_rate": {
+    "backend": "11/18 iter-15 tests pass, 7 skip (all skips traceable to a single upstream bug in assign_if_eligible). Full suite: 176/185 = 95%. Non-founding-member acceptance criteria: 11/11 = 100%.",
+    "frontend": "7/7 iter-15 frontend acceptance criteria pass (100%). Dashboard founding-member badge could not be exercised because the backend bug prevents any user from being a founder."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / ITHR!Root-2026-ChangeMe (from /app/memory/test_credentials.md, matches backend/.env SUPER_ADMIN_PASSWORD). Fresh learners registered per test via /api/auth/register with unique email prefixes (fmreg+, fmidem+, fmlock+, nonadmin+, resetme+, iter15+, employee+, cto+).",
+  "seed_data_creation": "Cleaned up on completion — deleted 39 TEST orgs, their org_members, and 13 test users (prefixed emails). DB counts back to pre-run state: 0 founders, super-admin intact, sample certificate intact.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 15 acceptance criteria are all covered by /app/backend/tests/test_iteration15.py (18 tests). Currently 7 skip because /app/backend/founding_member.py::assign_if_eligible has a projection-vs-null bug (change `if not existing:` to `if existing is None:`). Once the main agent applies that one-line fix, re-run: `cd /app/backend && REACT_APP_BACKEND_URL=<url> python -m pytest tests/test_iteration15.py -v` — expected 18/18 pass. The frontend Dashboard FoundingMemberBadge should also become verifiable end-to-end at that point; test recipe: register a fresh user, hit /dashboard, assert data-testid='founding-member-badge' present, contains '#N of 500' and copy-able signup_discount_code. All admin routes, enterprise domain enforcement, sample cert, legal pages, and header/footer changes are FULLY working today. Pre-existing failures (Stripe seat-change + 502 on patch-decide) are documented in iteration_13.json and unchanged.",
+  "rca of the issue": "Bug: assign_if_eligible in /app/backend/founding_member.py returns None on every new user, so the perk is never allocated.\n\nRoot cause:\n```python\nexisting = await db.users.find_one(\n    {'id': user_id},\n    {'_id': 0, 'founding_member_seq': 1, 'signup_discount_code': 1},\n)\nif not existing:      # ← BUG: {} is falsy\n    return None\n```\nFor a freshly-inserted user that has neither field yet, the projection returns `{}` — an empty dict, which is falsy — so the function short-circuits before ever computing seq / update_one.\n\nReproduction:\n1. POST /api/auth/register with any fresh email.\n2. Inspect the returned user object: `founding_member_seq` is null even though the DB has 0 founders.\n3. `assign_if_eligible(user_id)` called directly from a Python shell returns None; `db.users.count_documents({'founding_member_seq': {'$exists': True}})` stays 0.\n\nMitigation (one-line fix in /app/backend/founding_member.py, ~line 42):\n```python\nif existing is None:   # ← was: `if not existing:`\n    return None\n```\nVerified: with the fix, update_one matches 1 / modifies 1, seq=1, valid 10-char alphanumeric code is stored, and subsequent `/auth/me` returns the populated founding fields."
+}

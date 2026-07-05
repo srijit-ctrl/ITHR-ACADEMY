@@ -33,6 +33,7 @@ import Passport from "@/pages/Passport";
 import PatchReview from "@/pages/PatchReview";
 import Trust from "@/pages/Trust";
 import SuperAdminPortal from "@/pages/SuperAdminPortal";
+import LegalDoc from "@/pages/LegalDoc";
 
 function AppShell() {
     const location = useLocation();
@@ -81,6 +82,11 @@ function AppShell() {
                     <Route path="/enterprise/join" element={<ProtectedRoute><EnterpriseJoin /></ProtectedRoute>} />
                     {/* Super-admin console — deliberately unlinked from public nav. */}
                     <Route path="/admin" element={<ProtectedRoute><SuperAdminPortal /></ProtectedRoute>} />
+                    {/* Legal & compliance pages */}
+                    <Route path="/legal/disclaimer" element={<LegalDoc docKey="disclaimer" />} />
+                    <Route path="/legal/terms" element={<LegalDoc docKey="terms" />} />
+                    <Route path="/legal/security" element={<LegalDoc docKey="security" />} />
+                    <Route path="/legal/compliance" element={<LegalDoc docKey="compliance" />} />
                 </Routes>
             </main>
             {!isLesson && <Footer />}

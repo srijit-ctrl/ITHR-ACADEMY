@@ -193,6 +193,11 @@ async def on_startup():
         await seed_super_admin()
     except Exception:
         logger.exception("Super-admin seed failed (non-fatal)")
+    from seed_sample_cert import seed_sample_certificate
+    try:
+        await seed_sample_certificate()
+    except Exception:
+        logger.exception("Sample certificate seed failed (non-fatal)")
 
 
 @app.on_event("shutdown")

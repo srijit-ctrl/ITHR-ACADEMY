@@ -204,6 +204,48 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Report flagged `is` vs `==` in `auth.py:47,61`, `core.py:66`, `recommendation_router.py:207` — all four are `is None` checks, which is the idiomatic Python pattern (not a bug).
 - Report flagged missing DOMPurify at `LessonViewer:137`, `Intelligence:259`, `TryALesson:118` — all three already use `DOMPurify.sanitize()` (fixed in Iteration 11).
 
+### Iteration 15 — Founding-Member Perk + Admin Roles + Legal Docs + Sample Cert (Feb 2026)
+
+**Header brand text**
+- Header sub-mark now reads **"Enterprise Agentic AI Academy"** (previously "Academy | INDEPENDENT ISSUER"). Wrapped for narrow chrome; ITHRSeal default label kept as "Independent Issuer" for the certificate ceremonial use.
+
+**Founding-Member Perk (first 500 signups — user directive `c`)**
+- New module `/app/backend/founding_member.py` — idempotent allocator, `assign_if_eligible()` on register, `claim_first_course()` on first enrollment, `can_claim_free_cert()` + `mark_cert_claimed()` inside assessment.
+- Fields added to `users`: `founding_member_seq (int)`, `signup_discount_code (10-char alnum)`, `founding_course_id`, `founding_cert_used`. Surfaced through `UserPublic` model.
+- UX: `FoundingMemberBadge` on `/dashboard` shows the seq, code (copy-to-clipboard), and status ("Enroll in your first course…" → "Locked in…" → "Redeemed").
+
+**Admin architecture (two-tier)**
+- New role `super_admin` (God-mode). `get_current_super_admin` guard in `auth.py` validates JWT role + DB role (defence in depth against a stolen token whose role was later downgraded).
+- New router `/app/backend/routers/admin_router.py`:
+  - `POST /api/admin/orgs` — provision org + first admin user; returns temp password once.
+  - `GET  /api/admin/orgs` / `DELETE /api/admin/orgs/{id}` — list/cascade-delete.
+  - `GET  /api/admin/users` / `POST /api/admin/users/{id}/reset-password`.
+- New `POST /api/enterprise/organizations/users` — enterprise admin creates users directly; enforces org's email domain (derived from admin's email at provisioning time). Returns temp password once.
+- New Super-Admin console `/admin` (unlinked from public nav, role-gated). Includes Orgs table (with create-new modal), Users table (with reset-password action), and TempCredsModal (one-time password display).
+- New Enterprise Portal "Create user directly" flow with domain enforcement + one-time creds display.
+- Idempotent super-admin seed at startup (`SUPER_ADMIN_EMAIL` + `SUPER_ADMIN_PASSWORD` env vars).
+
+**Legal / compliance pages**
+- Markdown source of truth under `/app/frontend/public/legal/` (4 docs, 16 KB total).
+- New `LegalDoc.jsx` renderer using `react-markdown` + `remark-gfm` (installed as deps).
+- 4 public routes: `/legal/disclaimer`, `/legal/terms`, `/legal/security`, `/legal/compliance`.
+- Placeholder tokens (`{{ EFFECTIVE_DATE }}`, `{{ LEGAL_EMAIL }}`, etc.) substituted at render time.
+- Custom `.legal-prose` CSS in `index.css` for typography, tables, code blocks, blockquotes.
+- Footer expanded to 6 columns; new "Legal" column links all four docs.
+- All docs carry the "DRAFT — not yet reviewed by counsel" disclaimer at the top.
+
+**Sample certificate**
+- Idempotent seed `seed_sample_cert.py` creates a public cert `SAMPLE-ITHR-2026-001` linked to "Agentic AI Foundations" course, holder "Sample Learner", score 92.
+- `/certifications` page now has two CTAs: **"See a sample certificate"** (→ `/verify/SAMPLE-ITHR-2026-001`) + **"Download sample PDF"** (→ WeasyPrint-rendered PDF, ~25 KB).
+
+**Cost & infrastructure doc**
+- `/app/docs/COST_AND_INFRASTRUCTURE.md` — 378-line internal costing sheet with 5 traffic tiers (Seed → Enterprise-heavy), component-level unit costs, sensitivity analysis, headcount waterfall, risk register.
+- Downloadable Word doc at `/docs/ITHR_Cost_and_Infrastructure.docx` (20 KB, generated via pandoc; auto ToC + numbered sections).
+
+**Tier consistency audit**
+- Verified 6-tier ladder is consistent across Landing, Certifications page copy, and stat pips.
+- Renamed a misleading test assertion (`expected 8 tiers` → `expected 8 learning paths`) — the "8" referred to Learning Paths, not credential tiers.
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)

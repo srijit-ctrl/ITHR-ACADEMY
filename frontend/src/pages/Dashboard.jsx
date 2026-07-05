@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight } from "lucide-react";
+import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -50,6 +51,14 @@ export default function Dashboard() {
                             ? "Your learning journey begins with a single enrollment. Explore the catalog."
                             : "Pick up where you left off, or begin something new."}
                     </p>
+                    {user?.founding_member_seq && (
+                        <FoundingMemberBadge
+                            seq={user.founding_member_seq}
+                            code={user.signup_discount_code}
+                            hasClaimedCourse={!!user.founding_course_id}
+                            certUsed={!!user.founding_cert_used}
+                        />
+                    )}
                 </div>
                 <div className="md:col-span-4 grid grid-cols-2 gap-3">
                     <StatCard icon={BookOpen} label="Enrollments" value={stats?.enrollments || 0} testId="stat-enrollments" />
@@ -233,6 +242,51 @@ function StatCard({ icon: Icon, label, value, testId }) {
             <Icon className="w-4 h-4 text-brand mb-2" />
             <div className="font-serif text-2xl leading-none">{value}</div>
             <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">{label}</div>
+        </div>
+    );
+}
+
+function FoundingMemberBadge({ seq, code, hasClaimedCourse, certUsed }) {
+    const copy = () => {
+        navigator.clipboard.writeText(code);
+        toast.success("Founding-member code copied");
+    };
+    const statusLine = certUsed
+        ? "You've already redeemed your free certificate. Thank you for being a founder."
+        : hasClaimedCourse
+            ? "Your first-course perk is locked in. Complete it to claim your free certificate."
+            : "Enroll in your first course to lock in modules 6–15 unlocked + a free certificate on that course.";
+
+    return (
+        <div className="mt-6 border-2 border-brand bg-brand/5 rounded-sm p-5 max-w-xl" data-testid="founding-member-badge">
+            <div className="flex items-start gap-4">
+                <div className="w-11 h-11 shrink-0 rounded-full bg-brand text-white flex items-center justify-center">
+                    <Star className="w-5 h-5 fill-current" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand mb-1">
+                        Founding Member · #{seq} of 500
+                    </div>
+                    <div className="font-sans font-semibold text-lg leading-tight">Thanks for being early.</div>
+                    <p className="text-sm text-muted-foreground mt-1">{statusLine}</p>
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <code
+                            className="font-mono text-sm bg-surface border border-border px-3 py-1.5 rounded-sm select-all"
+                            data-testid="founding-member-code"
+                        >
+                            {code}
+                        </code>
+                        <button
+                            onClick={copy}
+                            data-testid="founding-member-code-copy"
+                            className="p-1.5 hover:bg-surface-alt rounded-sm text-muted-foreground hover:text-brand"
+                            title="Copy code"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

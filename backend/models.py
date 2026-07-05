@@ -42,6 +42,11 @@ class UserPublic(BaseModel):
     avatar_url: Optional[str] = None
     xp: int = 0
     streak_days: int = 0
+    # Founding-member perk (only populated for the first 500 users)
+    founding_member_seq: Optional[int] = None
+    signup_discount_code: Optional[str] = None
+    founding_course_id: Optional[str] = None
+    founding_cert_used: bool = False
 
 
 class AuthResponse(BaseModel):
