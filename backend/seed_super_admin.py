@@ -1,21 +1,32 @@
-"""Idempotent super-admin seed.
+"""Idempotent super-admin seed with password sync.
 
-Creates a single super-admin user on first startup if one does not exist.
-Credentials come from env vars (with safe defaults for dev/preview).
+Behaviour on every backend boot:
+1. If no super-admin exists → create one with either
+   $SUPER_ADMIN_PASSWORD (if set) or a fresh random password (logged once).
+2. If a super-admin already exists AND $SUPER_ADMIN_PASSWORD is set → sync
+   the DB password_hash to the env-var value so operators can rotate the
+   secret by rotating the Emergent secret + restarting the pod.
+3. If a super-admin already exists AND $SUPER_ADMIN_PASSWORD is unset →
+   leave it alone (safest — some other operator may have rotated via API).
 
-DEPLOY NOTE: In production set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD
-via secure secrets. The default password below is intentionally generated
-fresh each server boot when the env var is unset — the fingerprint is
-logged so an operator can copy it from server logs the first time.
+Additionally: if the env-var value is the well-known preview placeholder
+(`preview-only-rotate-in-prod`) but the runtime environment looks like
+production (host resolves to `learn.ithr.tech` or `SUPER_ADMIN_PASSWORD`
+is literally set to the placeholder value in prod), log a loud WARNING so
+operators cannot miss the misconfiguration.
+
+DEPLOY NOTE: in production, set `SUPER_ADMIN_PASSWORD` via the Emergent
+secret manager. Do NOT commit a real value to `.env` in this repo.
 """
 import os
 import secrets
 import string
 
-from auth import hash_password
+from auth import hash_password, verify_password
 from core import db, logger, now_iso
 
 DEFAULT_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@ithr.tech")
+PLACEHOLDER_PASSWORD = "preview-only-rotate-in-prod"
 
 
 def _generate_default_password() -> str:
@@ -23,13 +34,55 @@ def _generate_default_password() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(20))
 
 
+def _looks_like_production() -> bool:
+    """Best-effort check — does this pod look like production?"""
+    for var in ("PUBLIC_APP_URL", "REACT_APP_BACKEND_URL"):
+        v = (os.environ.get(var) or "").lower()
+        if "learn.ithr.tech" in v or "ithr.host" in v:
+            return True
+    return False
+
+
+def _log_placeholder_warning() -> None:
+    if _looks_like_production():
+        logger.error(
+            "\n"
+            "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+            "  SUPER_ADMIN_PASSWORD is the preview placeholder in a production env.\n"
+            "  ROTATE IMMEDIATELY via the Emergent secret manager, then restart.\n"
+            "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        )
+    else:
+        logger.warning(
+            "Super-admin using preview placeholder password — fine for preview, "
+            "must be rotated in production."
+        )
+
+
 async def seed_super_admin() -> None:
-    existing = await db.users.find_one({"role": "super_admin"}, {"_id": 0, "email": 1})
+    env_password = os.environ.get("SUPER_ADMIN_PASSWORD")
+    existing = await db.users.find_one(
+        {"role": "super_admin"},
+        {"_id": 0, "email": 1, "password_hash": 1},
+    )
+
     if existing:
-        logger.info(f"Super-admin already exists ({existing['email']}) — skipping seed.")
+        # Sync password to env-var if it's set (enables rotate-via-restart)
+        if env_password:
+            if not verify_password(env_password, existing.get("password_hash", "")):
+                await db.users.update_one(
+                    {"role": "super_admin"},
+                    {"$set": {"password_hash": hash_password(env_password)}},
+                )
+                logger.info(f"Super-admin ({existing['email']}) password re-synced from SUPER_ADMIN_PASSWORD env var.")
+            if env_password == PLACEHOLDER_PASSWORD:
+                _log_placeholder_warning()
+        else:
+            logger.info(f"Super-admin already exists ({existing['email']}) — SUPER_ADMIN_PASSWORD unset, leaving DB password unchanged.")
         return
 
-    password = os.environ.get("SUPER_ADMIN_PASSWORD") or _generate_default_password()
+    # No super-admin yet — create one
+    password = env_password or _generate_default_password()
     user_doc = {
         "id": "super-admin-root",
         "email": DEFAULT_EMAIL.lower(),
@@ -47,18 +100,18 @@ async def seed_super_admin() -> None:
     try:
         await db.users.insert_one(user_doc)
     except Exception:
-        # Race with a parallel worker — safe to swallow.
         logger.exception("Super-admin insert raced; assuming another worker created it.")
         return
 
-    # Only show the password when we generated it ourselves (env var was unset).
-    if not os.environ.get("SUPER_ADMIN_PASSWORD"):
+    if not env_password:
         logger.warning(
             "==================================================\n"
             f"  Super-admin created: {DEFAULT_EMAIL}\n"
             f"  Temp password (rotate immediately): {password}\n"
-            "  Set SUPER_ADMIN_PASSWORD in backend/.env to fix a value.\n"
+            "  Set SUPER_ADMIN_PASSWORD in the secret manager to lock a value.\n"
             "=================================================="
         )
+    elif env_password == PLACEHOLDER_PASSWORD:
+        _log_placeholder_warning()
     else:
         logger.info(f"Super-admin created ({DEFAULT_EMAIL}) using SUPER_ADMIN_PASSWORD env var.")

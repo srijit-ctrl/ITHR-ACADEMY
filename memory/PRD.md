@@ -301,6 +301,14 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 **Minor post-test polish applied:**
 - `platform_analytics` + `org_analytics` now **skip** orphaned course_ids (enrollments pointing to deleted courses) — top-courses list is now real courses only.
 
+### Iteration 17 — SUPER_ADMIN_PASSWORD moved out of committed .env (Feb 2026)
+
+- `/app/backend/.env` now stores `SUPER_ADMIN_PASSWORD=preview-only-rotate-in-prod` — a deliberate placeholder, never a real secret.
+- `seed_super_admin.py` rewritten to be **rotate-via-restart**: on every boot it re-syncs the DB password_hash to `$SUPER_ADMIN_PASSWORD` (so operators rotate by changing the Emergent secret + restarting).
+- Production-safety warning: if the running pod resolves to `learn.ithr.tech` AND the placeholder value is present, an **ERROR-level** loud banner logs on every boot; anywhere else it logs a milder WARNING. Impossible to miss in production tail-of-logs.
+- Rotation flow + production launch checklist added to `/app/memory/test_credentials.md`.
+- Verified end-to-end: old password → 401 · new placeholder → 200 (`role: super_admin`) · rotation warning fires in preview logs · nothing broken elsewhere.
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)
