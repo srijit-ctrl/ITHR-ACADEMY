@@ -129,6 +129,20 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Certifications + Pricing hero styling already matched — re-verified 0 console errors.
 - 2/2 backend pytest (`test_iteration8_pdf.py`) + 4/4 frontend hero pages pass (iteration_8.json).
 
+### Iteration 9 — Public Trust Page + Factual Copy Sweep + Made-in-UAE Theme + Calibre Font Stack (Feb 2026)
+- **Public `/trust` page** — realistic-only claims with Live / In progress / Planned pill labels: 14 security controls, 6 sub-processors, 8 issuer legitimacy pillars, "What we do not claim" honest-limits section (SOC 2 not attested, ISO 27001 not certified, no UAE data residency yet, Stripe on test key). Contact cards: `security@ithr.ae`, `privacy@ithr.ae`, `enterprise@ithr.ae`. HeroBlobs cool + section-kicker + italic "honestly" accent.
+- **Made-in-UAE theme** — inline SVG UAE flag (2:1 official ratio, no external asset dependency) surfaces in three places: `/trust` UAE strip, Landing hero micro-pill, Footer signature line. Copy: "Made in the UAE — for the world."
+- **Factual copy sweep** — removed all inflated / unverifiable claims across pages:
+  - Landing hero: `128,400 CERTIFIED`, `400+ ENTERPRISES` → replaced with structural stats (10 tiers / 24 courses / 15 modules / 100% publicly verifiable).
+  - Enterprise page: `2.3× Higher AI ROI`, `68% Faster upskilling`, `128k`, `400+ Enterprises` → replaced with structural stats.
+  - Curriculum band: "shaped with faculty and practitioners from" → "informed by public research & standards from" + "Independently authored by ITHR · not affiliated" disclaimer.
+  - Removed "Fortune 500" phrasing from Landing, Pricing, Enterprise, Footer.
+  - Removed "400+ enterprises" claim from Certifications hero copy.
+  - Footer: replaced fake SOC 2 / ISO 27001 / GDPR badge row with a Made-in-UAE + Trust link.
+- **Font stack** — swapped `IBM Plex Sans` → `Calibre → Manrope → system` (Manrope loaded from Google Fonts, actually renders; Calibre remains first so a future self-hosted licensed webfont picks up automatically). Cormorant Garamond (serif) and IBM Plex Mono (mono) unchanged.
+- **Documentation** — `/app/docs/COMMERCIAL_STRATEGY_AND_COMPLIANCE.md` published in prior turn covers ownership, UAE data-residency migration plan, regulatory matrix (PDPL/NESA/CBUAE/DHA/DoH/ADGM/DIFC + GDPR/CCPA/FERPA/HIPAA/SOC 2/ISO 27001), certificate + courseware authenticity model, and cost projections at 3 tiers ($785 / $11,580 / $28,500 monthly).
+- Testing: frontend 100% pass, 0 console errors, computed body font-family confirmed `Calibre, Manrope, -apple-system, ...` (iteration_9.json).
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)
