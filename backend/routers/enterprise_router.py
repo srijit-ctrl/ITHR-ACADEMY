@@ -1,5 +1,6 @@
 """Enterprise Portal: organization management, team invites, team dashboards."""
 import re
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -64,7 +65,7 @@ async def create_organization(payload: OrganizationCreate, user_id: str = Depend
 
     # owner as first member
     member_doc = {
-        "id": __import__("uuid").uuid4().hex,
+        "id": uuid.uuid4().hex,
         "org_id": org_doc["id"],
         "user_id": user_id,
         "email": user["email"],
@@ -100,7 +101,7 @@ async def create_invite(payload: dict, user_id: str = Depends(get_current_user_i
         raise HTTPException(status_code=400, detail="No seats available. Purchase more seats first.")
 
     invite = {
-        "id": __import__("uuid").uuid4().hex,
+        "id": uuid.uuid4().hex,
         "org_id": org["id"],
         "email": email,
         "role": role if role in ("admin", "member") else "member",
@@ -141,7 +142,7 @@ async def accept_invite(payload: InviteAcceptRequest, user_id: str = Depends(get
     department = invite.get("department") if invite else None
 
     member_doc = {
-        "id": __import__("uuid").uuid4().hex,
+        "id": uuid.uuid4().hex,
         "org_id": org["id"], "user_id": user_id,
         "email": user["email"], "full_name": user["full_name"],
         "role": role, "department": department,
@@ -305,7 +306,7 @@ async def update_seats(payload: dict, request: Request, user_id: str = Depends(g
         credit_amount = round(abs(delta) * SEAT_PRICE_PER_MONTH, 2)
         await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
         credit_doc = {
-            "id": __import__("uuid").uuid4().hex,
+            "id": uuid.uuid4().hex,
             "org_id": org["id"],
             "type": "prorated_credit",
             "seats_removed": abs(delta),
@@ -414,7 +415,7 @@ async def fulfill_seat_increment(session_id: str, request: Request, user_id: str
         new_count = int(txn["target_seat_count"])
         await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
         await db.org_billing_events.insert_one({
-            "id": __import__("uuid").uuid4().hex,
+            "id": uuid.uuid4().hex,
             "org_id": org["id"],
             "type": "seat_increment_paid",
             "seats_added": int(txn["seats_delta"]),

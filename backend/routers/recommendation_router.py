@@ -145,7 +145,8 @@ async def _rationale_from_llm(learner_context: str, course: dict) -> str:
     key = os.environ.get("EMERGENT_LLM_KEY")
     if not key:
         return ""
-    sig = hashlib.md5(f"{learner_context}::{course['slug']}".encode()).hexdigest()[:12]
+    # SHA-256 (truncated) — cache key hash, not a security digest.
+    sig = hashlib.sha256(f"{learner_context}::{course['slug']}".encode()).hexdigest()[:12]
     chat = LlmChat(
         api_key=key,
         session_id=f"rec-rationale-{sig}",
@@ -197,8 +198,8 @@ async def next_best(user_id: str = Depends(get_current_user_id)):
         f"Certifications earned: {', '.join(completed_titles) if completed_titles else 'none yet'}"
     )
 
-    # Cache rationale by (user, course) for 24h
-    cache_key = hashlib.md5(f"{user_id}::{course['slug']}".encode()).hexdigest()
+    # Cache rationale by (user, course) for 24h — SHA-256 used as cache key, not a security digest.
+    cache_key = hashlib.sha256(f"{user_id}::{course['slug']}".encode()).hexdigest()
     cached = await db.rec_rationales.find_one({"key": cache_key}, {"_id": 0})
     if cached:
         try:

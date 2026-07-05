@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import DOMPurify from "dompurify";
 import { api, API_BASE } from "@/lib/api";
 import { Send, Loader2, Sparkles, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -16,7 +17,9 @@ export default function TryALesson() {
     const scrollRef = useRef(null);
 
     useEffect(() => {
-        api.get("/demo/lesson").then((r) => setLesson(r.data)).catch(() => {});
+        api.get("/demo/lesson")
+            .then((r) => setLesson(r.data))
+            .catch((err) => console.error("demo lesson fetch failed:", err));
     }, []);
 
     useEffect(() => {
@@ -71,7 +74,7 @@ export default function TryALesson() {
                             });
                         }
                         if (p.error) throw new Error(p.error);
-                    } catch { /* ignore */ }
+                    } catch (parseErr) { /* SSE partial JSON — wait for next chunk */ }
                 }
             }
         } catch (e) {
@@ -107,15 +110,17 @@ export default function TryALesson() {
                         </div>
                         <h3 className="font-serif text-3xl tracking-tight mb-6">{lesson.title}</h3>
                         <div className="space-y-6">
-                            {lesson.sections.map((s, i) => (
-                                <div key={i}>
+                            {lesson.sections.map((s) => (
+                                <div key={s.heading}>
                                     <h4 className="font-serif text-lg text-brand mb-2">{s.heading}</h4>
                                     <p
                                         className="text-sm leading-relaxed text-foreground"
                                         dangerouslySetInnerHTML={{
-                                            __html: s.body
-                                                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                                                .replace(/\*(.+?)\*/g, '<em class="text-brand">$1</em>'),
+                                            __html: DOMPurify.sanitize(
+                                                s.body
+                                                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                                                    .replace(/\*(.+?)\*/g, '<em class="text-brand">$1</em>')
+                                            ),
                                         }}
                                     />
                                 </div>
@@ -140,11 +145,11 @@ export default function TryALesson() {
                                 <div>
                                     <p className="text-sm text-muted-foreground mb-4">Not sure where to start? Try one of these:</p>
                                     <div className="space-y-2">
-                                        {lesson.suggested_questions.map((q, i) => (
+                                        {lesson.suggested_questions.map((q) => (
                                             <button
-                                                key={i}
+                                                key={q}
                                                 onClick={() => ask(q)}
-                                                data-testid={`demo-suggested-${i}`}
+                                                data-testid={`demo-suggested-${q.slice(0, 32)}`}
                                                 className="w-full text-left text-xs card-sharp p-3 hover:border-brand"
                                             >
                                                 {q}

@@ -16,8 +16,12 @@ from models import QuizQuestion
 
 
 def _qid(slug: str, question_text: str) -> str:
-    """Stable ID so re-seeds don't duplicate."""
-    h = hashlib.md5(f"{slug}::{question_text}".encode()).hexdigest()[:12]
+    """Stable ID so re-seeds don't duplicate.
+
+    Note: SHA-256 truncated to 12 chars — this is a *stable ID*, not a security digest.
+    (Previously used MD5 which flagged as weak-crypto in scanners.)
+    """
+    h = hashlib.sha256(f"{slug}::{question_text}".encode()).hexdigest()[:12]
     return f"q-{slug[:20]}-{h}"
 
 

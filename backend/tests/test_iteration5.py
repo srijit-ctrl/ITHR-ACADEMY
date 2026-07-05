@@ -17,6 +17,8 @@ import requests
 from pathlib import Path
 from dotenv import load_dotenv
 
+from conftest import TEST_USER_PASSWORD
+
 # Load frontend .env (has REACT_APP_BACKEND_URL) — same convention as backend_test.py
 load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
 
@@ -35,7 +37,7 @@ def api_client():
 @pytest.fixture(scope="module")
 def learner(api_client):
     email = f"test.iter5+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
-    password = "TestPass123!"
+    password = TEST_USER_PASSWORD
     r = api_client.post(f"{API}/auth/register", json={
         "email": email, "password": password, "full_name": "Iter5 Learner",
         "organization": "TEST BankCo", "title": "Product Manager",

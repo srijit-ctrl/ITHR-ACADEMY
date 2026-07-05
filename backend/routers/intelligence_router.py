@@ -1,4 +1,5 @@
 """Intelligence briefing + course refresh + NEW push-to-curriculum action."""
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -143,7 +144,7 @@ async def apply_signal(signal_id: str, payload: dict, user_id: str = Depends(get
         module_title = modules[module_number - 1].get("title")
 
     patch_doc = {
-        "id": __import__("uuid").uuid4().hex,
+        "id": uuid.uuid4().hex,
         "course_slug": course_slug,
         "signal_id": signal_id,
         "signal_title": signal.get("title", ""),

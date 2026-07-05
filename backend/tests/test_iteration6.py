@@ -20,6 +20,8 @@ import pytest
 import requests
 from dotenv import load_dotenv
 
+from conftest import TEST_USER_PASSWORD
+
 load_dotenv(Path(__file__).resolve().parents[2] / "frontend" / ".env")
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
@@ -39,7 +41,7 @@ def api_client():
 
 def _register(api_client, tag: str) -> dict:
     email = f"TEST_iter6.{tag}+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
-    password = "TestPass123!"
+    password = TEST_USER_PASSWORD
     r = api_client.post(
         f"{API}/auth/register",
         json={

@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, Award, Loader2 } from "lucide-react";
 import InlineTutor from "@/components/InlineTutor";
@@ -12,7 +13,8 @@ export default function LessonViewer() {
     const [loading, setLoading] = useState(true);
     const [completing, setCompleting] = useState(false);
 
-    useEffect(() => {
+    const loadCourseAndEnrollments = useCallback(() => {
+        setLoading(true);
         Promise.all([
             api.get(`/courses/${slug}`),
             api.get("/enrollments"),
@@ -20,9 +22,14 @@ export default function LessonViewer() {
             setCourse(courseRes.data);
             const e = enrRes.data.find((x) => x.course?.slug === slug);
             setEnrollment(e?.enrollment || null);
-            setLoading(false);
-        }).catch(() => setLoading(false));
+        }).catch((err) => {
+            console.error("Failed to load lesson data:", err);
+        }).finally(() => setLoading(false));
     }, [slug]);
+
+    useEffect(() => {
+        loadCourseAndEnrollments();
+    }, [loadCourseAndEnrollments]);
 
     const { module, lesson, allLessons, currentIndex } = useMemo(() => {
         if (!course) return {};
@@ -115,15 +122,22 @@ export default function LessonViewer() {
                 </div>
 
                 <article className="prose-lesson">
-                    {lesson.content.split(/\n\n+/).map((para, i) => (
-                        <p key={i} dangerouslySetInnerHTML={{
-                            __html: para
-                                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-                                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                                .replace(/\n/g, '<br/>'),
-                        }} />
-                    ))}
+                    {lesson.content.split(/\n\n+/).map((para, i) => {
+                        const rendered = para
+                            .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/`([^`]+)`/g, '<code>$1</code>')
+                            .replace(/\n/g, '<br/>');
+                        // Stable key: paragraph position + hash of content start (safe even if
+                        // the same paragraph repeats).
+                        const key = `${lesson.id}-p${i}-${para.slice(0, 24)}`;
+                        return (
+                            <p
+                                key={key}
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rendered) }}
+                            />
+                        );
+                    })}
                 </article>
 
                 {lesson.code_sample && (

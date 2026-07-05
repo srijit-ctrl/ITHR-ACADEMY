@@ -7,6 +7,8 @@ import uuid
 import pytest
 import requests
 
+from conftest import TEST_USER_PASSWORD
+
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE_URL}/api"
 
@@ -23,7 +25,7 @@ def api_client():
 def test_user(api_client):
     """Register a fresh user, return dict {email, password, token, user}."""
     email = f"test.learner+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
-    password = "TestPass123!"
+    password = TEST_USER_PASSWORD
     payload = {
         "email": email, "password": password, "full_name": "Test Learner",
         "organization": "Test Corp", "title": "Analyst",
@@ -51,7 +53,7 @@ def test_health(api_client):
 class TestAuth:
     def test_register_duplicate(self, api_client, test_user):
         r = api_client.post(f"{API}/auth/register", json={
-            "email": test_user["email"], "password": "AnotherPass!", "full_name": "Dup"
+            "email": test_user["email"], "password": TEST_USER_PASSWORD, "full_name": "Dup"
         })
         assert r.status_code == 400
 
@@ -66,7 +68,7 @@ class TestAuth:
 
     def test_login_invalid(self, api_client, test_user):
         r = api_client.post(f"{API}/auth/login", json={
-            "email": test_user["email"], "password": "WrongPass!"
+            "email": test_user["email"], "password": "wrong-password-for-negative-test"
         })
         assert r.status_code == 401
 
@@ -227,7 +229,7 @@ class TestQuizCert:
         # register another user for a clean fail attempt
         email = f"quizfail+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
         reg = api_client.post(f"{API}/auth/register", json={
-            "email": email, "password": "Pass123!", "full_name": "Q Fail"
+            "email": email, "password": TEST_USER_PASSWORD, "full_name": "Q Fail"
         })
         token = reg.json()["token"]
         h = {"Authorization": f"Bearer {token}"}
@@ -525,7 +527,7 @@ class TestStripeCheckout:
         # register user B
         email = f"otheruser+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
         reg = api_client.post(f"{API}/auth/register", json={
-            "email": email, "password": "Pass123!", "full_name": "Other User"
+            "email": email, "password": TEST_USER_PASSWORD, "full_name": "Other User"
         })
         assert reg.status_code == 200
         token_b = reg.json()["token"]
@@ -567,7 +569,7 @@ class TestStripeCheckout:
 def _register_user(api_client, prefix="ent"):
     email = f"{prefix}+{int(time.time())}-{uuid.uuid4().hex[:6]}@example.com"
     r = api_client.post(f"{API}/auth/register", json={
-        "email": email, "password": "TestPass123!", "full_name": f"{prefix.title()} User"
+        "email": email, "password": TEST_USER_PASSWORD, "full_name": f"{prefix.title()} User"
     })
     assert r.status_code == 200, r.text
     d = r.json()

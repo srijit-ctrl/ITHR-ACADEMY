@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { RefreshCcw, Radio, Zap, AlertTriangle, ArrowRight, Loader2, Sparkles, CheckCircle2 } from "lucide-react";
@@ -30,21 +31,22 @@ export default function Intelligence() {
     const [pushingSignal, setPushingSignal] = useState(null);
     const [patchModal, setPatchModal] = useState(null);
 
-    const load = async (force = false) => {
+    const load = useCallback(async (force = false) => {
         setError("");
-        force ? setRefreshing(true) : setLoading(true);
+        if (force) setRefreshing(true); else setLoading(true);
         try {
             const res = await api.get("/intelligence/briefing", { params: force ? { force: true } : {} });
             setBriefing(res.data);
         } catch (e) {
+            console.error("intelligence briefing failed:", e);
             setError(e.response?.data?.detail || "Failed to load briefing.");
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    }, []);
 
-    useEffect(() => { load(false); }, []);
+    useEffect(() => { load(false); }, [load]);
 
     const pushToCurriculum = async (signal, courseSlug) => {
         if (!user) {
@@ -255,7 +257,9 @@ export default function Intelligence() {
                                     <div className="overline mb-2">Proposed {patchModal.patch.patch_type.replace(/_/g, " ")}</div>
                                     <div className="font-serif text-xl leading-tight mb-3">{patchModal.patch.proposed_title}</div>
                                     <div className="prose-lesson bg-surface-alt/40 p-5 border border-border text-sm" dangerouslySetInnerHTML={{
-                                        __html: (patchModal.patch.proposed_content || "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>"),
+                                        __html: DOMPurify.sanitize(
+                                            (patchModal.patch.proposed_content || "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>")
+                                        ),
                                     }} />
                                 </div>
                                 <div>

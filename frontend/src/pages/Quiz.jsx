@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Timer, Award, XCircle, Loader2, ArrowRight, Shuffle } from "lucide-react";
@@ -18,7 +18,7 @@ export default function Quiz() {
     const [startedAt, setStartedAt] = useState(Date.now());
     const [remaining, setRemaining] = useState(30 * 60);
 
-    const loadSession = async () => {
+    const loadSession = useCallback(async () => {
         setLoading(true);
         setError("");
         setAnswers({});
@@ -33,13 +33,14 @@ export default function Quiz() {
             setStartedAt(Date.now());
             setRemaining(30 * 60);
         } catch (e) {
+            console.error("assessment session load failed:", e);
             setError(e?.response?.data?.detail || "Unable to start assessment");
         } finally {
             setLoading(false);
         }
-    };
+    }, [slug]);
 
-    useEffect(() => { loadSession(); }, [slug]);
+    useEffect(() => { loadSession(); }, [loadSession]);
 
     useEffect(() => {
         if (submitted) return;
@@ -129,7 +130,7 @@ export default function Quiz() {
                                     const selected = (answers[q.id] || []).includes(oi);
                                     return (
                                         <button
-                                            key={oi}
+                                            key={`${q.id}-opt-${oi}`}
                                             onClick={() => toggle(q.id, oi, isMulti)}
                                             data-testid={`quiz-q${qi + 1}-opt-${oi}`}
                                             className={`w-full text-left px-4 py-3 border transition-all text-sm ${

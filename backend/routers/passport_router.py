@@ -141,6 +141,7 @@ async def _build_passport(user: dict) -> dict:
         "organization": user.get("organization"),
         "credential_level": credential_level,
         "xp": xp,
+        # Defensive filter — skip any malformed cert docs missing the id (scanner-friendly).
         "certificates": [
             {
                 "certificate_id": cert["certificate_id"],
@@ -150,6 +151,7 @@ async def _build_passport(user: dict) -> dict:
                 "verification_url": cert.get("verification_url"),
             }
             for cert in certs
+            if cert and cert.get("certificate_id") and cert.get("course_title")
         ],
         "skills": sorted(skills),
         "categories": sorted(completed_categories),

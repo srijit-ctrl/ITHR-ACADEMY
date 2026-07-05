@@ -26,7 +26,12 @@ export default function Dashboard() {
             setCertificates(c.data);
             setRecs(r.data.recommendations || []);
             setNextBest(nb.data.recommendation || null);
+        }).catch((err) => {
+            console.error("dashboard load failed:", err);
         }).finally(() => setLoading(false));
+        // user is auth-context-derived; API endpoints resolve user from JWT — no need to react to
+        // user identity changing (a logout unmounts this page).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     if (loading) return <div className="container-page py-24"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;

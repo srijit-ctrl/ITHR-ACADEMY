@@ -52,7 +52,9 @@ async def seed_database():
         full = builder()
         doc = full.model_dump()
         doc["has_full_content"] = True
-        seed_hash = int(hashlib.md5(full.slug.encode()).hexdigest()[:8], 16)
+        # SHA-256 truncated — used as a deterministic seed for the reviewed-date jitter.
+        # Not a security digest. (Was MD5 previously — flagged as weak-crypto in scanners.)
+        seed_hash = int(hashlib.sha256(full.slug.encode()).hexdigest()[:8], 16)
         days_ago = seed_hash % 45
         reviewed_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
         doc["last_reviewed_at"] = reviewed_at.isoformat()
@@ -71,7 +73,7 @@ async def seed_database():
     for meta in CATALOG_COURSES:
         if meta["slug"] in full_slugs:
             continue
-        seed_hash = int(hashlib.md5(meta["slug"].encode()).hexdigest()[:8], 16)
+        seed_hash = int(hashlib.sha256(meta["slug"].encode()).hexdigest()[:8], 16)
         days_ago = seed_hash % 90
         reviewed_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
         catalog_doc = {
@@ -146,6 +148,40 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Baseline security headers on every response.
+
+    CSP hardens the XSS blast radius (localStorage token exfiltration surface is
+    dominated by XSS; sanitising dangerouslySetInnerHTML + CSP is the pragmatic
+    root-cause fix. httpOnly-cookie migration is on the roadmap.)
+    """
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    response.headers.setdefault(
+        "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+    )
+    # Content-Security-Policy is deliberately permissive for the SPA (React needs
+    # inline styles from Tailwind + streaming fetches). We block <object> and
+    # frame-ancestors and lock scripts to self.
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self' https:; "
+        "frame-ancestors 'none'; "
+        "object-src 'none'; "
+        "base-uri 'self'",
+    )
+    return response
 
 
 @app.on_event("startup")

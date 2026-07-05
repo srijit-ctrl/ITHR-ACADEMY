@@ -71,8 +71,8 @@ async function _streamSSE(path, body, { onDelta, onDone, onError }) {
                     if (payload.delta) onDelta?.(payload.delta);
                     if (payload.error) onError?.(new Error(payload.error));
                     if (payload.done) onDone?.(payload);
-                } catch {
-                    /* ignore parse errors */
+                } catch (parseErr) {
+                    console.debug("SSE partial chunk, waiting for next:", parseErr?.message);
                 }
             }
         }
