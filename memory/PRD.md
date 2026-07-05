@@ -129,6 +129,17 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Certifications + Pricing hero styling already matched — re-verified 0 console errors.
 - 2/2 backend pytest (`test_iteration8_pdf.py`) + 4/4 frontend hero pages pass (iteration_8.json).
 
+### Iteration 10 — One-click Procurement Pack (Feb 2026)
+- **New endpoint `GET /api/trust/procurement-pack`** (public, `/app/backend/routers/trust_router.py`) returns an ~88KB ZIP with 5 entries:
+  - `README.txt` — usage instructions + contacts
+  - `SECURITY_FACTSHEET.pdf` — one-page Live / In progress / Planned snapshot
+  - `SUB_PROCESSORS.pdf` — authoritative sub-processor register
+  - `DPA_TEMPLATE.pdf` — working Data Processing Addendum draft (12 clauses, signature block)
+  - `COMPLIANCE_DOSSIER.pdf` — full 10-section dossier mirroring the /trust page
+- All PDFs are server-rendered with WeasyPrint. Filename: `ITHR-Academy-Procurement-Pack-YYYY-MM-DD.zip`.
+- **Frontend CTA on `/trust`**: primary "Generate procurement pack" button in the hero (data-testid `download-procurement-pack`) + secondary CTA in the "Request a DPA" card (data-testid `dpa-download-pack`). Uses Blob + anchor download pattern; loader while generating; sonner toast on success/failure.
+- 7/7 backend pytest + full frontend Playwright download interception pass (iteration_10.json).
+
 ### Iteration 9 — Public Trust Page + Factual Copy Sweep + Made-in-UAE Theme + Calibre Font Stack (Feb 2026)
 - **Public `/trust` page** — realistic-only claims with Live / In progress / Planned pill labels: 14 security controls, 6 sub-processors, 8 issuer legitimacy pillars, "What we do not claim" honest-limits section (SOC 2 not attested, ISO 27001 not certified, no UAE data residency yet, Stripe on test key). Contact cards: `security@ithr.ae`, `privacy@ithr.ae`, `enterprise@ithr.ae`. HeroBlobs cool + section-kicker + italic "honestly" accent.
 - **Made-in-UAE theme** — inline SVG UAE flag (2:1 official ratio, no external asset dependency) surfaces in three places: `/trust` UAE strip, Landing hero micro-pill, Footer signature line. Copy: "Made in the UAE — for the world."

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import HeroBlobs from "@/components/HeroBlobs";
 import { api, API_BASE } from "@/lib/api";
+import { toast } from "sonner";
 
 /**
  * Public Trust Page — realistic-only claims.
@@ -139,7 +140,7 @@ export default function Trust() {
         setPackLoading(true);
         try {
             const res = await fetch(`${API_BASE}/trust/procurement-pack`);
-            if (!res.ok) throw new Error("Download failed");
+            if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -149,6 +150,9 @@ export default function Trust() {
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
+            toast.success("Procurement pack downloaded.");
+        } catch (e) {
+            toast.error(e?.message || "Could not generate the pack. Please retry in a moment.");
         } finally {
             setPackLoading(false);
         }
