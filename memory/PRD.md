@@ -163,6 +163,16 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - **Documentation** — `/app/docs/COMMERCIAL_STRATEGY_AND_COMPLIANCE.md` published in prior turn covers ownership, UAE data-residency migration plan, regulatory matrix (PDPL/NESA/CBUAE/DHA/DoH/ADGM/DIFC + GDPR/CCPA/FERPA/HIPAA/SOC 2/ISO 27001), certificate + courseware authenticity model, and cost projections at 3 tiers ($785 / $11,580 / $28,500 monthly).
 - Testing: frontend 100% pass, 0 console errors, computed body font-family confirmed `Calibre, Manrope, -apple-system, ...` (iteration_9.json).
 
+### Iteration 13 — Integrity & Honest-Claims Sweep + Legacy Class Rename (Feb 2026)
+- **"Certification Authority" → "Independent Issuer"** across Landing hero kicker, Certificate page (seal label + est. line), Footer signature tagline, ITHRLockup sub-mark, ITHRSeal default label. Motivation: avoid implying government/national accreditation ITHR does not hold.
+- **Enterprise compliance line softened** — `Enterprise.jsx` capability card no longer says "SOC 2 Type II / ISO 27001 / FERPA aligned". Now: *"Designed to align with GDPR, SOC 2, ISO 27001, and FERPA controls. Audit trails on every credential. Current attestation status is published on our Trust page."* — matches the honest posture already used on `/trust`.
+- **Instructor byline generalised** — CourseDetail now shows *"ITHR Academy Editorial Team · Course authored & reviewed by ITHR"* instead of 24 invented persona names. `course.instructor` field is untouched on the backend but is no longer surfaced in the UI.
+- **Fake social-proof metrics hidden** — Star/rating badge + Users/enrolled_count badge removed from `CourseCard.jsx` and `CourseDetail.jsx`. Cards now display *`15 modules · 28h · Refreshed Xd ago`* (structural facts only, no fabricated popularity). Backend data unchanged for internal analytics.
+- **Pricing capstone claim** — "Live capstone review by ITHR faculty" → "Capstone review by ITHR Academy reviewers" (no non-existent faculty implied).
+- **Legacy class rename completed** — all `text-brand-gold-deep` occurrences swapped to canonical ITHR tokens (`text-brand-teal` and `text-brand-navy` where semantic). Trust page "In progress" status pill now uses `bg-brand-sky/15 text-brand-navy border-brand-sky/40` (softer, visually distinct from Live/Planned).
+- Files touched: `Landing.jsx`, `Enterprise.jsx`, `Pricing.jsx`, `Certificate.jsx`, `Trust.jsx`, `Footer.jsx`, `TryALesson.jsx`, `CourseCard.jsx`, `CourseDetail.jsx`, `components/brand/ITHRBrand.jsx`.
+- Verified via smoke screenshots on `/`, `/courses`, `/courses/agentic-ai-foundations`. Header brand row now reads *"Academy | INDEPENDENT ISSUER"*.
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)

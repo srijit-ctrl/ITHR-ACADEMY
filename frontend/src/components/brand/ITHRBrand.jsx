@@ -63,7 +63,7 @@ export function ITHRLockup({ variant = "stacked", size = 44, className = "", onD
             >
                 <div className="font-sans font-semibold text-sm tracking-tight">Academy</div>
                 <div className={`text-[9px] font-mono uppercase tracking-[0.2em] mt-0.5 ${onDark ? "text-white/70" : "text-muted-foreground"}`}>
-                    Certification Authority
+                    Independent Issuer
                 </div>
             </div>
         </div>
@@ -74,7 +74,7 @@ export function ITHRLockup({ variant = "stacked", size = 44, className = "", onD
  * ITHRSeal — the ceremonial certification seal.
  * Kept for the on-certificate ceremonial use; uses brand-navy + brand-teal only.
  */
-export function ITHRSeal({ size = 96, label = "Certification Authority" }) {
+export function ITHRSeal({ size = 96, label = "Independent Issuer" }) {
     const dim = typeof size === "number" ? `${size}px` : size;
     return (
         <div className="ithr-seal" style={{ width: dim, height: dim }} data-testid="ithr-seal">

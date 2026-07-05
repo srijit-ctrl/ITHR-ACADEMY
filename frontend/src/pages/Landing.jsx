@@ -44,7 +44,7 @@ export default function Landing() {
                 <div className="relative container-page pt-14 pb-20 md:pt-20 md:pb-28 z-10">
                     <div className="max-w-4xl mx-auto text-center">
                         <span className="section-kicker" data-testid="hero-kicker">
-                            ITHR Academy · Est. 2026 · A Certification Authority
+                            ITHR Academy · Est. 2026 · An Independent Issuer
                         </span>
                         <div className="mt-3 inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground" data-testid="hero-uae-badge">
                             <svg viewBox="0 0 12 6" aria-hidden="true" className="w-4 h-2.5 rounded-[2px] shadow-sm">

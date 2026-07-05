@@ -49,7 +49,7 @@ const INDIVIDUAL = [
         features: [
             "Everything in Practitioner (12 mo)",
             "Advanced + Architect certifications",
-            "Live capstone review by ITHR faculty",
+            "Capstone review by ITHR Academy reviewers",
             "AI Career Advisor sessions",
             "Alumni network access",
         ],

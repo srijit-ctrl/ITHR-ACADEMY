@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Clock, Users, Star, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
+import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 
 export default function CourseDetail() {
     const { slug } = useParams();
@@ -63,8 +63,6 @@ export default function CourseDetail() {
                         <p className="text-base leading-relaxed max-w-3xl mb-8">{course.description}</p>
 
                         <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground border-t border-border pt-6">
-                            <span className="flex items-center gap-2"><Star className="w-4 h-4 fill-brand text-brand" /><b className="text-foreground">{course.rating.toFixed(1)}</b> rating</span>
-                            <span className="flex items-center gap-2"><Users className="w-4 h-4" /><b className="text-foreground">{course.enrolled_count.toLocaleString()}</b> enrolled</span>
                             <span className="flex items-center gap-2"><Clock className="w-4 h-4" /><b className="text-foreground">{course.duration_hours}h</b> total</span>
                             <span className="flex items-center gap-2"><BookOpen className="w-4 h-4" />{course.modules?.length || 15} modules</span>
                             <span className="flex items-center gap-2" data-testid="course-detail-freshness">
@@ -86,7 +84,8 @@ export default function CourseDetail() {
                     <aside className="lg:col-span-4">
                         <div className="card-flat p-8 sticky top-24">
                             <div className="overline mb-3">Certification Track</div>
-                            <div className="font-serif text-2xl leading-tight mb-6">{course.instructor}</div>
+                            <div className="font-serif text-2xl leading-tight mb-1">ITHR Academy Editorial Team</div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-6">Course authored & reviewed by ITHR</div>
 
                             {enrolled ? (
                                 <Link to={firstLesson ? `/learn/${slug}/${course.modules[0].id}/${firstLesson.id}` : "/dashboard"} data-testid="continue-learning" className="btn-primary w-full mb-3">

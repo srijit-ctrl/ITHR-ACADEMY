@@ -106,7 +106,7 @@ export default function TryALesson() {
                     <article className="lg:col-span-3 step-card">
                         <div className="flex items-center justify-between mb-5">
                             <span className="badge-gold">Unit 01 · {lesson.duration_min} min</span>
-                            <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand-gold-deep">ITHR Academy</span>
+                            <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand-teal">ITHR Academy</span>
                         </div>
                         <h3 className="font-serif text-3xl tracking-tight mb-6">{lesson.title}</h3>
                         <div className="space-y-6">

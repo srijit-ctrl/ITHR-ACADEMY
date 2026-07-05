@@ -9,7 +9,7 @@ export default function Footer() {
                 <div className="container-page py-8 flex items-center justify-between flex-wrap gap-6">
                     <ITHRLockup size={52} />
                     <div className="flex items-center gap-6 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                        <span className="hidden md:inline">A Certification Authority for the Agentic Enterprise</span>
+                        <span className="hidden md:inline">An Independent Issuer for the Agentic Enterprise</span>
                         <span className="badge-gold">Est. 2026</span>
                     </div>
                 </div>
@@ -23,7 +23,7 @@ export default function Footer() {
                 </div>
 
                 <div>
-                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-gold-deep mb-4">Learn</div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal mb-4">Learn</div>
                     <ul className="space-y-2 text-sm">
                         <li><Link to="/courses" className="hover:text-brand" data-testid="footer-catalog">Course catalog</Link></li>
                         <li><Link to="/certifications" className="hover:text-brand" data-testid="footer-certifications">Certifications</Link></li>
@@ -33,7 +33,7 @@ export default function Footer() {
                 </div>
 
                 <div>
-                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-gold-deep mb-4">Enterprise</div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal mb-4">Enterprise</div>
                     <ul className="space-y-2 text-sm">
                         <li><Link to="/pricing" className="hover:text-brand" data-testid="footer-pricing">Pricing</Link></li>
                         <li><Link to="/enterprise" className="hover:text-brand" data-testid="footer-teams">For teams</Link></li>
@@ -43,7 +43,7 @@ export default function Footer() {
                 </div>
 
                 <div>
-                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-gold-deep mb-4">ITHR</div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal mb-4">ITHR</div>
                     <ul className="space-y-2 text-sm text-muted-foreground">
                         <li>About ITHR</li>
                         <li>Consulting</li>

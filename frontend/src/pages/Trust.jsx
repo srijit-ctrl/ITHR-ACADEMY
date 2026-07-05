@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 const STATUS = {
     live: { label: "Live", cls: "bg-success/10 text-success border-success/30" },
-    progress: { label: "In progress", cls: "bg-brand-gold/15 text-brand-gold-deep border-brand-gold/40" },
+    progress: { label: "In progress", cls: "bg-brand-sky/15 text-brand-navy border-brand-sky/40" },
     planned: { label: "Planned", cls: "bg-muted text-muted-foreground border-border" },
 };
 
@@ -170,7 +170,7 @@ export default function Trust() {
                             Built openly. Verified <span className="italic text-brand">honestly</span>.
                         </h1>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                            Every claim on this page is labelled <b className="text-success">Live</b>, <b className="text-brand-gold-deep">In progress</b>, or <b>Planned</b>. If it isn&apos;t Live, we won&apos;t pretend otherwise.
+                            Every claim on this page is labelled <b className="text-success">Live</b>, <b className="text-brand-navy">In progress</b>, or <b>Planned</b>. If it isn&apos;t Live, we won&apos;t pretend otherwise.
                         </p>
                         <div className="mt-6 flex flex-wrap gap-3 text-xs">
                             <button
@@ -205,7 +205,7 @@ export default function Trust() {
                     <div className="flex items-center gap-4">
                         <UAEFlag className="w-10 h-7 rounded-sm shadow-sm shrink-0" />
                         <div>
-                            <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-brand-gold-deep">Designed &amp; engineered in the United Arab Emirates</div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-brand-teal">Designed &amp; engineered in the United Arab Emirates</div>
                             <div className="font-serif text-lg">Made in the UAE — for the world.</div>
                         </div>
                     </div>
@@ -281,7 +281,7 @@ export default function Trust() {
                     </div>
                     <div className="card-flat p-6 space-y-4" data-testid="residency-status">
                         <div className="flex items-start gap-3">
-                            <Clock className="w-5 h-5 text-brand-gold-deep mt-0.5" />
+                            <Clock className="w-5 h-5 text-brand-navy mt-0.5" />
                             <div>
                                 <div className="font-serif text-lg">Today</div>
                                 <div className="text-sm text-muted-foreground">Shared managed-Kubernetes cluster, MongoDB primary. Suitable for pilots.</div>

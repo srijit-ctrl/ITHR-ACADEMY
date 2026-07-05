@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BookOpen, Star, Users, Radio } from "lucide-react";
+import { BookOpen, Radio } from "lucide-react";
 
 function freshnessColor(score) {
     if (score >= 90) return "text-brand border-brand bg-brand/5";
@@ -66,13 +66,13 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
 
                 <div className="mt-5 pt-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-brand text-brand" />{course.rating.toFixed(1)}</span>
-                        <span className="flex items-center gap-1"><Users className="w-3 h-3" />{course.enrolled_count.toLocaleString()}</span>
+                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{course.module_count || 15} modules</span>
+                        <span className="opacity-30">·</span>
+                        <span>{course.duration_hours}h</span>
                     </div>
-                    <div className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{course.module_count || 15} modules</div>
-                </div>
-                <div className="mt-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
-                    {freshnessLabel(course.days_since_review)}
+                    <div className="text-[10px] font-mono uppercase tracking-[0.15em]">
+                        {freshnessLabel(course.days_since_review)}
+                    </div>
                 </div>
             </div>
         </Link>

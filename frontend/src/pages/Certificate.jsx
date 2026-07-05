@@ -45,17 +45,17 @@ export default function Certificate() {
 
                         <div className="flex items-start justify-between mb-10 gap-4">
                             <div className="flex items-center gap-4">
-                                <ITHRSeal size={72} label="Certification Authority" />
+                                <ITHRSeal size={72} label="Independent Issuer" />
                                 <div>
-                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-gold-deep">ITHR Technologies</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal">ITHR Technologies</div>
                                     <div className="font-serif text-2xl leading-none mt-1">Enterprise Agentic AI Academy</div>
-                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-1">Est. 2026 · A Certification Authority</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-1">Est. 2026 · An Independent Issuer</div>
                                 </div>
                             </div>
                             <Award className="w-12 h-12 text-brand hidden md:block" />
                         </div>
 
-                        <div className="divider-gold"><span className="text-[10px] font-mono uppercase tracking-[0.25em] text-brand-gold-deep">Certificate</span></div>
+                        <div className="divider-gold"><span className="text-[10px] font-mono uppercase tracking-[0.25em] text-brand-teal">Certificate</span></div>
 
                         <div className="text-center py-4">
                             <p className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground mb-6">This is to certify that</p>

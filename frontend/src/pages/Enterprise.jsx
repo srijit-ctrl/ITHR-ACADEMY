@@ -8,7 +8,7 @@ const CAPABILITIES = [
     { icon: Zap, title: "Role-Based Learning Paths", desc: "Curated tracks for HR, Finance, Sales, Procurement, Manufacturing — mapped to competency frameworks." },
     { icon: Award, title: "Manager Dashboards", desc: "Team-level analytics on progress, skill gaps, and certification status. Renewal credits keep credentials current." },
     { icon: Building2, title: "Enterprise Identity", desc: "SSO across Azure AD, Google Workspace, Okta. SCIM for automated provisioning. LDAP for hybrid deployments." },
-    { icon: ShieldCheck, title: "Compliance-Ready", desc: "GDPR, SOC 2 Type II, ISO 27001, and FERPA aligned. Audit trails on every credential." },
+    { icon: ShieldCheck, title: "Compliance-Ready", desc: "Designed to align with GDPR, SOC 2, ISO 27001, and FERPA controls. Audit trails on every credential. Current attestation status is published on our Trust page." },
 ];
 
 const PLANS = [
