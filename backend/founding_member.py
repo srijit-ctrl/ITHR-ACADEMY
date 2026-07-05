@@ -39,7 +39,10 @@ async def assign_if_eligible(user_id: str) -> dict | None:
         {"id": user_id},
         {"_id": 0, "founding_member_seq": 1, "signup_discount_code": 1},
     )
-    if not existing:
+    # NB: Mongo returns `{}` (empty dict — truthy check would flip wrong way)
+    # when the user exists but neither field has been set yet. Compare `is None`
+    # explicitly so a fresh user is treated as eligible instead of "not found".
+    if existing is None:
         return None
     if existing.get("founding_member_seq"):
         return {

@@ -10,11 +10,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Ensure backend/.env is loaded before any test imports auth.py / core.py
-# (they read env-vars at import time). This is a no-op when run via the running
-# supervisor process because os.environ is already populated, but makes standalone
-# `pytest tests/test_iteration14.py::TestX` invocations work too.
+# Ensure backend/.env AND frontend/.env are both loaded before any test imports
+# reach for env vars. auth.py + core.py read JWT_SECRET / MONGO_URL at import
+# time; backend_test.py reaches for REACT_APP_BACKEND_URL which lives in
+# frontend/.env. Loading both here means `pytest tests/...` works standalone.
 load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(Path(__file__).parent.parent.parent / "frontend" / ".env")
 
 # Read from env-var; fall back to a fresh random per-run password. This keeps
 # the test suite hermetic while satisfying static security scanners that flag

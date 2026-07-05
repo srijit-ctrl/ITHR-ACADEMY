@@ -86,7 +86,13 @@ async def register(payload: UserRegister, response: Response):
     # their first enrolled course — free modules 6-15 + free certificate).
     try:
         from founding_member import assign_if_eligible
-        await assign_if_eligible(user_id)
+        result = await assign_if_eligible(user_id)
+        if result:
+            # Re-hydrate local doc so the response reflects the newly-assigned
+            # founding_member_seq + signup_discount_code fields.
+            doc["founding_member_seq"] = result["seq"]
+            doc["signup_discount_code"] = result["code"]
+            doc["founding_cert_used"] = False
     except Exception:
         # Non-fatal — user is still registered.
         pass
