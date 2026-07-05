@@ -309,6 +309,30 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 - Rotation flow + production launch checklist added to `/app/memory/test_credentials.md`.
 - Verified end-to-end: old password → 401 · new placeholder → 200 (`role: super_admin`) · rotation warning fires in preview logs · nothing broken elsewhere.
 
+### Iteration 18 — 10-Second Course Intro Videos (Ken-Burns MVP + Sora 2 Upgrade Path) (Feb 2026)
+
+**Approach (best-judgment):**
+- **B / Ken-Burns cinemagraphs** over each course's existing Unsplash thumbnail. Zero AI-credit spend, ships in one pass, visually cohesive with the aiilm.me hero motion already in the codebase.
+- Backend model kept extensible: `Course.intro_video_url: Optional[str]` (nullable). Any course can be upgraded to a real Sora 2 clip later by just populating that field — the frontend switches to a real `<video>` element automatically. **No frontend changes needed** for the upgrade.
+
+**Frontend**
+- New `/app/frontend/src/components/CourseIntro.jsx` exporting `<CourseIntroHero>` (full-bleed autoplay for CourseDetail), `<CourseIntroButton>` (small pill for CourseCard hover overlay), and `<CourseIntroLightbox>` (12-second auto-close modal, ESC-close, mute toggle when video present).
+- `.course-intro-cinemagraph` CSS keyframe: 10-second `transform: scale(1) → scale(1.08) translate(-1.5%,-1.5%) → scale(1)` loop with `prefers-reduced-motion: reduce` bypass.
+- Lightbox rendered via **`createPortal(modal, document.body)`** so parent `overflow-hidden` / `transform` / `contain` never clip it.
+- CourseCard: play button appears on hover, opens the lightbox with the course category kicker + title overlaid in navy-gradient at bottom.
+- CourseDetail hero: static `<img>` replaced with `<CourseIntroHero>` — courses now open with a subtle Ken-Burns animation instead of a still frame.
+
+**Backend**
+- `Course.intro_video_url` field added to both the full `Course` model and the `CourseSummary` API response.
+- Catalog router surfaces the field so the frontend receives it on `/api/courses`.
+
+**Verified end-to-end via Playwright:**
+- 24 play buttons on `/courses` ✅
+- Click opens portal-rendered lightbox with full-viewport blurred navy backdrop ✅
+- Course title + category rendered in the lightbox ✅
+- ESC key closes lightbox ✅
+- Zero non-401 console errors ✅
+
 ## Test Users & Files
 - No pre-seeded users. Register via `POST /api/auth/register`.
 - Backend test suite: `/app/backend/tests/backend_test.py` (75/75 pass)

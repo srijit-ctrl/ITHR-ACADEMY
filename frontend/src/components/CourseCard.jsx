@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { BookOpen, Radio } from "lucide-react";
+import { CourseIntroButton } from "./CourseIntro";
 
 function freshnessColor(score) {
     if (score >= 90) return "text-brand border-brand bg-brand/5";
@@ -33,6 +34,12 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                     loading="lazy"
                 />
+                {/* 10-sec intro play button — visible on hover; click doesn't propagate to the outer Link. */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <CourseIntroButton course={course} />
+                    </div>
+                </div>
                 <div className="absolute top-3 left-3 flex gap-1.5">
                     <span className="badge-mono bg-background/95 backdrop-blur">{course.category}</span>
                 </div>

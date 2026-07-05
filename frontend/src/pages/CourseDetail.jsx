@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
+import { CourseIntroHero } from "@/components/CourseIntro";
 
 export default function CourseDetail() {
     const { slug } = useParams();
@@ -45,15 +46,10 @@ export default function CourseDetail() {
         <div>
             {/* Hero */}
             <section className="border-b border-border relative overflow-hidden">
-                {(course.hero_url || course.thumbnail_url) && (
+                {(course.hero_url || course.thumbnail_url || course.intro_video_url) && (
                     <>
                         <div className="absolute inset-0">
-                            <img
-                                src={course.hero_url || course.thumbnail_url}
-                                alt=""
-                                className="w-full h-full object-cover"
-                                onError={(e) => { e.currentTarget.style.display = "none"; }}
-                            />
+                            <CourseIntroHero course={course} />
                         </div>
                         <div className="absolute inset-0 bg-background/94 backdrop-blur-[2px]" />
                     </>

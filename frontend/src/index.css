@@ -422,3 +422,21 @@
 .legal-prose th { background: hsl(var(--surface-alt)); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
 .legal-prose blockquote { border-left: 3px solid hsl(var(--brand)); background: hsl(var(--brand) / 0.03); padding: 0.75rem 1rem; margin: 1rem 0; color: hsl(var(--muted-foreground)); font-style: italic; }
 .legal-prose hr { border: 0; border-top: 1px solid hsl(var(--border)); margin: 2rem 0; }
+
+/* Course intro cinemagraph — subtle 10s Ken-Burns loop over a still image.
+   Used both on the CourseDetail hero (autoplay) and inside the lightbox
+   opened from CourseCard. Falls back to a static image when reduced-motion
+   is preferred. */
+@keyframes ithr-ken-burns {
+    0%   { transform: scale(1.00) translate(0, 0); }
+    50%  { transform: scale(1.08) translate(-1.5%, -1.5%); }
+    100% { transform: scale(1.00) translate(0, 0); }
+}
+.course-intro-cinemagraph {
+    animation: ithr-ken-burns 10s ease-in-out infinite;
+    will-change: transform;
+    transform-origin: center center;
+}
+@media (prefers-reduced-motion: reduce) {
+    .course-intro-cinemagraph { animation: none; }
+}

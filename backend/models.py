@@ -96,6 +96,7 @@ class Course(BaseModel):
     duration_hours: int = 20
     thumbnail_url: str = ""
     hero_url: Optional[str] = None
+    intro_video_url: Optional[str] = None  # Optional Sora-2 (or other) intro clip; falls back to Ken-Burns on thumbnail_url.
     instructor: str = "AI Academy Faculty"
     prerequisites: List[str] = []
     learning_objectives: List[str] = []
@@ -123,6 +124,7 @@ class CourseSummary(BaseModel):
     difficulty: str
     duration_hours: int
     thumbnail_url: str
+    intro_video_url: Optional[str] = None
     instructor: str
     enrolled_count: int
     rating: float
