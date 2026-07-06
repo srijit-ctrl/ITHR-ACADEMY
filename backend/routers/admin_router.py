@@ -15,12 +15,15 @@ Endpoints:
                                     the new temp password (one-time display).
 - DELETE /api/admin/orgs/{id}      Delete an org and cascade its members.
 """
+import csv
+import io
 import re
 import secrets
 import string
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from auth import get_current_super_admin, hash_password
 from core import db, gen_invite_code, now_iso
@@ -316,6 +319,71 @@ async def recent_activity(
     events = await db.activity_events.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     # Reverse so callers can render oldest-first if they choose
     return {"events": events, "count": len(events)}
+
+
+# ---- CSV export (P2, iter-31) --------------------------------------------
+EXPORT_CSV_MAX_ROWS = 10000
+
+
+@router.get("/activity/export.csv")
+async def export_activity_csv(
+    since: str | None = Query(None, description="ISO timestamp — include events strictly after this moment"),
+    until: str | None = Query(None, description="ISO timestamp — include events strictly before this moment"),
+    kind: str | None = Query(None, description="Filter by event kind (signup, enrollment, certificate, org_created, seat_change, ...)"),
+    limit: int = Query(EXPORT_CSV_MAX_ROWS, ge=1, le=EXPORT_CSV_MAX_ROWS, description=f"Max rows (capped at {EXPORT_CSV_MAX_ROWS})"),
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Stream a CSV of platform activity events for offline audit / compliance.
+
+    Newest events first. Columns:
+      created_at, kind, actor_id, actor_name, message, target_json
+
+    `target_json` is a JSON-encoded string of the event's `target` payload
+    (course_slug, org_slug, certificate_id, etc.) so downstream tools can
+    parse it without a schema per row.
+    """
+    import json as _json
+
+    query: dict = {}
+    ts_filter: dict = {}
+    if since:
+        ts_filter["$gt"] = since
+    if until:
+        ts_filter["$lt"] = until
+    if ts_filter:
+        query["created_at"] = ts_filter
+    if kind:
+        query["kind"] = kind
+
+    cursor = db.activity_events.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
+
+    async def _iter_rows():
+        # Header row
+        buf = io.StringIO()
+        writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(["created_at", "kind", "actor_id", "actor_name", "message", "target_json"])
+        yield buf.getvalue()
+
+        async for ev in cursor:
+            buf = io.StringIO()
+            writer = csv.writer(buf, quoting=csv.QUOTE_MINIMAL)
+            target = ev.get("target") or {}
+            writer.writerow([
+                ev.get("created_at", ""),
+                ev.get("kind", ""),
+                ev.get("actor_id", ""),
+                ev.get("actor_name", ""),
+                ev.get("message", ""),
+                _json.dumps(target, separators=(",", ":")) if target else "",
+            ])
+            yield buf.getvalue()
+
+    filename = f"ithr-activity-{now_iso()[:10]}.csv"
+    return StreamingResponse(
+        _iter_rows(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---- Weekly digest runners -----------------------------------------------

@@ -653,3 +653,36 @@ User picked "Option B — do the actual P3 refactor" after a Code Quality Report
 - P2: CSV export button on Activity feed.
 - P4: Two nits above.
 
+
+### Iteration 31 — Activity Feed CSV Export (Feb 2026)
+
+Delivered the P2 backlog item: super-admin can now download the activity feed as CSV for offline audit / compliance.
+
+**Backend:**
+- New endpoint `GET /api/admin/activity/export.csv` (super-admin gated) in `routers/admin_router.py`.
+- Streaming response via `fastapi.responses.StreamingResponse` — no in-memory materialization for large exports.
+- Query params: `since` (ISO), `until` (ISO), `kind` (signup/enrollment/certificate/org_created/seat_change/…), `limit` (max 10,000, hard-capped at `EXPORT_CSV_MAX_ROWS`).
+- Columns: `created_at, kind, actor_id, actor_name, message, target_json` — `target_json` is the event's `target` payload serialized as compact JSON so downstream tools can parse without a per-row schema.
+- Response headers: `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="ithr-activity-YYYY-MM-DD.csv"`.
+
+**Frontend:**
+- New "Export CSV" button in the Live Activity panel header (`ActivityFeedPanel.jsx`), between the pulse indicator and the Pause/Resume toggle.
+- Fetches via axios with `responseType: "blob"`, extracts filename from `Content-Disposition` header, triggers browser download via a temporary anchor + `URL.createObjectURL`.
+- Toast success/failure feedback via `sonner`; loading state shown as spinning `<Loader2>` swap-in on the button.
+- `data-testid="activity-feed-export-csv"`.
+
+**Testing:**
+- New pytest suite `tests/test_iteration31_activity_csv.py` — 8/8 pass:
+  - Auth gating (401 anon, 403 learner)
+  - Response headers (Content-Type text/csv, Content-Disposition attachment .csv)
+  - CSV shape (header row + 6-col data rows)
+  - `target_json` cell is either empty string or parseable JSON dict
+  - `kind=signup` filter is exclusive (no leakage)
+  - `since=<future ISO>` returns only header row
+  - `limit=999999` → 422 (FastAPI validation clamps at 10,000)
+
+**Backlog (unchanged):**
+- P2: Platform hardening (K8s manifests, caching, CI/CD, load tests).
+- P2: Resume Sora 2 video batch + AI course pipeline after Emergent LLM key top-up.
+- P4: Two nits from iter-30 review (util reordering in `digest_router.py`; move remaining state into `useSeatEditor`).
+

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Activity, Award, Building2, GraduationCap, UserPlus, Loader2 } from "lucide-react";
+import { Activity, Award, Building2, Download, GraduationCap, UserPlus, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const POLL_INTERVAL_MS = 3000;
 const FEED_LIMIT = 25;
@@ -26,7 +27,34 @@ export default function ActivityFeedPanel() {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [live, setLive] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const latestTsRef = useRef(null);
+
+    const exportCsv = useCallback(async () => {
+        setExporting(true);
+        try {
+            const res = await api.get("/admin/activity/export.csv", { responseType: "blob" });
+            // Extract filename from Content-Disposition if present, otherwise fall back
+            const cd = res.headers?.["content-disposition"] || "";
+            const match = /filename="?([^";]+)"?/i.exec(cd);
+            const filename = match?.[1] || `ithr-activity-${new Date().toISOString().slice(0, 10)}.csv`;
+
+            const blobUrl = URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(blobUrl);
+            toast.success("Activity CSV downloaded");
+        } catch (e) {
+            console.debug("[ActivityFeed] CSV export failed:", e?.message);
+            toast.error("CSV export failed");
+        } finally {
+            setExporting(false);
+        }
+    }, []);
 
     const fetchOnce = useCallback(async (isInitial) => {
         try {
@@ -75,13 +103,25 @@ export default function ActivityFeedPanel() {
                     </div>
                     <div className="overline">Live activity</div>
                 </div>
-                <button
-                    onClick={() => setLive((v) => !v)}
-                    data-testid="activity-feed-toggle"
-                    className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
-                >
-                    {live ? "Pause" : "Resume"}
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={exportCsv}
+                        disabled={exporting}
+                        data-testid="activity-feed-export-csv"
+                        title="Download last 10,000 activity events as CSV"
+                        className="flex items-center gap-1 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    >
+                        {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        {exporting ? "Exporting…" : "Export CSV"}
+                    </button>
+                    <button
+                        onClick={() => setLive((v) => !v)}
+                        data-testid="activity-feed-toggle"
+                        className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground"
+                    >
+                        {live ? "Pause" : "Resume"}
+                    </button>
+                </div>
             </div>
 
             {loading && (
