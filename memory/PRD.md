@@ -482,9 +482,30 @@ Per-user request: split all 4 large React files into focused sub-components. Beh
 - `seed_ai_course.py` — AI-generated 15-module curricula for the 14 remaining stub courses. Script exists + is lint-clean; live run against 1 course timed out at 2min (Claude Sonnet 4.5 needs longer for full 15×5 lessons — will run async in a follow-up session).
 - Sora 2 intro videos for the 14 stub courses (deferred with course pipeline).
 
+### Iteration 26 — Credential Impressions Widget (Feb 2026)
+
+New feature per user request. When someone visits `/verify/<cert_id>`, log a **unique impression** (dedup by SHA-256 of `cert_id|day|client_ip`), and show credential holders on their dashboard how often their certificates are being checked.
+
+**Backend:**
+- `db.verify_impressions` collection with 3 indexes: unique on `impression_key`, single on `user_id`, compound on `(certificate_id, day)`.
+- `/api/certificates/verify/<id>` now inserts an impression row (idempotent via unique compound key). Same IP hitting the same day = 1 impression; different IP OR different day = new impression.
+- SAMPLE-ITHR-2026-001 verify is fully suppressed — no impression row, no email alert.
+- **NEW** `GET /api/certificates/impressions` (auth required) → returns `{total_all_time, total_last_30d, total_this_month, by_certificate: [{certificate_id, course_title, impressions}]}`. Sorted desc by count.
+- Cert-verification-alert email now uses the same `is_new_impression` guard, so duplicate-IP-same-day hits do NOT re-fire the alert.
+
+**Frontend:**
+- New `components/CredentialImpressions.jsx` — 3-stat card (this-month / 30d / all-time) with "Being verified" pill (appears when 30d ≥ 3), top-3 most-verified credentials list, and educational footer linking to the AI Skills Passport.
+- Mounted in `pages/Dashboard.jsx` — right-hand 4-col pane beside the cert cards. Only renders if the user has ≥1 cert AND the impressions API returns any data.
+
+**Testing verdict (iteration_26.json):**
+- Backend: **9/9** new + 52 regression pass = 100% (1 pre-existing iter-25 analytics-band drift, unrelated).
+- Frontend: **3/3** acceptance scenarios PASS — widget renders correctly for seeded learner + hides correctly for 0-cert + 0-impression learner + 1-cert-0-impression learner.
+- Zero criticals. Zero console errors.
+
 **Backlog (P1/P2) — unchanged**
-- P1: Stripe webhook proration hardening during seat adjustments.
-- P2: `seed_ai_course` live run + Sora 2 intro videos (deferred multi-session task).
+- P1: Stripe webhook proration hardening.
+- P2: AI course-content pipeline live run (`seed_ai_course.py` exists; Claude Sonnet 4.5 needs longer-running background job).
+- P2: Sora 2 intro videos for 14 stub courses.
 - P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 
 
