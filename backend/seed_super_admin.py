@@ -26,7 +26,7 @@ from auth import hash_password, verify_password
 from core import db, logger, now_iso
 
 DEFAULT_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@ithr.tech")
-PLACEHOLDER_PASSWORD = "preview-only-rotate-in-prod"
+PLACEHOLDER_PASSWORD = "preview-only-rotate-in-prod"  # nosec B105 — sentinel constant, not a live secret. See CODE_QUALITY_NOTES.md.
 
 
 def _generate_default_password() -> str:

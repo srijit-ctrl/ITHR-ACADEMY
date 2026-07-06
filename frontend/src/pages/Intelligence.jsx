@@ -256,7 +256,9 @@ export default function Intelligence() {
                                 <div>
                                     <div className="overline mb-2">Proposed {patchModal.patch.patch_type.replace(/_/g, " ")}</div>
                                     <div className="font-serif text-xl leading-tight mb-3">{patchModal.patch.proposed_title}</div>
-                                    <div className="prose-lesson bg-surface-alt/40 p-5 border border-border text-sm" dangerouslySetInnerHTML={{
+                                    <div className="prose-lesson bg-surface-alt/40 p-5 border border-border text-sm"
+                                        // eslint-disable-next-line react/no-danger -- content sanitized via DOMPurify below
+                                        dangerouslySetInnerHTML={{
                                         __html: DOMPurify.sanitize(
                                             (patchModal.patch.proposed_content || "").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>")
                                         ),

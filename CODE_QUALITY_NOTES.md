@@ -106,6 +106,38 @@ scan reports and have already been fixed:
 - `routers/admin_router.py:list_all_orgs` — N+1 query replaced with `$lookup`
   aggregation.
 - `server.py` — added `/health` endpoint for K8s liveness probes.
+
+---
+
+## Scanner Suppressions Applied (iter-31, Option A)
+
+To finally silence the recurring scanner reports, inline suppression comments
+have been added at each confirmed-false-positive site:
+
+- `backend/seed_super_admin.py:29` — `# nosec B105` on `PLACEHOLDER_PASSWORD`.
+- `backend/routers/assessment_router.py:132` — `# nosec B311` on the
+  `random.Random(seed)` fallback (non-security question shuffling).
+- `frontend/src/pages/LessonViewer.jsx:136` — `// eslint-disable-next-line
+  react/no-danger` above the DOMPurify-sanitized `dangerouslySetInnerHTML`.
+- `frontend/src/pages/Intelligence.jsx:259` — same suppression above the
+  DOMPurify-sanitized `dangerouslySetInnerHTML`.
+- `frontend/src/components/demo/DemoLessonBody.jsx:22` — same suppression
+  above the DOMPurify-sanitized `dangerouslySetInnerHTML`.
+
+**Items that cannot be suppressed in code** (scanner has no way to silence):
+
+- `seed_assessments.py:124` — the scanner "eval() RCE" flag is triggered by
+  substring-matching the word **"evaluate"** in question content
+  (line 138 contains `"RAGAS evaluates"`). Nothing to suppress in code;
+  scanner needs to be reconfigured or ignored.
+- 49 "missing React hook deps" — `eslint-plugin-react-hooks` reports zero
+  issues, so no `// eslint-disable-next-line react-hooks/exhaustive-deps`
+  comments are warranted. Scanner is producing phantom findings.
+- `is True/False/None` in test assertions — the linters actually configured
+  (ruff, pylint) do not flag these because they are correct per PEP 8.
+- 13 "undefined variables" — reported with no file/line references. Cannot
+  action a hallucination without a specific location.
+
 - `components/admin/ActivityFeedPanel.jsx` — silent catch now emits
   `console.debug` for devtools observability while preserving polling
   recovery behavior.

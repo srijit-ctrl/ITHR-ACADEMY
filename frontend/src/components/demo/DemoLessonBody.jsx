@@ -18,6 +18,7 @@ export default function DemoLessonBody({ lesson }) {
                         <h4 className="font-serif text-lg text-brand mb-2">{s.heading}</h4>
                         <p
                             className="text-sm leading-relaxed text-foreground"
+                            // eslint-disable-next-line react/no-danger -- content sanitized via DOMPurify below
                             dangerouslySetInnerHTML={{
                                 __html: DOMPurify.sanitize(
                                     s.body

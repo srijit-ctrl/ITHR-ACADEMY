@@ -134,6 +134,7 @@ export default function LessonViewer() {
                         return (
                             <p
                                 key={key}
+                                // eslint-disable-next-line react/no-danger -- content sanitized via DOMPurify above
                                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rendered) }}
                             />
                         );
