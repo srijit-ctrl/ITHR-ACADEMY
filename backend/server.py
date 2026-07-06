@@ -22,6 +22,14 @@ from seed_data import CATALOG_COURSES, build_full_course
 app = FastAPI(title="Enterprise Agentic AI Academy API", version="1.1.0")
 
 
+# -------------------- Kubernetes liveness/readiness probe --------------------
+# Kubernetes hits `/health` (no /api prefix) directly on the container. This must
+# stay lightweight — no DB calls — so probes never flap on transient Mongo latency.
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 # -------------------- Seeding --------------------
 async def seed_database():
     """Seed catalog + full courses. Idempotent (upserts full courses to replace metadata stubs)."""
