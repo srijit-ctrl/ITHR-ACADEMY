@@ -83,9 +83,11 @@ async def text_to_speech(payload: TTSRequest):
     text = (payload.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="Empty text")
-    # Guard against runaway TTS spend
-    if len(text) > 4000:
-        text = text[:3997] + "…"
+    # Guard against runaway TTS spend + ingress timeout at long generations.
+    # Cap at 2000 chars — OpenAI TTS at 4000 chars regularly bumps against a
+    # 60s Cloudflare upstream limit. Long content should be chunked client-side.
+    if len(text) > 2000:
+        text = text[:1997] + "…"
 
     voice = payload.voice if payload.voice in {
         "alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer",
