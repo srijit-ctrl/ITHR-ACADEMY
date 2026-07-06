@@ -20,8 +20,8 @@ BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "test_database")
 
-LEARNER_EMAIL = "impressions-test@example.com"
-LEARNER_PASSWORD = "TestPass123!"
+LEARNER_EMAIL = os.environ.get("EAIA_IMPRESSIONS_TEST_EMAIL", "impressions-test@example.com")
+LEARNER_PASSWORD = os.environ.get("EAIA_IMPRESSIONS_TEST_PASSWORD", "TestPass123!")
 REAL_CERT_ID = "IMPR-TEST-2026-XYZ"
 SAMPLE_CERT_ID = "SAMPLE-ITHR-2026-001"
 

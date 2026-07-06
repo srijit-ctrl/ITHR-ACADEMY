@@ -57,7 +57,7 @@ def test_user(api):
     """Register a fresh user for the whole module."""
     ts = int(time.time() * 1000)  # ms to reduce collision on rapid reruns
     email = f"iter21.reset+{ts}@example.com"
-    password = "OldPass123!"
+    password = os.environ.get("EAIA_TEST_USER_PASSWORD", "TestPass123!")
     r = api.post(f"{BASE_URL}/api/auth/register", json={
         "email": email,
         "password": password,
@@ -172,7 +172,7 @@ class TestResetPassword:
             "ip": "test",
         })
 
-        new_password = "NewPass123!"
+        new_password = os.environ.get("EAIA_TEST_NEW_PASSWORD", "NewPass123!")
         r = api.post(f"{BASE_URL}/api/auth/reset-password", json={
             "token": raw_token,
             "new_password": new_password,

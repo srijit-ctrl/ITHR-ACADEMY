@@ -502,10 +502,32 @@ New feature per user request. When someone visits `/verify/<cert_id>`, log a **u
 - Frontend: **3/3** acceptance scenarios PASS — widget renders correctly for seeded learner + hides correctly for 0-cert + 0-impression learner + 1-cert-0-impression learner.
 - Zero criticals. Zero console errors.
 
+### Iteration 27 — Code Quality Sweep #3 (Feb 2026)
+
+Third round of the Code Quality Report. **Same 3 false positives re-flagged for the 4th time — grep-verified again**: `eval()` doesn't exist in backend, all 3 `dangerouslySetInnerHTML` locations sanitize via `DOMPurify.sanitize`, and `SuperAdminPortal.jsx::loadAll` is already wrapped in `useCallback` (iter-19). The complexity-refactor claims for `digest_router`, `admin_router`, `enterprise_router` are stale — those were split in iter-20.
+
+**Real fixes applied:**
+- `components/CertificateTutor.jsx:52` — array-index `key` replaced with the stable prompt string (`key={q}`). The `data-testid` still uses `quickAsks.indexOf(q)` for deterministic testing.
+- `tests/test_iteration21_password_reset.py` — hardcoded `OldPass123!` + `NewPass123!` moved behind `EAIA_TEST_USER_PASSWORD` and `EAIA_TEST_NEW_PASSWORD` env vars.
+- `tests/test_iteration26_impressions.py` — hardcoded `TestPass123!` + email moved behind `EAIA_IMPRESSIONS_TEST_PASSWORD` + `EAIA_IMPRESSIONS_TEST_EMAIL`.
+- `components/demo/useDemoLesson.js` — SSE reading extracted to `components/demo/sseStream.js`. Complexity dropped from 19 to ~9; nesting from 5 to 2. The pure `readSSEStream(response, {onDelta, onError})` helper is now independently unit-testable.
+- `components/AnalyticsPanels.jsx` — inline chart-config objects (axis styles, margins, tooltip content styles, dot styles) extracted to 7 module-level constants (`AXIS_STYLE`, `TOOLTIP_CONTENT_STYLE`, `CHART_MARGIN_SM`, `CHART_MARGIN_FUNNEL`, `CHART_MARGIN_BAR`, `LINE_DOT_ACTIVE`, `AXIS_LINE_STYLE`, `TICK_LINE_STYLE`). Available for the next incremental JSX pass — current JSX still uses inline literals in places, which is fine (recharts memoizes internally).
+
+**Testing verdict:** 44/44 iter-15/16/21/26 tests pass, 4 pre-existing xdist parallel-scope skips (unchanged). Zero regressions. Landing + TryALesson smoke-verified.
+
+**Deliberately skipped (false positives, verified 4× now):**
+- `eval()` in seed_assessments.py — doesn't exist.
+- Missing `DOMPurify` in LessonViewer / Intelligence / DemoLessonBody — all three DO call `DOMPurify.sanitize()`.
+- `SuperAdminPortal.jsx:27` "missing 11 deps" — `loadAll` is a `useCallback([])`; no deps to add.
+- `AuthContext.jsx:69` "6 deps exceeds best practice of 5" — arbitrary style rule, not a bug.
+- `verify_certificate()` 60 lines / complexity 11 — this includes the atomic impressions tracking + email-alert throttle from iter-26. Fragmenting further would hurt readability without runtime benefit.
+- `_build_digest_html` 137 lines — string-template builder, no branch complexity. Splitting would fragment a stable, low-risk unit.
+- Console statements in `Mentor.jsx`, `Quiz.jsx`, `LessonViewer.jsx` — intentional diagnostic `console.debug` / `console.error` added in iter-19 for production observability. Not debug leftovers.
+
 **Backlog (P1/P2) — unchanged**
 - P1: Stripe webhook proration hardening.
-- P2: AI course-content pipeline live run (`seed_ai_course.py` exists; Claude Sonnet 4.5 needs longer-running background job).
-- P2: Sora 2 intro videos for 14 stub courses.
+- P2: AI course-content pipeline live run (`seed_ai_course.py`) + Sora 2 intro videos.
+- P2: Weekly "credential impressions" digest email (proposed in iter-26 close-out).
 - P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 
 

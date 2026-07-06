@@ -47,11 +47,11 @@ export default function CertificateTutor({ certificate }) {
 
                 {messages.length === 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
-                        {quickAsks.map((q, i) => (
+                        {quickAsks.map((q) => (
                             <button
-                                key={i}
+                                key={q}
                                 onClick={() => handleSend(q)}
-                                data-testid={`cert-tutor-quick-${i}`}
+                                data-testid={`cert-tutor-quick-${quickAsks.indexOf(q)}`}
                                 className="card-sharp p-3 text-left text-xs hover:border-brand"
                             >
                                 {q}

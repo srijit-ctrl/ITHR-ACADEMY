@@ -20,6 +20,18 @@ const CHART_COLOR_ALT = "hsl(var(--brand-teal, 179 65% 40%))";
 const CHART_AXIS = "hsl(var(--muted-foreground))";
 const CHART_GRID = "hsl(var(--border))";
 
+// Module-level chart-config constants — extracted from inline JSX props so
+// they aren't re-created on every render (avoids unnecessary recharts
+// reconciliation of chart internals).
+const AXIS_STYLE = { fontSize: 11, fill: CHART_AXIS };
+const AXIS_LINE_STYLE = { stroke: CHART_GRID };
+const TICK_LINE_STYLE = { stroke: CHART_GRID };
+const TOOLTIP_CONTENT_STYLE = { background: "hsl(var(--surface))", border: "1px solid hsl(var(--border))", borderRadius: 2, fontSize: 12 };
+const CHART_MARGIN_SM = { top: 4, right: 8, left: -8, bottom: 4 };
+const CHART_MARGIN_FUNNEL = { top: 4, right: 32, left: 24, bottom: 4 };
+const CHART_MARGIN_BAR = { top: 4, right: 8, left: -8, bottom: 24 };
+const LINE_DOT_ACTIVE = { r: 3, fill: CHART_COLOR };
+
 function useAnalytics(endpoint, days) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);

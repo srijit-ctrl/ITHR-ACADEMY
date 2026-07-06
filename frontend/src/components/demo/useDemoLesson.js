@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { api, API_BASE } from "@/lib/api";
+import { readSSEStream } from "@/components/demo/sseStream";
 
 /**
  * Fetches the demo lesson once on mount and manages the streaming Q&A
  * chat state (messages, input, streaming flag, IP-rate-limit).
+ *
+ * SSE plumbing lives in components/demo/sseStream.js so this hook stays
+ * focused on React state.
  */
 export default function useDemoLesson() {
     const [lesson, setLesson] = useState(null);
@@ -35,6 +39,15 @@ export default function useDemoLesson() {
         });
     };
 
+    const handleRateLimited = () => {
+        setLimitReached(true);
+        replaceLastAssistant({
+            role: "assistant",
+            content: "You've reached the demo limit. Register free to keep chatting with Aletheia without limits.",
+        });
+        setStreaming(false);
+    };
+
     const ask = async (text) => {
         const msg = (text || input).trim();
         if (!msg || streaming || limitReached) return;
@@ -48,41 +61,15 @@ export default function useDemoLesson() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: msg }),
             });
-            if (res.status === 429) {
-                setLimitReached(true);
-                replaceLastAssistant({
+            if (res.status === 429) return handleRateLimited();
+
+            await readSSEStream(res, {
+                onDelta: (delta) => replaceLastAssistant((last) => ({
                     role: "assistant",
-                    content: "You've reached the demo limit. Register free to keep chatting with Aletheia without limits.",
-                });
-                setStreaming(false);
-                return;
-            }
-            if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const events = buffer.split("\n\n");
-                buffer = events.pop() || "";
-                for (const evt of events) {
-                    if (!evt.startsWith("data: ")) continue;
-                    try {
-                        const p = JSON.parse(evt.slice(6));
-                        if (p.delta) {
-                            replaceLastAssistant((last) => ({
-                                role: "assistant",
-                                content: (last?.content || "") + p.delta,
-                            }));
-                        }
-                        if (p.error) throw new Error(p.error);
-                    } catch (parseErr) {
-                        console.debug("[TryALesson] SSE partial chunk, awaiting next:", parseErr?.message);
-                    }
-                }
-            }
+                    content: (last?.content || "") + delta,
+                })),
+                onError: (err) => { throw err; },
+            });
         } catch (e) {
             replaceLastAssistant({ role: "assistant", content: `Sorry — ${e.message}` });
         } finally { setStreaming(false); }
