@@ -197,7 +197,7 @@ export default function KpiDashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie data={bandData} dataKey="value" nameKey="name" outerRadius={80} label={(e) => e.name}>
-                                    {bandData.map((_, i) => <Cell key={i} fill={BAND_COLORS[i % BAND_COLORS.length]} />)}
+                                    {bandData.map((entry) => <Cell key={entry.name} fill={BAND_COLORS[bandData.indexOf(entry) % BAND_COLORS.length]} />)}
                                 </Pie>
                                 <Tooltip />
                             </PieChart>
@@ -210,7 +210,7 @@ export default function KpiDashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie data={langData} dataKey="value" nameKey="name" outerRadius={80} label={(e) => e.name}>
-                                    {langData.map((_, i) => <Cell key={i} fill={BAND_COLORS[i % BAND_COLORS.length]} />)}
+                                    {langData.map((entry) => <Cell key={entry.name} fill={BAND_COLORS[langData.indexOf(entry) % BAND_COLORS.length]} />)}
                                 </Pie>
                                 <Tooltip />
                             </PieChart>
