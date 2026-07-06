@@ -29,6 +29,7 @@ export default function Footer() {
                         <li><Link to="/certifications" className="hover:text-brand" data-testid="footer-certifications">Certifications</Link></li>
                         <li><Link to="/paths" className="hover:text-brand" data-testid="footer-paths">Learning paths</Link></li>
                         <li><Link to="/intelligence" className="hover:text-brand" data-testid="footer-intelligence">AI Intelligence</Link></li>
+                        <li><Link to="/podcast" className="hover:text-brand" data-testid="footer-podcast">Weekly Briefing Podcast</Link></li>
                     </ul>
                 </div>
 

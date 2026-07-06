@@ -893,3 +893,30 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 
 **Testing:** Curl smoke ✓ (first + cached round-trip both return valid MP3), lint ✓, UI screenshot on `/courses` shows 28 preview buttons rendered.
 
+
+### Iteration 36.6 — Weekly Executive Briefing Podcast (Feb 2026)
+
+**Feature:** Every Monday, a 5-minute auto-generated podcast episode is published, narrated by Aletheia (OpenAI `shimmer` voice).
+
+**Backend:** new router `/app/backend/routers/podcast_router.py`
+- `POST /api/admin/podcast/generate` (super-admin) — assembles a script from the cached intelligence briefing (top-3 signals) + a freshly-reviewed featured course, chunks it into ≤1800-char pieces (sentence-boundary aware), TTS each via OpenAI `tts-1` shimmer, concatenates MP3 bytes, upserts by ISO-week key into `podcast_episodes`
+- `GET /api/podcast/latest` (public) — metadata + audio_url of the most recent episode
+- `GET /api/podcast/episodes` (public) — last 24 episodes
+- `GET /api/podcast/episodes/{id}/audio.mp3` (public) — MP3 stream (Content-Type `audio/mpeg`, Accept-Ranges, 1h cache)
+- `GET /api/podcast/rss.xml` (public) — **RSS 2.0 + iTunes namespace** feed for Apple Podcasts / Spotify / Overcast subscription
+- `POST /api/admin/podcast/{id}/email` (super-admin) — Resend fan-out to all opted-in learners + super-admins
+
+**Frontend:** new page `/podcast` (`/app/frontend/src/pages/Podcast.jsx`)
+- Hero: "Five minutes. *Every Monday.*" + Subscribe via RSS button (rss link to `${API_BASE}/podcast/rss.xml`)
+- Per-episode card: week badge, date, duration, title, executive summary, HTML5 `<audio controls>`, 3-signal recap, featured-program deep-link
+- Route registered in App.js; footer link added under "Explore"
+
+**Delivery cadence:** Manual/cron trigger of `POST /api/admin/podcast/generate` on Mondays (super-admin bearer). External schedulers (`crontab` on your infra, Emergent scheduled task, or GitHub Action calling curl) can hit it weekly. RSS + web-player + email fan-out are automatic once an episode exists.
+
+**End-to-end verified:**
+- Generated episode `ep-2026-W28`: 3.57 MB MP3, ~2.5 min actual runtime (148s estimated), MP3 magic bytes `FF F3 E4` OK, 3 signals + featured course "Agentic AI in Banking & Financial Services" ✓
+- `/api/podcast/latest` returns clean JSON (no audio_b64 or script leaked to clients) ✓
+- `/api/podcast/rss.xml` returns valid RSS 2.0 with iTunes namespace ✓
+- `/podcast` page renders the episode with inline player + 3-signal list + featured-course link + RSS pill ✓
+- Backend + frontend lint: clean ✓
+
