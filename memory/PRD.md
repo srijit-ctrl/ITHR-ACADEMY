@@ -686,3 +686,43 @@ Delivered the P2 backlog item: super-admin can now download the activity feed as
 - P2: Resume Sora 2 video batch + AI course pipeline after Emergent LLM key top-up.
 - P4: Two nits from iter-30 review (util reordering in `digest_router.py`; move remaining state into `useSeatEditor`).
 
+
+### Iteration 32 — HR Course Track: Talent Acquisition + 3 stubs + Caching + CI (Feb 2026)
+
+Delivered three parallel workstreams this session.
+
+**A. HR & People Ops course track (Option B — 1 flagship full + 3 stubs):**
+- New file: `backend/seed_hr_courses.py`
+- **Flagship** (`agentic-ai-talent-acquisition`) — 15-module × 3-level full curriculum: 46 lessons, 15 domain-specific quiz questions. Covers passive-candidate signal stack, skill ontology, 4-agent + supervisor architecture (sourcing / enrichment / outreach / coordinator), NYC AEDT + EEOC UGESP + EU AI Act (Annex III §4) + GDPR Art. 22 compliance, comp intelligence, internal mobility, capstone shipping a real sourcing agent.
+- **3 stubs** in `seed_data.CATALOG_COURSES`:
+  - `agentic-ai-performance-management` — Continuous, evidence-based coaching (Intermediate, 18h)
+  - `agentic-ai-succession-planning` — Predictive leadership bench modeling (Advanced, 22h)
+  - `agentic-ai-learning-development` — Adaptive learning + skills-gap closure (Intermediate, 20h)
+- Added `"HR & People Operations"` to the `INDUSTRIES` list.
+- Course catalog now shows **28 courses total, 11 full + 17 stubs** (up from 24/10/14).
+- Assessment session on the flagship returns 5 randomized questions from the 15-question bank.
+- **Seeding hardening**: `server.py:seed_database` now detects stub→full transitions and force-sets the quiz bank (previously, `$setOnInsert` skipped the quiz update when a stub already existed for that slug — the flagship course would show 0 quiz questions after the first boot).
+
+**B. Caching layer:**
+- New module `backend/core_cache.py` — process-local, thread-safe TTL cache with `@cached(ttl_seconds, key_prefix)` decorator. No infra dependency (deliberate — Redis rejected; 1–2 pod replicas make per-pod duplication negligible vs the infra cost).
+- Applied to hot paths:
+  - `analytics.platform_analytics` — 120s TTL (super-admin dashboard hits)
+  - `analytics.org_analytics` — 90s TTL (per-org enterprise dashboard)
+  - `catalog_router.list_courses` — 180s TTL, keyed by filter-query string
+- New super-admin endpoints: `GET /api/admin/cache/stats`, `POST /api/admin/cache/purge?prefix=...`
+- Verified via curl: analytics second-hit is a cache HIT (entries_fresh 1); catalog list purge works.
+
+**C. CI workflow:**
+- New file `.github/workflows/ci.yml` — two-job pipeline that runs on every push/PR to `main`/`master`:
+  - **backend job**: Python 3.11 + Mongo 7 service container + ruff (E,F only) + pytest (skips integration-marker tests, Stripe/Resend/Sora API tests)
+  - **frontend job**: Node 20 + Yarn frozen-lockfile install + ESLint + `yarn build` + bundle-size report
+  - **ci-summary job**: fails the pipeline if either dependent job failed
+
+**Testing:** Backend healthy (`/health` 200), all HR courses visible via `?industry=HR%20%26%20People%20Operations`, flagship course detail returns 15 modules × 46 lessons × 15 quiz questions, frontend course detail page renders correctly with hero, curriculum, and learning objectives.
+
+**Backlog (P2/P3):**
+- P2: Resume Sora 2 video batch + AI course pipeline after Emergent LLM key top-up (14 stubs still awaiting content — including the 3 HR follow-on courses).
+- P2: Load tests (Locust or k6) — deferred from Option A/B/C/D pick.
+- P3: Optional distributed Redis cache backend if traffic ever pushes >5 pod replicas.
+- P3: Author-name display on course detail hero currently shows "ITHR Academy Editorial Team" instead of `course.instructor` — presentation-only.
+

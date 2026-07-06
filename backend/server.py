@@ -41,6 +41,7 @@ async def seed_database():
         build_banking_course, build_government_course, build_healthcare_course,
         build_manufacturing_course, build_retail_course,
     )
+    from seed_hr_courses import build_talent_acquisition_course
 
     full_builders = [
         build_full_course,
@@ -53,6 +54,7 @@ async def seed_database():
         build_manufacturing_course,
         build_retail_course,
         build_government_course,
+        build_talent_acquisition_course,
     ]
     full_slugs = set()
 
@@ -67,13 +69,27 @@ async def seed_database():
         reviewed_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
         doc["last_reviewed_at"] = reviewed_at.isoformat()
         # Preserve existing extended quiz bank on upsert: use $setOnInsert for quiz
-        # so seed_assessments' extra questions survive restarts.
+        # so seed_assessments' extra questions survive restarts. BUT if the
+        # course exists in DB as a stub (empty quiz + has_full_content=False)
+        # and is now graduating to a full course, force-set the quiz too.
         quiz_default = doc.pop("quiz", [])
-        await db.courses.update_one(
+        existing = await db.courses.find_one(
             {"slug": full.slug},
-            {"$set": doc, "$setOnInsert": {"quiz": quiz_default}},
-            upsert=True,
+            {"_id": 0, "has_full_content": 1, "quiz": 1},
         )
+        was_stub = existing is not None and (not existing.get("has_full_content") or not existing.get("quiz"))
+        if was_stub:
+            # Stub → full transition: overwrite quiz with the new bank.
+            doc["quiz"] = quiz_default
+            await db.courses.update_one(
+                {"slug": full.slug}, {"$set": doc}, upsert=True,
+            )
+        else:
+            await db.courses.update_one(
+                {"slug": full.slug},
+                {"$set": doc, "$setOnInsert": {"quiz": quiz_default}},
+                upsert=True,
+            )
         full_slugs.add(full.slug)
 
     logger.info(f"Upserted {len(full_slugs)} full courses.")

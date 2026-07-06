@@ -263,6 +263,11 @@ CATALOG_COURSES = [
     {"slug": "chief-ai-officer-track", "title": "Chief AI Officer Executive Track", "subtitle": "The definitive CAIO leadership program", "category": "AI Strategy", "industries": ["Banking", "Insurance", "Manufacturing", "Retail"], "difficulty": "CXO", "duration_hours": 40, "thumbnail_url": "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&q=80", "instructor": "Multiple Faculty", "enrolled_count": 1240, "rating": 4.95},
     {"slug": "mcp-a2a-protocols", "title": "MCP & A2A Protocol Deep Dive", "subtitle": "Standards for interoperable agents", "category": "MCP", "industries": ["Technology"], "difficulty": "Advanced", "duration_hours": 14, "thumbnail_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80", "instructor": "Marcus Blackwood", "enrolled_count": 3420, "rating": 4.88},
     {"slug": "ai-observability", "title": "AI Observability & Evaluation", "subtitle": "LangSmith, Arize, and evaluation harnesses", "category": "AI Observability", "industries": ["Technology"], "difficulty": "Advanced", "duration_hours": 18, "thumbnail_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80", "instructor": "Nathan Reilly", "enrolled_count": 4560, "rating": 4.84},
+    # ---- HR & People Operations track (iter-32) ----
+    {"slug": "agentic-ai-talent-acquisition", "title": "Agentic AI for Talent Acquisition — Niche & Passive Skill Hunting", "subtitle": "Ship a legal, ethical, board-defensible sourcing agent for hard roles", "category": "Enterprise AI", "industries": ["Professional Services", "Technology", "Banking", "Healthcare", "HR & People Operations"], "difficulty": "Advanced", "duration_hours": 28, "thumbnail_url": "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&q=80", "instructor": "Ravi Menon", "enrolled_count": 1240, "rating": 4.91},
+    {"slug": "agentic-ai-performance-management", "title": "AI-Augmented Performance Management", "subtitle": "From annual reviews to continuous, evidence-based coaching", "category": "Enterprise AI", "industries": ["HR & People Operations", "Professional Services", "Technology"], "difficulty": "Intermediate", "duration_hours": 18, "thumbnail_url": "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80", "instructor": "Dr. Ayesha Karim", "enrolled_count": 780, "rating": 4.82},
+    {"slug": "agentic-ai-succession-planning", "title": "Succession Planning with Predictive Talent Intelligence", "subtitle": "Model the leadership bench 24 months before you need it", "category": "Enterprise AI", "industries": ["HR & People Operations", "Banking", "Manufacturing", "Professional Services"], "difficulty": "Advanced", "duration_hours": 22, "thumbnail_url": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800&q=80", "instructor": "Mira Sundaram", "enrolled_count": 640, "rating": 4.89},
+    {"slug": "agentic-ai-learning-development", "title": "Agentic AI for L&D and Skills-Gap Closure", "subtitle": "Adaptive learning paths, cohort agents, and skills-inventory intelligence", "category": "Enterprise AI", "industries": ["HR & People Operations", "Education", "Technology"], "difficulty": "Intermediate", "duration_hours": 20, "thumbnail_url": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&q=80", "instructor": "Dr. Fenwick Cole", "enrolled_count": 920, "rating": 4.86},
 ]
 
 
@@ -270,7 +275,7 @@ INDUSTRIES = [
     "Manufacturing", "Healthcare", "Hospitality", "Retail", "Real Estate", "Education",
     "Construction", "Government", "Banking", "Insurance", "Logistics", "Supply Chain",
     "Oil & Gas", "Telecommunications", "Energy", "Pharmaceutical", "Aviation", "Travel",
-    "Media", "Professional Services", "Technology", "Research",
+    "Media", "Professional Services", "Technology", "Research", "HR & People Operations",
 ]
 
 CATEGORIES = [
