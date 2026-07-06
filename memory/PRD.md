@@ -726,3 +726,39 @@ Delivered three parallel workstreams this session.
 - P3: Optional distributed Redis cache backend if traffic ever pushes >5 pod replicas.
 - P3: Author-name display on course detail hero currently shows "ITHR Academy Editorial Team" instead of `course.instructor` — presentation-only.
 
+
+### Iteration 33 — Domain Migration: ithr.tech → ithr.online (Feb 2026)
+
+Triggered by production `learn.ithr.tech` being unreachable at the CloudFront edge (Emergent-managed infrastructure ticket open with support). User pivoted to a new domain they fully control: `ithr.online`.
+
+**Backend `.env` changes:**
+- `SUPER_ADMIN_EMAIL`: `superadmin@ithr.tech` → `superadmin@ithr.online`
+- `SENDER_EMAIL`: `no-reply@ithr.tech` → `no-reply@ithr.online`
+- `PUBLIC_APP_URL`: preview host → `https://learn.ithr.online`
+- `FRONTEND_URL`: preview host → `https://learn.ithr.online`
+- `SUPER_ADMIN_PASSWORD` unchanged (`preview-only-rotate-in-prod` placeholder).
+
+**Database:**
+- Old `superadmin@ithr.tech` user deleted.
+- New `superadmin@ithr.online` seeded automatically on next boot via `seed_super_admin.py`.
+- Verified: new login succeeds, old email returns 401.
+
+**Resend domain verification (user-side, done):**
+- User added `ithr.online` in Resend dashboard and completed SPF + DKIM + MX DNS records.
+- User confirmed "verified" in this session.
+
+**Email pipeline verification — all 7 transactional templates PASS from `no-reply@ithr.online`:**
+1. Welcome (id: c49e17c6-3054-4d4a-91e9-30c8753b1bdf)
+2. Certificate issuance (id: 07259565-017c-47a7-88d1-8b6135a12172)
+3. Org invite (id: 13b22f2c-da79-4e6c-ab3c-c2d6e05a9345)
+4. Payment confirmation (id: bc6b92b4-d869-4054-9667-42e6a8dbf1e4)
+5. Credential validity expiration (retried past Resend's 2 req/sec rate limit)
+6. Complaint response
+7. Credential verification alert
+
+**Test credentials doc updated:** `/app/memory/test_credentials.md` now reflects `superadmin@ithr.online`.
+
+**Blocked on user (parallel workstream — not code):**
+- Point `learn.ithr.online` DNS at the Emergent deployment host (either directly via CNAME, or via a working CloudFront distribution — depends on Emergent Support's resolution path for the old ithr.tech setup).
+- Once DNS + hosting are wired, all email links (welcome, certificate, org invite, payment receipt, digest CTA, reset-password) will land at the correct URL because they're all templated from `FRONTEND_URL` / `PUBLIC_APP_URL`.
+
