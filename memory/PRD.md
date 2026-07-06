@@ -872,3 +872,24 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - P2: Load tests (k6/Locust)
 - P2: Bundle pricing page for Enterprise HR suite
 - P2: Sora 2 batch + AI course pipeline
+
+### Iteration 36.5 — "Listen 30s" Course Audio Preview (Feb 2026)
+
+**Enhancement:** Every catalog card + course detail hero now has a **"Listen 30s"** headphones button that plays a spoken pitch of the course.
+
+**Backend:** `GET /api/catalog/courses/{slug}/preview-audio`
+- Composes a ~75-word script from `title + subtitle + first-module + duration + difficulty` via `_build_preview_script`
+- Generates via OpenAI TTS (`tts-1`, voice `shimmer`, speed 1.05, MP3) using Emergent LLM Key
+- Caches MP3 base64 in Mongo collection `course_previews` keyed on `{course_id}::{last_reviewed_at}` — freshness bump auto-invalidates so refreshed courses get a fresh pitch
+- Second call is < 5ms cache hit — smoke-tested: `agentic-ai-foundations` cached ~552KB MP3
+
+**Frontend:** `CoursePreviewButton` (`/app/frontend/src/components/CoursePreviewButton.jsx`)
+- Two variants: `compact` (catalog card footer, mono uppercase text) + `pill` (course detail hero)
+- States: idle → loading (spinner) → playing (Pause icon) → error (auto-recovers in 1.8s)
+- Click doesn't propagate to parent Link — safe inside `CourseCard`
+- Mounted on: `CourseCard.jsx` footer + `CourseDetail.jsx` hero (under subtitle)
+
+**Value:** Every catalog card gets an audio "trailer" for the executive audience. Dwell time and conversion signal.
+
+**Testing:** Curl smoke ✓ (first + cached round-trip both return valid MP3), lint ✓, UI screenshot on `/courses` shows 28 preview buttons rendered.
+

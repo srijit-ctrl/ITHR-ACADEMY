@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { CourseIntroHero } from "@/components/CourseIntro";
+import CoursePreviewButton from "@/components/CoursePreviewButton";
 
 export default function CourseDetail() {
     const { slug } = useParams();
@@ -62,7 +63,10 @@ export default function CourseDetail() {
                             {course.industries?.slice(0, 3).map((ind) => <span key={ind} className="badge-mono">{ind}</span>)}
                         </div>
                         <h1 className="font-serif text-4xl md:text-6xl tracking-tighter leading-[1.02] mb-4">{course.title}</h1>
-                        <p className="text-xl text-muted-foreground italic mb-8">{course.subtitle}</p>
+                        <p className="text-xl text-muted-foreground italic mb-6">{course.subtitle}</p>
+                        <div className="mb-8">
+                            <CoursePreviewButton course={course} variant="pill" />
+                        </div>
                         <p className="text-base leading-relaxed max-w-3xl mb-8">{course.description}</p>
 
                         <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground border-t border-border pt-6">

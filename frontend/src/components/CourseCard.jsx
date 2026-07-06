@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { BookOpen, Radio } from "lucide-react";
 import { CourseIntroButton } from "./CourseIntro";
+import CoursePreviewButton from "./CoursePreviewButton";
 
 function freshnessColor(score) {
     if (score >= 90) return "text-brand border-brand bg-brand/5";
@@ -77,9 +78,7 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
                         <span className="opacity-30">·</span>
                         <span>{course.duration_hours}h</span>
                     </div>
-                    <div className="text-[10px] font-mono uppercase tracking-[0.15em]">
-                        {freshnessLabel(course.days_since_review)}
-                    </div>
+                    <CoursePreviewButton course={course} />
                 </div>
             </div>
         </Link>

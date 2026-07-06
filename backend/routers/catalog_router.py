@@ -92,6 +92,100 @@ async def get_course(slug: str):
     return Course(**doc)
 
 
+def _build_preview_script(course: dict) -> str:
+    """Compose a ~30-second (~75-word) audio pitch from course meta."""
+    title = course.get("title", "this program")
+    subtitle = course.get("subtitle") or ""
+    difficulty = course.get("difficulty", "")
+    duration = course.get("duration_hours", "")
+    category = course.get("category", "")
+    modules = course.get("modules", []) or []
+    first_module = modules[0].get("title") if modules and isinstance(modules[0], dict) else ""
+
+    parts = [f"Welcome to {title}."]
+    if subtitle:
+        parts.append(subtitle.rstrip(".") + ".")
+    if first_module:
+        parts.append(f"We open with {first_module},")
+    parts.append(f"then walk you through {len(modules) or 15} focused modules")
+    if duration:
+        parts.append(f"across roughly {duration} hours of executive-grade material.")
+    else:
+        parts.append("of executive-grade material.")
+    if difficulty:
+        parts.append(f"Pitched at the {difficulty.lower()} level")
+        if category:
+            parts.append(f"for {category.lower()} practitioners.")
+        else:
+            parts.append("for enterprise practitioners.")
+    parts.append("Ready when you are — enroll below to begin.")
+    script = " ".join(parts)
+    # Keep it comfortably inside the TTS 2000-char cap
+    return script[:1200]
+
+
+@router.get("/courses/{slug}/preview-audio")
+async def course_preview_audio(slug: str):
+    """Return a cached ~30-second TTS pitch for the course.
+
+    First request generates via OpenAI TTS + Emergent LLM key, caches the MP3
+    base64 in `course_previews`. Subsequent requests hit the cache (< 5ms).
+    Freshness: cache is invalidated whenever the course's `last_reviewed_at`
+    changes so refreshed courses get a fresh pitch.
+    """
+    import base64
+    import os
+
+    course = await db.courses.find_one(
+        {"slug": slug},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "subtitle": 1, "difficulty": 1,
+         "duration_hours": 1, "category": 1, "modules.title": 1, "last_reviewed_at": 1},
+    )
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    cache_key = f"{course['id']}::{course.get('last_reviewed_at', '')}"
+    cached_row = await db.course_previews.find_one({"cache_key": cache_key}, {"_id": 0})
+    if cached_row and cached_row.get("audio_b64"):
+        return {
+            "audio_b64": cached_row["audio_b64"],
+            "mime": cached_row.get("mime", "audio/mpeg"),
+            "script": cached_row.get("script", ""),
+            "cached": True,
+        }
+
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=500, detail="LLM key not configured")
+
+    script = _build_preview_script(course)
+    try:
+        from emergentintegrations.llm.openai import OpenAITextToSpeech
+        tts = OpenAITextToSpeech(api_key=key)
+        audio_bytes = await tts.generate_speech(
+            text=script, model="tts-1", voice="shimmer", speed=1.05, response_format="mp3",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"TTS generation failed: {e}") from e
+
+    audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+    await db.course_previews.update_one(
+        {"cache_key": cache_key},
+        {"$set": {
+            "cache_key": cache_key,
+            "course_id": course["id"],
+            "slug": slug,
+            "script": script,
+            "audio_b64": audio_b64,
+            "mime": "audio/mpeg",
+            "voice": "shimmer",
+            "generated_at": now_iso(),
+        }},
+        upsert=True,
+    )
+    return {"audio_b64": audio_b64, "mime": "audio/mpeg", "script": script, "cached": False}
+
+
 @router.post("/courses/{slug}/enroll")
 async def enroll(slug: str, user_id: str = Depends(get_current_user_id)):
     course = await db.courses.find_one({"slug": slug}, {"_id": 0})
