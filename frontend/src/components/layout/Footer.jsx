@@ -38,6 +38,7 @@ export default function Footer() {
                     <ul className="space-y-2 text-sm">
                         <li><Link to="/pricing" className="hover:text-brand" data-testid="footer-pricing">Pricing</Link></li>
                         <li><Link to="/enterprise" className="hover:text-brand" data-testid="footer-teams">For teams</Link></li>
+                        <li><Link to="/hr-suite" className="hover:text-brand" data-testid="footer-hr-suite">HR Transformation Suite</Link></li>
                         <li><Link to="/verify" className="hover:text-brand" data-testid="footer-verify">Verify a credential</Link></li>
                         <li><Link to="/trust" className="hover:text-brand" data-testid="footer-trust">Trust &amp; security</Link></li>
                     </ul>

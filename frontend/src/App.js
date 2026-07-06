@@ -35,6 +35,7 @@ import Passport from "@/pages/Passport";
 import PatchReview from "@/pages/PatchReview";
 import Trust from "@/pages/Trust";
 import Podcast from "@/pages/Podcast";
+import HrSuite from "@/pages/HrSuite";
 import SuperAdminPortal from "@/pages/SuperAdminPortal";
 import LegalDoc from "@/pages/LegalDoc";
 
@@ -72,6 +73,7 @@ function AppShell() {
                     <Route path="/verify/:certId" element={<Verify />} />
                     <Route path="/trust" element={<Trust />} />
                     <Route path="/podcast" element={<Podcast />} />
+                    <Route path="/hr-suite" element={<HrSuite />} />
 
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     <Route path="/mentor" element={<ProtectedRoute><Mentor /></ProtectedRoute>} />

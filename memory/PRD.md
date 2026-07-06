@@ -920,3 +920,39 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - `/podcast` page renders the episode with inline player + 3-signal list + featured-course link + RSS pill ✓
 - Backend + frontend lint: clean ✓
 
+
+### Iteration 37 — Load Tests · HR Transformation Suite Page (Feb 2026)
+
+**A) Load tests (Locust)** — `/app/backend/tests/load/`
+- `locustfile.py` — one `PublicReader` HttpUser class exercising:
+  - `GET /api/courses` (weight 10, p95 target < 800ms)
+  - `GET /api/intelligence/briefing` (weight 6, p95 < 900ms)
+  - `GET /api/podcast/latest` (weight 5, p95 < 400ms)
+  - `GET /api/podcast/rss.xml` (weight 3, p95 < 500ms)
+  - `POST /api/demo/ask` SSE (weight 1, low to bound LLM cost; asserts first 4KB streamed OK)
+- `README.md` — usage, thresholds, prod caveats, cost note
+- **Baseline captured** at `/app/backend/tests/load/baselines/2026-02-06_baseline_stats.csv`:
+  - Preview env, 10 VUs, 30s, ramp 3/s → **0 failures / 124 requests**, aggregated p95 = 130ms.
+  - Per-endpoint p95: /courses 79ms · /briefing 71ms · /podcast/latest 120ms · /podcast/rss 170ms · demo/ask 51ms — every endpoint is 5-15× under its SLO target.
+- Isolated from CI (won't run in unit-test pass). Run manually via the README.
+
+**B) HR Transformation Suite page** — `/hr-suite`
+- New file: `/app/frontend/src/pages/HrSuite.jsx`
+- **Section 1 — Talent Ops Bundle (flagship):** $24,900/year flat for 50 seats, 4 flagship HR courses (Talent Acquisition Agentic AI · Compensation Analytics AI · Performance Enablement AI · HR Copilot Blueprint) + 6 Aletheia workflows unlocked. "Reserve the bundle" CTA → `/enterprise?bundle=talent-ops-bundle`.
+- **Section 2 — HR Transformation Stack (3-tier ladder):**
+  - Starter: 25 seats · $14,900/yr · 2 HR courses + 2 workflows
+  - Growth (Recommended): 100 seats · $39,900/yr · full Talent Ops + 4 workflows + SAML SSO + CSM
+  - Enterprise-HR: 500+ seats · Custom · everything + private LLM, HRIS integrations, white-label
+- Final CTA row: "Book a 20-min HR AI readiness call" → `/enterprise?bundle=hr-consult`
+- Route registered in `App.js`; Footer link added ("HR Transformation Suite") in the "Explore" column.
+
+**Files touched:**
+- `frontend/src/pages/HrSuite.jsx` (new)
+- `frontend/src/App.js` (route)
+- `frontend/src/components/layout/Footer.jsx` (link)
+- `backend/tests/load/locustfile.py` (new)
+- `backend/tests/load/README.md` (new)
+- `backend/tests/load/baselines/*.csv` (baseline artifacts)
+
+**Testing:** Locust baseline run 0 failures / 124 reqs / p95 130ms aggregated; frontend UI smoke-test confirms flagship bundle card + 3 tier cards + all CTAs render; backend + frontend lint clean.
+
