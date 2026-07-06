@@ -111,6 +111,11 @@ async def seed_database():
     await db.password_reset_tokens.create_index("token_hash", unique=True)
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.password_reset_tokens.create_index("user_id")
+    # Credential impressions: dedup verifiers via unique impression_key + fast
+    # lookups by holder + by-cert breakdown.
+    await db.verify_impressions.create_index("impression_key", unique=True)
+    await db.verify_impressions.create_index("user_id")
+    await db.verify_impressions.create_index([("certificate_id", 1), ("day", 1)])
 
     # Seed randomized assessment banks (idempotent)
     from seed_assessments import seed_all as seed_assessment_banks

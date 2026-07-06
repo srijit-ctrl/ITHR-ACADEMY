@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy } from "lucide-react";
 import { toast } from "sonner";
+import CredentialImpressions from "@/components/CredentialImpressions";
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -180,21 +181,28 @@ export default function Dashboard() {
             {/* Certificates */}
             {certificates.length > 0 && (
                 <section className="mb-14">
-                    <h2 className="font-serif text-3xl tracking-tight mb-6">Your certificates</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {certificates.map((c) => (
-                            <div key={c.id} className="cert-beam" data-testid={`dashboard-cert-${c.certificate_id}`}>
-                                <div className="bg-surface p-6">
-                                    <Award className="w-6 h-6 text-brand mb-4" />
-                                    <div className="font-serif text-xl leading-tight mb-2">{c.course_title}</div>
-                                    <div className="text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground mb-4">{c.certificate_id}</div>
-                                    <div className="text-sm mb-4">Score: <b>{c.score}%</b></div>
-                                    <Link to={`/certificate/${c.certificate_id}`} data-testid={`view-cert-${c.certificate_id}`} className="text-sm text-brand inline-flex items-center gap-1 hover:underline">
-                                        View credential <ExternalLink className="w-3 h-3" />
-                                    </Link>
-                                </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+                        <div className="lg:col-span-8">
+                            <h2 className="font-serif text-3xl tracking-tight mb-6">Your certificates</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {certificates.map((c) => (
+                                    <div key={c.id} className="cert-beam" data-testid={`dashboard-cert-${c.certificate_id}`}>
+                                        <div className="bg-surface p-6">
+                                            <Award className="w-6 h-6 text-brand mb-4" />
+                                            <div className="font-serif text-xl leading-tight mb-2">{c.course_title}</div>
+                                            <div className="text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground mb-4">{c.certificate_id}</div>
+                                            <div className="text-sm mb-4">Score: <b>{c.score}%</b></div>
+                                            <Link to={`/certificate/${c.certificate_id}`} data-testid={`view-cert-${c.certificate_id}`} className="text-sm text-brand inline-flex items-center gap-1 hover:underline">
+                                                View credential <ExternalLink className="w-3 h-3" />
+                                            </Link>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </div>
+                        <div className="lg:col-span-4">
+                            <CredentialImpressions />
+                        </div>
                     </div>
                 </section>
             )}

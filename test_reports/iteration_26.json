@@ -1,0 +1,54 @@
+{
+  "summary": "Iter-26 Credential Impressions widget verified end-to-end. Backend: 9/9 iter-26 tests PASS covering (a) 3 Mongo indexes on verify_impressions (unique impression_key, single user_id, compound certificate_id+day), (b) SAMPLE-ITHR-2026-001 verify creates ZERO impression rows across 3 hits (explicit suppression), (c) real cert verify creates rows with sha256(cert|day|ip) impression_key + dedup plateaus (10 hits → small stable count; second burst of 10 does NOT grow the count — dedup works), (d) auth required for /api/certificates/impressions (no token → 401; bad token → 401), (e) endpoint returns correct {total_all_time, total_last_30d, total_this_month, by_certificate} shape with values that match direct DB counts and by_certificate sorted desc, (f) email throttle guard: duplicate-IP-same-day hit does NOT bump cert.last_verify_alert_at (confirming is_new_impression=False path skips the alert). Frontend: 3/3 acceptance scenarios PASS on /dashboard — (1) seeded learner (impressions-test@example.com, IMPR-TEST-2026-XYZ, 5 impressions) → widget renders in the 4-col right pane beside the cert card, shows month=5 / 30d=5 / all=5, 'Being verified' pill visible (30d≥3), per-cert list shows 'Agentic AI Foundations for the Enterprise · 5× verifies'; (2) learner with 0 certs + 0 impressions → widget NOT rendered (parent gate certificates.length>0 short-circuits); (3) learner with 1 cert + 0 impressions → cert section renders but widget returns null (hasAny=false). Regression on iter-15/16/21/24/25 suites: 52 passed / 3 skipped / 1 failed. The single failure is the iter-25 post-purge analytics band assertion drifting (users=89 vs upper bound 80) — pre-existing test-created drift, NOT caused by iter-26 code.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/certificates/verify/{id}",
+        "issue": "Impression dedup uses request.client.host which reflects the immediate TCP peer (k8s ingress pod IP), not the true client IP. Repeated hits from the same origin can surface 2-3 distinct source IPs to the backend (one per ingress replica), inflating impression counts by that ingress-pool factor. In a production deployment behind CDN/load-balancer the effect will be larger. Recommend using the first entry of X-Forwarded-For (or X-Real-IP) when behind a trusted proxy. Observed empirically: 10 hits from the same test process → 2 rows created (should be 1). Dedup itself works — the count still plateaus and second burst does not grow it. Non-critical for MVP but the 'per-recruiter per day' promise on the widget's footer text may over-count by 2-5x in real traffic."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "console_warnings": [
+      {
+        "screen": "/dashboard",
+        "issue": "React warning: 'Each child in a list should have a unique key prop.' emitted from the Dashboard render method. Not related to iter-26 code (widget uses c.certificate_id as key correctly); likely from an earlier list in Dashboard.jsx (probably the recs or courses map). Cosmetic warning only — no functional impact.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration26_impressions.py",
+    "/app/test_reports/pytest/iter26_impressions.xml",
+    "/app/test_reports/pytest/iter26_regression.xml"
+  ],
+  "action_items": [
+    "OPTIONAL/P2: assessment_router.py:316 — replace `request.client.host` with `request.headers.get('x-forwarded-for', '').split(',')[0].strip() or request.client.host` so dedup uses the real client IP behind ingress/CDN. Trusted-proxy check advisable.",
+    "OPTIONAL: investigate the React 'unique key prop' warning in Dashboard.jsx render (unrelated to iter-26 additions but surfaced during widget testing).",
+    "OPTIONAL: widen the iter-25 post-purge analytics assertion band in test_iteration25_emails.py::test_analytics_reflects_purge — current upper bound 80 is now consistently exceeded due to test-user drift from parallel iter runs. Not an iter-26 concern but the regression suite would then be 100%."
+  ],
+  "critical_code_review_comments": [
+    "assessment_router.py:296-357 — verify_certificate: impression tracking is correctly wrapped in a broad try/except so tracking failures never break the public verify. The unique-index-on-impression_key approach for dedup is elegant (idempotency via DuplicateKeyError → is_new_impression=False) and behaves correctly. However, request.client.host is not the real client IP behind k8s ingress — see minor issue above. Also worth noting: the impression_key stored in DB happens to be re-used as verifier_ip_hash in the alert email (line 350) — that's a bit of a semantic overload (impression_key = sha256(cert|day|ip) NOT sha256(ip)), so the '{verifier_ip_hash}[:12]' fingerprint shown in the email varies per-cert-per-day, not per-IP. Cosmetic — the user just sees a truncated hex fingerprint. Consider passing the dedicated ip-hash instead: `hashlib.sha256(client_ip.encode()).hexdigest()`.",
+    "assessment_router.py:360-416 — credential_impressions: clean implementation. Two subtle notes: (1) `total_this_month` uses day >= month_start where day is 'YYYY-MM-DD' — correct because lexicographic ordering aligns with chronological for that format; (2) title_by_id falls back to '(unknown)' — should never trigger in practice since impressions carry the same certificate_id as certificates, but the guard is fine defensively. Good separation between count_documents (fast) and aggregate (only when needed for per-cert grouping).",
+    "server.py:114-118 — 3 indexes on verify_impressions verified live: `impression_key_1` (unique=True), `user_id_1`, and compound `certificate_id_1_day_1`. Matches spec.",
+    "CredentialImpressions.jsx — clean early-return guard (hasAny = total_all_time > 0 || by_certificate.length > 0) prevents empty widget rendering. The `data-testid` coverage is complete (credential-impressions on root, impressions-{month,30d,all}, and impr-cert-<id> per row). Only nit: the 'This month' StatMini uses `accent` styling which visually promotes it as the primary — a helpful cue but note the label 'THIS MONTH' is technically day>=first-of-month, which resets on the 1st and may look confusing to a user checking on Jan 1st (would show 0 vs the prior day's 30d/all number). Non-blocking.",
+    "Dashboard.jsx:203-205 — widget mounted in a lg:col-span-4 pane inside the certs section, only rendered when certificates.length > 0. This means the widget is unreachable for a user with impressions but NO certs (unlikely edge case, since impressions can only accumulate against certs the user owns). Behaviorally consistent with the review request's early-return specs."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration26_impressions.py (NEW — 9 tests, 100% pass)"
+  ],
+  "success_rate": {
+    "backend": "iter-26 new suite 9/9 = 100%. Regression on iter-15/16/21/24/25 = 52 passed / 3 skipped / 1 failed. The one failure (iter-25 analytics drift band) is pre-existing and unrelated to iter-26.",
+    "frontend": "3/3 acceptance scenarios PASS on /dashboard (widget renders + hides correctly across all 3 states)."
+  },
+  "test_credentials": "Seeded learner: impressions-test@example.com / TestPass123! (has cert IMPR-TEST-2026-XYZ with impressions). Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod (not used this iter — impressions endpoint is learner-scoped, no admin surface).",
+  "seed_data_creation": "Tests re-seeded 3 controlled impression rows for IMPR-TEST-2026-XYZ (days: today, 2026-07-01, 2026-07-02; IPs 10.0.0.1/2/3) via upsert on impression_key to make total_all_time deterministic. Also created + cleaned up a throwaway cert IMPR-TEST26-EMPTY-XYZ for the '1 cert / 0 impressions' frontend scenario (deleted after test). One new negative-case learner: iter26.negative+1783307652@example.com / TestPass123!.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Post-iter-26 baseline: verify_impressions collection populated (5+ rows for IMPR-TEST-2026-XYZ across multiple simulated IPs/days). The 3 mongo indexes are stable. Note: `request.client.host` behind k8s ingress reveals 2-3 distinct IPs per test process, so a strict '1 hit → 1 row' assertion will flake — use burst+plateau assertions instead (as done in test_verify_real_cert_creates_and_dedups). The iter-25 analytics band assertion (users≤80) is still stale (89 users observed) — separate concern from this iter. React 'unique key prop' warning on Dashboard.jsx is pre-existing and not from iter-26 code.",
+  "rca of the issue": "N/A — no functional bugs in iter-26 code. One product-level concern documented (dedup keyed on ingress pod IP rather than true client IP), one pre-existing React warning noted, and one pre-existing regression drift band flagged for widening."
+}

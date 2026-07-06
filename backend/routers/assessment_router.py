@@ -301,35 +301,119 @@ async def verify_certificate(certificate_id: str, request: Request):
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
 
-    # Notify the holder that their credential was verified — throttled to
-    # at most one email per 6 hours per cert, so a page refresh doesn't spam.
+    # ---- Impression tracking + holder alert -----------------------------
+    # A single verifier IP on a given day counts as one impression, no matter
+    # how many times they refresh. The email alert is throttled separately
+    # (once per 6h). The sample cert is fully excluded from both.
     try:
         import asyncio as _asyncio
         import hashlib
         from datetime import datetime, timedelta, timezone
         from email_service import send_credential_verification_alert
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
-        last = cert.get("last_verify_alert_at", "")
-        if last < cutoff and certificate_id != "SAMPLE-ITHR-2026-001":
+
+        if certificate_id != "SAMPLE-ITHR-2026-001":
+            now_dt = datetime.now(timezone.utc)
             client_ip = (request.client.host if request.client else "unknown") or "unknown"
-            ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()
-            holder = await db.users.find_one({"id": cert["user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
-            if holder:
-                now_utc = datetime.now(timezone.utc).isoformat()
-                await db.certificates.update_one(
-                    {"certificate_id": certificate_id},
-                    {"$set": {"last_verify_alert_at": now_utc}},
-                )
-                _asyncio.create_task(send_credential_verification_alert(
-                    email=holder["email"], full_name=holder.get("full_name") or "",
-                    certificate_id=certificate_id, course_title=cert.get("course_title", ""),
-                    verifier_ip_hash=ip_hash, verified_at=now_utc[:19].replace("T", " "),
-                ))
+            day = now_dt.strftime("%Y-%m-%d")
+            impression_key = hashlib.sha256(f"{certificate_id}|{day}|{client_ip}".encode()).hexdigest()
+
+            # Idempotent insert — unique on impression_key so refreshes/rescans
+            # by the same verifier on the same day only count once.
+            try:
+                await db.verify_impressions.insert_one({
+                    "impression_key": impression_key,
+                    "certificate_id": certificate_id,
+                    "user_id": cert["user_id"],
+                    "day": day,
+                    "verified_at": now_dt.isoformat(),
+                    "ip_hash_short": hashlib.sha256(client_ip.encode()).hexdigest()[:12],
+                })
+                is_new_impression = True
+            except Exception:
+                # Duplicate key on the unique index — this verifier already
+                # counted today. Not an error.
+                is_new_impression = False
+
+            # Send holder-alert only on new impression + past 6h cooldown
+            cutoff = (now_dt - timedelta(hours=6)).isoformat()
+            last_alert = cert.get("last_verify_alert_at", "")
+            if is_new_impression and last_alert < cutoff:
+                holder = await db.users.find_one({"id": cert["user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
+                if holder:
+                    await db.certificates.update_one(
+                        {"certificate_id": certificate_id},
+                        {"$set": {"last_verify_alert_at": now_dt.isoformat()}},
+                    )
+                    _asyncio.create_task(send_credential_verification_alert(
+                        email=holder["email"], full_name=holder.get("full_name") or "",
+                        certificate_id=certificate_id, course_title=cert.get("course_title", ""),
+                        verifier_ip_hash=impression_key,
+                        verified_at=now_dt.isoformat()[:19].replace("T", " "),
+                    ))
     except Exception:
-        # Never fail a public verify because of an email hiccup.
+        # Never fail a public verify because of tracking / email hiccups.
         pass
 
     return {"valid": True, "certificate": cert}
+
+
+@router.get("/certificates/impressions")
+async def credential_impressions(user_id: str = Depends(get_current_user_id)):
+    """Return credential-verification impression counts for the caller.
+
+    Response shape:
+        {
+          "total_all_time": int,
+          "total_last_30d": int,
+          "total_this_month": int,
+          "by_certificate": [
+            {"certificate_id": str, "course_title": str, "impressions": int}
+          ]
+        }
+    """
+    from datetime import datetime, timedelta, timezone
+
+    now_dt = datetime.now(timezone.utc)
+    since_30d = (now_dt - timedelta(days=30)).isoformat()
+    month_start = now_dt.replace(day=1).strftime("%Y-%m-%d")
+
+    total_all_time = await db.verify_impressions.count_documents({"user_id": user_id})
+    total_last_30d = await db.verify_impressions.count_documents({
+        "user_id": user_id, "verified_at": {"$gte": since_30d},
+    })
+    total_this_month = await db.verify_impressions.count_documents({
+        "user_id": user_id, "day": {"$gte": month_start},
+    })
+
+    # Per-cert breakdown (only user's own certs)
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {"_id": "$certificate_id", "impressions": {"$sum": 1}}},
+        {"$sort": {"impressions": -1}},
+    ]
+    per_cert_raw = await db.verify_impressions.aggregate(pipeline).to_list(50)
+    cert_ids = [r["_id"] for r in per_cert_raw]
+    cert_docs = await db.certificates.find(
+        {"certificate_id": {"$in": cert_ids}},
+        {"_id": 0, "certificate_id": 1, "course_title": 1},
+    ).to_list(50) if cert_ids else []
+    title_by_id = {c["certificate_id"]: c.get("course_title", "") for c in cert_docs}
+
+    by_certificate = [
+        {
+            "certificate_id": r["_id"],
+            "course_title": title_by_id.get(r["_id"], "(unknown)"),
+            "impressions": r["impressions"],
+        }
+        for r in per_cert_raw
+    ]
+
+    return {
+        "total_all_time": total_all_time,
+        "total_last_30d": total_last_30d,
+        "total_this_month": total_this_month,
+        "by_certificate": by_certificate,
+    }
 
 
 @router.get("/certificates/{certificate_id}/qr.svg")
