@@ -227,17 +227,36 @@ async def security_headers(request, call_next):
 
 @app.on_event("startup")
 async def on_startup():
-    await seed_database()
-    from seed_super_admin import seed_super_admin
-    try:
-        await seed_super_admin()
-    except Exception:
-        logger.exception("Super-admin seed failed (non-fatal)")
-    from seed_sample_cert import seed_sample_certificate
-    try:
-        await seed_sample_certificate()
-    except Exception:
-        logger.exception("Sample certificate seed failed (non-fatal)")
+    """Kick off seeding in the background so /health becomes reachable
+    immediately (K8s readiness probes have ~2-5s tolerance, but a fresh
+    Atlas cluster + full seed can easily take 30-90s and would time out
+    the deployment).
+
+    Seeding is idempotent — it's safe for the pod to serve traffic while
+    seeding runs. Any endpoint that reads courses will return whatever is
+    in the DB at that moment (empty on first boot, populated within seconds).
+    """
+    import asyncio as _asyncio
+
+    async def _background_seed():
+        try:
+            await seed_database()
+        except Exception:
+            logger.exception("Catalog seed failed (non-fatal, will retry on next boot)")
+        try:
+            from seed_super_admin import seed_super_admin
+            await seed_super_admin()
+        except Exception:
+            logger.exception("Super-admin seed failed (non-fatal)")
+        try:
+            from seed_sample_cert import seed_sample_certificate
+            await seed_sample_certificate()
+        except Exception:
+            logger.exception("Sample certificate seed failed (non-fatal)")
+        logger.info("Background seeding complete.")
+
+    _asyncio.create_task(_background_seed())
+    logger.info("Backend started; seeding scheduled in background.")
 
 
 @app.on_event("shutdown")
