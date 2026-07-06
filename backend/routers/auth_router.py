@@ -177,7 +177,7 @@ async def me(user_id: str = Depends(get_current_user_id)):
 
 
 @router.post("/auth/google/callback", response_model=AuthResponse)
-async def google_callback(payload: dict, response: Response):
+async def google_callback(payload: dict, request: Request, response: Response):
     session_id = payload.get("session_id")
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
@@ -225,4 +225,8 @@ async def google_callback(payload: dict, response: Response):
 
     access = create_access_token(user_doc["id"], user_doc["email"], user_doc["role"])
     _set_refresh_cookie(response, user_doc["id"])
+    # Fire-and-forget login tracking so Google sign-ins also appear in
+    # /api/admin/dashboard KPIs (active_7d/active_30d, geo card, language pie).
+    from login_tracking import schedule_login_tracking
+    schedule_login_tracking(user_doc["id"], request)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(user_doc)))
