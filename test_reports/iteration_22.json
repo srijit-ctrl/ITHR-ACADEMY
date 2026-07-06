@@ -1,0 +1,61 @@
+{
+  "summary": "Iter-22 acceptance testing of P2 refactor (4 large React files split into focused sub-components). Backend regression = CLEAN — 36 passed, 3 skipped (same 3 pre-existing xdist parallel-scope skips called out in the review request). Frontend Playwright: 4/5 core flows PASS, 1 REGRESSION identified in EnterprisePortal → Create-user-directly → TempCredsModal (modal never renders after successful user creation because the parent unmounts MemberList during reload, wiping the newly-set local tempCreds state). All other refactored surfaces (TryALesson, InlineTutor, AITutorPanel) behave identically to iter-21: streaming works, quick prompts work, reset works, no React key warnings, no infinite-render warnings, no non-401 console errors, DOMPurify sanitization preserved in LessonViewer.jsx / Intelligence.jsx / DemoLessonBody.jsx.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "components/enterprise/MemberList.jsx",
+        "issue": "REGRESSION from iter-22 split: TempCredsModal never renders after createUserDirect succeeds. The user IS created server-side (200 response, appears in the member list, seat count increments) but the org admin never sees the temp password — it is generated, returned, and immediately lost because the modal is unmounted before it can paint.",
+        "selector": "[data-testid=\"temp-creds-modal\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "EnterprisePortal → 'Create user directly' → temp-creds surfacing",
+        "issue": "After the split, tempCreds state lives inside MemberList (local useState). MemberList.createUserDirect() calls onReload() which triggers EnterprisePortal.load() which calls setLoading(true) synchronously. EnterprisePortal has an early-return `if (loading) return <Loader/>` at line 79 that unmounts MemberList, destroying the just-set tempCreds. When loading finishes MemberList remounts with tempCreds=null, so the modal render (line 133-135 of MemberList.jsx) never fires. Same architectural pitfall would silently break any future 'success-toast-then-reload' pattern inside a child that reload-unmounts.",
+        "affected_selectors": [
+          "[data-testid=\"temp-creds-modal\"]",
+          "[data-testid=\"temp-creds-email\"]",
+          "[data-testid=\"temp-creds-password\"]"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration15.py",
+    "/app/backend/tests/test_iteration16_analytics.py",
+    "/app/backend/tests/test_iteration21_password_reset.py",
+    "/app/test_reports/pytest/iter22_regression.xml"
+  ],
+  "action_items": [
+    "FIX (HIGH): TempCredsModal regression in MemberList.jsx. Recommended fixes, in order of preference: (a) lift `tempCreds` state UP into EnterprisePortal (pass as prop) so it survives the load()-driven remount — closest to pre-split behaviour, or (b) do a soft-reload: change EnterprisePortal.load() so it does NOT setLoading(true) on subsequent reloads (only on initial mount), or (c) move <TempCredsModal /> render outside <MemberList /> (e.g., portal it via createPortal or promote to EnterprisePortal). Option (a) is smallest diff.",
+    "OPTIONAL: consider a similar audit on any other child-owned state that must survive an onReload() cycle (e.g., toast text, wizard step, etc.). Currently the only known casualty is tempCreds, but the pattern is fragile."
+  ],
+  "critical_code_review_comments": [
+    "EnterprisePortal.jsx L34-42 — `load()` sets loading=true on EVERY invocation, not just the initial mount. Combined with the L79 early-return `<Loader />` this causes ALL descendants to unmount on every dashboard refresh. Before the iter-22 split this was cosmetically ugly but functionally OK because tempCreds/showCreateUser etc. were state on the parent. After the split, child-owned state now silently gets destroyed on reload. This is the ROOT CAUSE of the TempCredsModal bug.",
+    "MemberList.jsx L60-68 — createUserDirect() sets `tempCreds` and THEN calls `onReload()`. The order matters and is currently backwards for the split architecture: onReload triggers a parent remount that discards tempCreds. Reordering alone won't fix it (the modal would still unmount mid-render). The clean fix is to lift tempCreds out of MemberList.",
+    "MemberList.jsx L173-231 — CreateUserModal is defined as an INTERNAL sibling inside MemberList.jsx. Fine for tree-shaking, but note it is re-declared on every MemberList render (as a bare function-in-scope, not a memoised component). Since React uses reference equality on element types, this means CreateUserModal has a fresh identity per render → its internal state would reset on every keystroke IF it had any internal state. Currently it's a controlled component (state lives in the parent MemberList) so this is harmless, but a future maintainer adding a local input to CreateUserModal would hit a very confusing 'input keeps blurring' bug. Recommendation: hoist CreateUserModal + TempCredsModal to top-level in the module (they are defined AT top-level already actually — verified L173 `function CreateUserModal(...)` is a top-level declaration inside the file, so this concern is moot; keeping the note for the reviewer's awareness).",
+    "SeatEditorModal.jsx L20-27 — useEffect fires the seat-preview POST 200 ms after seatTarget changes, but there is no abort-controller for in-flight requests. If a user rapidly changes the number field, older responses could out-race newer ones and setSeatPreview would apply a stale response. Not a regression (existed pre-split) — noting for future.",
+    "TutorDrawer.jsx L17-63 — Duplicates ~40 lines of streaming state-machine logic that also lives in useTutorStream.js. The review request notes this deliberately ('no dependency on useTutorStream hook — it uses a bare AITutorPanel copy because the panel does not carry per-lesson context prepending'). Functionally correct but the two implementations can drift. Consider parameterising useTutorStream to accept an optional context-prefix builder, then delete the duplicated block. Not blocking.",
+    "useDemoLesson.js L38-89 — SSE parser correctly handles partial 'data:' chunks by pushing incomplete tail back into buffer (L69). The catch on JSON.parse (L81-83) intentionally suppresses the exception on partial chunks. Good.",
+    "DOMPurify usage — VERIFIED CORRECT in three sites: DemoLessonBody.jsx L22 (new file — sanitises replaced markdown-lite HTML), LessonViewer.jsx L137, Intelligence.jsx L260. No dangerouslySetInnerHTML found without a DOMPurify.sanitize() wrapper.",
+    "Zero React key warnings observed across all four surfaces. All .map() calls use stable keys (m.id ?? `msg-${i}`, s.heading, qp.label, member.id, member.user_id, etc.).",
+    "Zero infinite-render / 'Maximum update depth exceeded' warnings observed on any surface."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "36/36 non-skipped tests PASS (100%) across test_iteration15 + test_iteration16 + test_iteration21. 3 pre-existing skips (TestEnterpriseAdminCreateUser.* — email_validator .test-TLD issue) unchanged.",
+    "frontend": "4/5 flows PASS (80%). PASS: (1) Landing/TryALesson streaming + suggested questions + typed Send, (2) LessonViewer/InlineTutor with 3 QuickPrompts + streaming + reset + typed Send, (3) AITutorPanel launcher → drawer → welcome → send → X-close, (4) EnterprisePortal hero + StatCards + MemberList + Invite form + Manage Seats modal with live seat-preview + Sidebar (Departments, Top courses). FAIL: (5) EnterprisePortal → Create-user-directly → TempCredsModal never renders (see backend/frontend issues above)."
+  },
+  "test_credentials": "Iter22 org-admin (created fresh this run via POST /api/admin/orgs): email=cto+70763c@acmecorp70763c.com, password=!GORY&asNj1P&x, org_id=c4d92d71-a8ca-415f-9326-89290db99fdb. Super-admin used for provisioning: superadmin@ithr.tech / preview-only-rotate-in-prod (per /app/memory/test_credentials.md). Additional members created during the flow: iter22.newuser+*@acmecorp70763c.com, iter22.creds+*@acmecorp70763c.com (safe to leave — all under iter22.* prefix).",
+  "seed_data_creation": "1 new org (Iter22 Acme 70763c) with 1 admin + 2 directly-created members under the acmecorp70763c.com domain. Safe to keep for future regression runs.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter-22 = pure frontend refactor (4 large files split into focused sub-components). Backend was untouched and regression-clean. The ONE regression found is a state-lifecycle bug in the enterprise/MemberList.jsx split — root cause is EnterprisePortal.load() setting loading=true on EVERY reload, which unmounts all descendants (including MemberList) and destroys the just-set tempCreds local state before the modal can paint. The user IS created server-side (verified via network 200 + member row appearing in the reloaded list) but the admin never sees the temp password. To reproduce quickly: log in as any org owner → /enterprise/portal → 'Create user directly' → submit valid form → observe user appears in list but temp-creds-modal never shows. To verify a fix, add a Playwright check that '[data-testid=temp-creds-modal]' is visible within 5s after clicking 'submit-create-user'. Everything else on the four refactored surfaces (TryALesson, InlineTutor, AITutorPanel, EnterprisePortal-except-tempCreds) works identically to iter-21.",
+  "rca of the issue": "Root cause of the TempCredsModal regression: The iter-22 split moved `tempCreds` from a top-level useState in EnterprisePortal (pre-split, 573-line file) into a local useState inside the new MemberList.jsx (post-split). MemberList.createUserDirect() correctly setTempCreds({...}) after a successful POST, then calls onReload(). onReload() is EnterprisePortal.load() which begins with `setLoading(true)`. EnterprisePortal has an early-return at line 79 rendering `<Loader />` when loading is true — this unmounts MemberList *and its local tempCreds state* in the same render tick as the tempCreds was set. When the dashboard fetch completes ~50-500ms later, MemberList remounts with a fresh tempCreds=null, so the `{tempCreds && <TempCredsModal ... />}` render path (L133-135 of MemberList.jsx) never fires. Reproduction: 100% (deterministic). Fix options (main agent's call): (a) lift tempCreds to EnterprisePortal.jsx, pass as prop — smallest diff, closest to pre-split; (b) change EnterprisePortal.load() to a soft-reload that does NOT setLoading(true) on non-initial calls; (c) render TempCredsModal outside MemberList via createPortal. Option (a) recommended."
+}
