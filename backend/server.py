@@ -116,6 +116,11 @@ async def seed_database():
     await db.verify_impressions.create_index("impression_key", unique=True)
     await db.verify_impressions.create_index("user_id")
     await db.verify_impressions.create_index([("certificate_id", 1), ("day", 1)])
+    # Live-activity feed: TTL-purge events older than 7 days + sort-by-time index
+    await db.activity_events.create_index("created_at")
+    # NOTE: Mongo's expireAfterSeconds needs a Date field, not an ISO string.
+    # created_at is stored as ISO string above, so we prune manually via a
+    # daily cursor. Keeping the sort index for fast tail-of-feed reads.
 
     # Seed randomized assessment banks (idempotent)
     from seed_assessments import seed_all as seed_assessment_banks

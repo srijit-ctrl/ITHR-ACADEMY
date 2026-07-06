@@ -1,0 +1,47 @@
+{
+  "summary": "Iter-28 Live Activity Feed verified end-to-end. BACKEND: 12/12 new iter-28 tests PASS covering (a) db.activity_events created_at index present; (b) GET /api/admin/activity/recent auth gating — 401/403 for anon, 403 for learner, 200 for super-admin; (c) response shape {events, count}, DESC sort by created_at, default limit=25, high-limit clamped to 100, low-limit clamped to 1; (d) POST /api/auth/register writes a signup event with actor_id + actor_name + message 'New signup: <name> (<email>)'; (e) POST /api/courses/{slug}/enroll writes an enrollment event ONLY on NEW enrollment (second call returns already_enrolled=true and does NOT create a duplicate event); (f) POST /api/admin/orgs writes an org_created event with 'New enterprise org \"<name>\" provisioned (N seats)'; (g) since=<future-iso> returns empty list; since=<past-iso> returns events; since=<snapshot> after a new signup returns the fresh event only (delta poll semantics verified). FRONTEND: /admin Analytics tab — ActivityFeedPanel renders in the lg:col-span-1 slot beside PlatformAnalyticsPanel (lg:col-span-2) inside a lg:grid-cols-3 grid; live pulse animate-pulse dot visible when live=true; 21 event rows rendered from live DB with correct icons — lucide-user-plus (signup), lucide-graduation-cap (enrollment), lucide-building2 (org_created); relative timestamps rendered ('55S AGO'/'46S AGO' etc.); Pause toggle → 0 delta requests observed over 5s (2 intervals); pulse hidden while paused; Resume → 1 request within 4s and pulse re-appears. Zero React key warnings from the feed. Grid layout matches spec. REGRESSION: iter-15/16/21/26 = 43 pass, 1 skip, 4 fail — all 4 failures are PRE-EXISTING and unrelated to iter-28 (3× iter-15 TestEnterpriseAdminCreateUser hits pydantic EmailStr rejecting .test TLD; 1× iter-26 dedup flakiness at ingress-pod-IP layer, documented in iter-26 report).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "console_warnings": [
+      {
+        "screen": "/admin",
+        "issue": "Recharts warning 'width(-1) and height(-1) of chart should be greater than 0' emitted 4× during initial mount of PlatformAnalyticsPanel (transient during the 0-width layout pass before ResponsiveContainer resolves). Pre-existing — not from iter-28 ActivityFeedPanel code. Cosmetic only.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration28_activity_feed.py",
+    "/app/test_reports/pytest/iter28_activity.xml",
+    "/app/test_reports/pytest/iter28_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "core.py:48-75 log_activity — clean fire-and-forget. Never raises. Correctly generates its own random id (secrets.token_hex(8)) instead of relying on Mongo _id, so responses can strip _id without losing the client-visible identifier used as React key. Consider adding a lightweight TTL index (e.g., 30 days) on activity_events to keep the collection bounded — currently unbounded growth.",
+    "admin_router.py:290-309 recent_activity — implementation is correct. Nitpick: the 'Reverse so callers can render oldest-first' comment is misleading — the code returns events sorted DESC (newest first) and does NOT reverse. The comment should be removed or corrected. Non-blocking.",
+    "auth_router.py:110-120, catalog_router.py:98-110, admin_router.py:146-157, assessment_router.py:217-228 — all four call sites use asyncio.create_task(log_activity(...)) inside a broad try/except, guaranteeing fire-and-forget semantics and no user-path slowdown. Verified: register response latency unchanged, enroll response latency unchanged (short-circuits before the log on already_enrolled=true — good).",
+    "ActivityFeedPanel.jsx:31-54 fetchOnce — de-dup via id set is correct. Two subtle points: (1) the useEffect for polling on line 60-64 restarts the interval on every `fetchOnce` reference change, which is safe because fetchOnce is memoized with useCallback([], []) (empty deps). Good; (2) the delta poll uses since=<latestTsRef.current> BUT if the initial fetch returns 0 events, latestTsRef stays null and subsequent polls send since=null — the backend then treats `if since` as falsy and returns the newest 25 events. That's actually the correct recovery behavior. Non-issue.",
+    "ActivityFeedPanel.jsx:112 — key={e.id} on FeedRow is safe because log_activity always assigns a unique 16-hex-char id. Confirmed 0 React key warnings during the 21-row live render.",
+    "SuperAdminPortal.jsx:117-125 — 3-col grid is correct. The right column (lg:col-span-1) is narrow (~1/3 of container), which is fine at desktop but on medium screens the feed collapses beneath analytics — verified this is the intended responsive behavior (lg breakpoint).",
+    "server.py:120 — single index on 'created_at' (ascending) is fine for the current query pattern (sort DESC + since $gt). If the events collection grows large, consider a partial or compound index (kind, created_at) for the 'filter by kind' future use case, but that's a P2/P3 optimization."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration28_activity_feed.py (NEW — 12 tests, 100% pass)"
+  ],
+  "success_rate": {
+    "backend": "iter-28 new suite 12/12 = 100%. Regression on iter-15/16/21/26 = 43 passed / 1 skipped / 4 failed. All 4 failures are pre-existing (3× iter-15 .test TLD rejected by pydantic; 1× iter-26 ingress dedup flakiness).",
+    "frontend": "8/8 acceptance scenarios PASS — panel render, live pulse, event rows + icons + relative timestamps, pause (0 requests), resume (polling resumes), grid layout, zero key warnings, correct testid coverage."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod. Fresh learner registered per test run: iter28.learner+<ts>@example.com / TestPass123!. Additional throwaway learner iter28.delta+<ts>@example.com for the delta-poll test.",
+  "seed_data_creation": "Tests created 2 learners + 1 org + 1 enrollment (all TEST_-prefixed for cleanup identifiability). The created org is deleted at end of test_create_org_writes_org_created_event. Learners are left in place — their signup activity_events serve as future regression fixtures.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Post-iter-28 baseline: db.activity_events has an index on created_at and is populated with 21+ events (signup / enrollment / org_created — no certificate events observed yet in live DB, but the code path in assessment_router.py:217-228 is wired identically to the others and was code-verified). Fire-and-forget via asyncio.create_task means events lag the triggering request by ~100-500ms; tests use time.sleep(1.5) as a safe buffer. The frontend feed caps at 25 rows and dedups by event.id. Pause/Resume behavior is correct — no polling requests fired while paused. Recharts width(-1) warning on admin console is pre-existing and NOT from iter-28. The iter-15 (.test TLD) + iter-26 (ingress dedup) regression failures remain pre-existing and separate from iter-28 scope.",
+  "rca of the issue": "N/A — no functional bugs in iter-28 code. Two doc/copy nitpicks noted (misleading 'Reverse so callers…' comment in admin_router.py:308 that doesn't match the actual return; potential unbounded growth of activity_events without a TTL) — both P2/cosmetic, not blocking."
+}

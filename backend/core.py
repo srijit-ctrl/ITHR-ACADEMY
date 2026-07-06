@@ -45,6 +45,36 @@ def gen_invite_code() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(8))
 
 
+async def log_activity(
+    kind: str,
+    message: str,
+    actor_id: Optional[str] = None,
+    actor_name: Optional[str] = None,
+    target: Optional[dict] = None,
+) -> None:
+    """Record a super-admin-facing activity event.
+
+    Fire-and-forget usage: `await log_activity(...)` OR wrap in
+    `asyncio.create_task(...)`. Failures are swallowed — activity logging
+    must NEVER block the user-facing action that triggered it.
+
+    kind: one of "signup", "enrollment", "certificate", "org_created",
+          "seat_change", "verify", "digest", "other"
+    """
+    try:
+        await db.activity_events.insert_one({
+            "id": secrets.token_hex(8),
+            "kind": kind,
+            "message": message,
+            "actor_id": actor_id,
+            "actor_name": actor_name,
+            "target": target or {},
+            "created_at": now_iso(),
+        })
+    except Exception:
+        logger.exception(f"[activity] Failed to log {kind}: {message}")
+
+
 def user_to_public(doc: dict) -> dict:
     return {
         "id": doc["id"],

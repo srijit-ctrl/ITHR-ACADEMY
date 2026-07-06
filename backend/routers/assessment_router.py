@@ -213,6 +213,19 @@ async def _issue_certificate_if_new(
     except Exception:
         # never block cert issuance on email
         pass
+
+    # Live activity feed
+    try:
+        import asyncio as _asyncio
+        from core import log_activity
+        _asyncio.create_task(log_activity(
+            kind="certificate",
+            message=f'{user["full_name"]} earned "{course["title"]}" ({round(score, 0):.0f}%)',
+            actor_id=user_id, actor_name=user["full_name"],
+            target={"certificate_id": cert_obj.certificate_id, "course_slug": course.get("slug")},
+        ))
+    except Exception:
+        pass
     # If this is the founder's free-cert course, flag it as claimed so future
     # certs on other courses are billable as usual.
     try:

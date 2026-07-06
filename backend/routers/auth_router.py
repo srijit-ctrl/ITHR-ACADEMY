@@ -107,6 +107,18 @@ async def register(payload: UserRegister, response: Response):
     except Exception:
         logger.exception("Welcome-email dispatch failed (non-fatal)")
 
+    # Log to the super-admin live activity feed (fire-and-forget).
+    try:
+        from core import log_activity
+        import asyncio as _asyncio
+        _asyncio.create_task(log_activity(
+            kind="signup",
+            message=f"New signup: {doc['full_name']} ({doc['email']})",
+            actor_id=user_id, actor_name=doc.get("full_name"),
+        ))
+    except Exception:
+        logger.exception("Activity-log dispatch failed (non-fatal)")
+
     access = create_access_token(user_id, doc["email"], doc["role"])
     _set_refresh_cookie(response, user_id)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))

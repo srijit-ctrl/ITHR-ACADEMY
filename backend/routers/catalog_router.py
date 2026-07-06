@@ -94,6 +94,21 @@ async def enroll(slug: str, user_id: str = Depends(get_current_user_id)):
         await claim_first_course(user_id, course["id"])
     except Exception:
         pass
+
+    # Live activity feed
+    try:
+        import asyncio as _asyncio
+        from core import log_activity
+        u = await db.users.find_one({"id": user_id}, {"_id": 0, "full_name": 1})
+        _asyncio.create_task(log_activity(
+            kind="enrollment",
+            message=f'{(u or {}).get("full_name", "A learner")} enrolled in "{course["title"]}"',
+            actor_id=user_id, actor_name=(u or {}).get("full_name"),
+            target={"course_slug": slug},
+        ))
+    except Exception:
+        pass
+
     return {"enrollment_id": enrollment.id, "already_enrolled": False}
 
 

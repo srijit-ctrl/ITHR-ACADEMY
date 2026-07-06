@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, BarChart3, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { PlatformAnalyticsPanel } from "@/components/AnalyticsPanels";
+import ActivityFeedPanel from "@/components/admin/ActivityFeedPanel";
 
 /**
  * Super-Admin console.
@@ -112,7 +113,16 @@ export default function SuperAdminPortal() {
                     <TabButton active={tab === "emails"} onClick={() => setTab("emails")} label="Send email" count={""} testId="tab-emails" />
                 </div>
 
-                {tab === "analytics" && <PlatformAnalyticsPanel />}
+                {tab === "analytics" && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2">
+                            <PlatformAnalyticsPanel />
+                        </div>
+                        <div className="lg:col-span-1">
+                            <ActivityFeedPanel />
+                        </div>
+                    </div>
+                )}
 
                 {tab === "orgs" && (
                     <div>

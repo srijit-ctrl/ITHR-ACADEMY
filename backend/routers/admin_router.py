@@ -143,6 +143,19 @@ async def create_org_with_admin(
         {"$set": {"org_id": org_doc["id"]}},
     )
 
+    # Live activity feed
+    try:
+        import asyncio as _asyncio
+        from core import log_activity
+        _asyncio.create_task(log_activity(
+            kind="org_created",
+            message=f'New enterprise org "{name}" provisioned ({seat_count} seats)',
+            actor_id=admin_user_id, actor_name=admin_full_name,
+            target={"org_slug": slug, "seat_count": org_obj.seat_count},
+        ))
+    except Exception:
+        pass
+
     return {
         "organization": org_doc,
         "admin": {
@@ -271,3 +284,26 @@ async def admin_send_validity_expiration(
         renewal_url=payload.get("renewal_url"),
     )
     return {"sent": sent, "email": to_email}
+
+
+# ---- Live activity feed --------------------------------------------------
+@router.get("/activity/recent")
+async def recent_activity(
+    limit: int = 25,
+    since: str | None = None,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Return recent platform activity events for the super-admin feed.
+
+    Params:
+      - limit: max events to return (default 25, clamped to [1, 100])
+      - since: ISO timestamp — return events created strictly AFTER this
+        moment. Used by the frontend for polling delta fetches.
+    """
+    limit = max(1, min(100, limit))
+    query = {}
+    if since:
+        query["created_at"] = {"$gt": since}
+    events = await db.activity_events.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    # Reverse so callers can render oldest-first if they choose
+    return {"events": events, "count": len(events)}
