@@ -444,10 +444,47 @@ Per-user request: split all 4 large React files into focused sub-components. Beh
 **Resend domain verification — status: PENDING USER ACTION**
 - User owns `ithr.tech` and wants sender `no-reply@ithr.tech`. User must add SPF + DKIM DNS records at their DNS provider (Resend will show the exact records once they add the domain at https://resend.com/domains). Once verified, agent will swap `SENDER_EMAIL` in `backend/.env` — zero code change needed.
 
+### Iteration 24 — Resend Domain Live + Palette + CertificateTutor + 3 Emails (Feb 2026)
+
+- `SENDER_EMAIL` flipped to `no-reply@ithr.tech` (ithr.tech domain verified in Resend).
+- WeasyPrint PDF template palette locked to ITHR brand: Ink #16335E (Navy), Teal #00A78B, Gold #C5A253 for ceremonial trim only. QR ink color = Navy.
+- `CertificateTutor` widget: post-cert "Ask Aletheia" panel on `/certificate/<id>` — 3 quick-ask buttons + streaming chat, reuses `useTutorStream` hook.
+- New `backend/email_service.py` — shared Resend wrapper with `_wrap()` common shell (Navy header + Teal CTA button + ITHR footer). Three initial templates: **welcome** (on signup), **cert-earned** (on cert issuance), **org-invite** (on POST /organizations/invites). All fire-and-forget via `asyncio.create_task`, never block the API.
+
+### Iteration 25 — 4 More Emails + DB Cleanup (Feb 2026)
+
+**7 total email templates now live** (4 automated + 2 manual + 1 alert):
+- **Auto**: welcome, cert-earned, org-invite, payment-confirmation
+- **Manual (super-admin driven)**: complaint response, validity expiration
+- **Alert**: credential verification (fires when anyone visits `/api/certificates/verify/<id>`; 6-hour throttle per cert; SAMPLE cert suppressed; verifier IP is SHA-256 hashed)
+
+**Purge tool** — `backend/purge_test_data.py`:
+- Dry-run + confirm modes.
+- Cascade delete: users → org_members, enrollments, certificates (SAMPLE preserved), quiz_attempts, mentor_sessions, org_invites, payment_transactions, password_reset_tokens.
+- Also drops orgs where 100% of remaining members are victims.
+- Protected: superadmin@ithr.tech + any --keep-email list.
+- **Result**: 555 test users purged. Baseline was 610 users → after purge: 55 real users, 25 orgs, 1 cert (SAMPLE preserved).
+
+**Super Admin console updates:**
+- New "Send email" tab hosts `EmailDispatchPanel` — form with Complaint / Expiration toggle. Fills recipient email + ticket-ref/response OR credential-name/expires-on → POST /api/admin/emails/*.
+- StatCards + Analytics tab now show real-time DB counts (25 orgs / 55 users / 1 cert / 640 seats), no dummy inflation.
+
+**New backend endpoints:**
+- `POST /api/admin/emails/complaint-response` (super-admin) — {email, ticket_ref, response_text, agent_name?, full_name?}.
+- `POST /api/admin/emails/validity-expiration` (super-admin) — {email, credential_or_plan, expires_on, renewal_url?, full_name?}.
+
+**Testing verdict (iteration_25.json):**
+- Backend: **10/10 new** (100%) + regression 42/42 (100%). Zero regressions.
+- Frontend: **5/5** (100%) — Send-email tab renders, panel toggles, form fill+send fires resend log line.
+- All 5 dispatch paths captured real Resend IDs (support, expiration, welcome, cert, invite, payment, verify-alert).
+
+**Deferred (not urgent, but tracked):**
+- `seed_ai_course.py` — AI-generated 15-module curricula for the 14 remaining stub courses. Script exists + is lint-clean; live run against 1 course timed out at 2min (Claude Sonnet 4.5 needs longer for full 15×5 lessons — will run async in a follow-up session).
+- Sora 2 intro videos for the 14 stub courses (deferred with course pipeline).
+
 **Backlog (P1/P2) — unchanged**
 - P1: Stripe webhook proration hardening during seat adjustments.
-- P2: WeasyPrint PDF + Print CSS palette → ITHR Teal/Navy.
-- P2: Additional transactional emails (welcome / cert-earned / org-invite) — same Resend plumbing.
+- P2: `seed_ai_course` live run + Sora 2 intro videos (deferred multi-session task).
 - P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 
 
