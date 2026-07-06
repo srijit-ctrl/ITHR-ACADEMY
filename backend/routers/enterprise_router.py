@@ -445,7 +445,20 @@ async def update_seats(payload: dict, request: Request, user_id: str = Depends(g
 
 @router.post("/organizations/seats/fulfill/{session_id}")
 async def fulfill_seat_increment(session_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
-    """Called by the client on redirect back to portal — verifies checkout and bumps seat count."""
+    """Called by the client on redirect back to portal — verifies checkout and bumps seat count.
+
+    Hardening (iter-29):
+      - Atomic "claim" via find_one_and_update so concurrent calls can't
+        double-fulfill even if Stripe/webhook + client-redirect race.
+      - Verifies the amount actually paid at Stripe matches the amount we
+        recorded when creating the session (defence against session-metadata
+        tampering).
+      - Never lets the fulfilled seat_count fall below the org's current
+        seats_used (someone may have removed a member between checkout
+        creation and payment completion — a decrease would leave dangling
+        members).
+      - Emits an activity event so the fulfillment shows up in the live feed.
+    """
     org, member = await _resolve_org_for_user(user_id, require_admin=True)
     if member["role"] != "owner":
         raise HTTPException(status_code=403, detail="Only the owner may fulfill seat purchases")
@@ -456,10 +469,11 @@ async def fulfill_seat_increment(session_id: str, request: Request, user_id: str
     if txn.get("org_id") != org["id"]:
         raise HTTPException(status_code=403, detail="This transaction does not belong to your org")
 
+    # Fast-path idempotency: already fulfilled → return current state.
     if txn.get("payment_status") == "paid" and txn.get("fulfilled_at"):
         return {"already_fulfilled": True, "seat_count": org.get("seat_count")}
 
-    from core import get_stripe
+    from core import get_stripe, log_activity
     stripe = get_stripe(request)
     try:
         status_resp = await stripe.get_checkout_status(session_id)
@@ -467,29 +481,84 @@ async def fulfill_seat_increment(session_id: str, request: Request, user_id: str
         logger.exception("Stripe seat-increment status failed")
         raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
 
-    updates = {"payment_status": status_resp.payment_status, "status": status_resp.status, "updated_at": now_iso()}
-    if status_resp.payment_status == "paid":
-        new_count = int(txn["target_seat_count"])
-        await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": new_count}})
-        await db.org_billing_events.insert_one({
-            "id": uuid.uuid4().hex,
-            "org_id": org["id"],
-            "type": "seat_increment_paid",
-            "seats_added": int(txn["seats_delta"]),
-            "amount": txn["amount"],
-            "currency": txn["currency"],
-            "session_id": session_id,
-            "created_at": now_iso(),
-        })
-        updates["fulfilled_at"] = now_iso()
-        org["seat_count"] = new_count
+    if status_resp.payment_status != "paid":
+        # Not yet paid — just refresh the txn status so the client sees it.
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"payment_status": status_resp.payment_status, "status": status_resp.status, "updated_at": now_iso()}},
+        )
+        return {"fulfilled": False, "payment_status": status_resp.payment_status, "seat_count": org.get("seat_count")}
 
-    await db.payment_transactions.update_one({"session_id": session_id}, {"$set": updates})
-    return {
-        "fulfilled": status_resp.payment_status == "paid",
-        "payment_status": status_resp.payment_status,
-        "seat_count": org.get("seat_count"),
-    }
+    # Amount tampering defence: compare paid amount vs recorded expectation.
+    # Stripe SDK exposes amount_total in cents; our txn.amount is in dollars.
+    paid_cents = getattr(status_resp, "amount_total", None)
+    expected_cents = int(round(float(txn["amount"]) * 100))
+    if paid_cents is not None and paid_cents != expected_cents:
+        logger.error(
+            f"[fulfill] Amount mismatch session={session_id} "
+            f"paid_cents={paid_cents} expected_cents={expected_cents}"
+        )
+        raise HTTPException(status_code=409, detail="Payment amount does not match transaction record")
+
+    # Downgrade-guard: never let the fulfilled seat_count drop below seats_used.
+    current_used = org.get("seats_used", 0)
+    target = int(txn["target_seat_count"])
+    if target < current_used:
+        # Someone must have added members via a different path — bump the
+        # target to at least seats_used so we don't leave orphans.
+        logger.warning(
+            f"[fulfill] target_seat_count {target} < seats_used {current_used}; using seats_used"
+        )
+        target = current_used
+
+    # Atomic "claim" — only the first caller to flip status→paid + set fulfilled_at wins.
+    claimed = await db.payment_transactions.find_one_and_update(
+        {
+            "session_id": session_id,
+            "$or": [
+                {"payment_status": {"$ne": "paid"}},
+                {"fulfilled_at": {"$exists": False}},
+            ],
+        },
+        {"$set": {
+            "payment_status": "paid",
+            "status": status_resp.status,
+            "fulfilled_at": now_iso(),
+            "updated_at": now_iso(),
+            "verified_paid_cents": paid_cents,
+        }},
+        return_document=True,
+    )
+    if not claimed:
+        # Another concurrent call fulfilled first — return the current state.
+        fresh_org = await db.organizations.find_one({"id": org["id"]}, {"_id": 0, "seat_count": 1})
+        return {"already_fulfilled": True, "seat_count": (fresh_org or {}).get("seat_count")}
+
+    await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": target}})
+    await db.org_billing_events.insert_one({
+        "id": uuid.uuid4().hex,
+        "org_id": org["id"],
+        "type": "seat_increment_paid",
+        "seats_added": int(txn["seats_delta"]),
+        "amount": txn["amount"],
+        "currency": txn["currency"],
+        "session_id": session_id,
+        "created_at": now_iso(),
+    })
+
+    # Activity feed
+    try:
+        import asyncio as _asyncio
+        _asyncio.create_task(log_activity(
+            kind="seat_change",
+            message=f'{org["name"]} added {int(txn["seats_delta"])} seats (now {target})',
+            actor_id=user_id,
+            target={"org_slug": org.get("slug"), "seat_count": target, "amount": txn["amount"]},
+        ))
+    except Exception:
+        pass
+
+    return {"fulfilled": True, "payment_status": "paid", "seat_count": target}
 
 
 @router.get("/organizations/billing")

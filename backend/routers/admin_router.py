@@ -307,3 +307,43 @@ async def recent_activity(
     events = await db.activity_events.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     # Reverse so callers can render oldest-first if they choose
     return {"events": events, "count": len(events)}
+
+
+# ---- Weekly digest runners -----------------------------------------------
+@router.post("/digests/impressions/run")
+async def run_impressions_digest_endpoint(
+    dry_run: bool = False,
+    window_days: int = 7,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Manually run the credential-impressions weekly digest.
+
+    Idempotent within a 6-day window per user, so safe to re-run.
+    Set ?dry_run=true to see the pool without sending.
+    """
+    from digest_jobs import run_impressions_digest
+    window_days = max(1, min(30, window_days))
+    return await run_impressions_digest(dry_run=dry_run, window_days=window_days)
+
+
+# ---- AI course-content generation status ---------------------------------
+@router.get("/courses/content-status")
+async def courses_content_status(_super_admin_id: str = Depends(get_current_super_admin)):
+    """Return per-course content status so admins can see which courses
+    have full curricula vs stubs. Used to drive the AI pipeline decisions."""
+    courses = await db.courses.find(
+        {},
+        {"_id": 0, "slug": 1, "title": 1, "has_full_content": 1, "content_generated_at": 1, "duration_hours": 1},
+    ).sort("slug", 1).to_list(200)
+    with_content = [c for c in courses if c.get("has_full_content")]
+    stubs = [c for c in courses if not c.get("has_full_content")]
+    return {
+        "total": len(courses),
+        "with_content": len(with_content),
+        "stubs": len(stubs),
+        "stub_slugs": [c["slug"] for c in stubs],
+        "recently_generated": sorted(
+            [c for c in courses if c.get("content_generated_at")],
+            key=lambda c: c["content_generated_at"], reverse=True,
+        )[:5],
+    }

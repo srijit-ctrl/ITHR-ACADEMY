@@ -373,3 +373,59 @@ async def send_credential_verification_alert(
         f"View public record: {verify_url}\nAI Skills Passport: {passport_url}\n\n— ITHR Academy"
     )
     return await _fire(email, f'Your "{course_title}" credential was just verified', html, text, tag="verify-alert")
+
+
+# ---- Weekly credential-impressions digest --------------------------------
+
+
+async def send_impressions_digest_email(
+    email: str, full_name: str, week_impressions: int, top_credentials: list[dict],
+) -> bool:
+    """Weekly summary of credential verifications for a learner.
+
+    Only send when week_impressions >= 1 — no zero-value emails.
+    top_credentials: list of {course_title, impressions} sorted desc.
+    """
+    if week_impressions < 1:
+        return False
+    name = _safe(full_name or "there")
+    passport_url = f"{FRONTEND_URL}/passport"
+    dash_url = f"{FRONTEND_URL}/dashboard"
+
+    rows_html = "".join(
+        f'<tr><td style="padding:8px 0;border-bottom:1px solid #E5E7EB;font-size:14px;color:#16335E;">{_safe(c.get("course_title",""))}</td>'
+        f'<td style="padding:8px 0;border-bottom:1px solid #E5E7EB;font-size:14px;text-align:right;font-family:monospace;color:#00A78B;">{int(c.get("impressions", 0))}×</td></tr>'
+        for c in (top_credentials[:5] or [])
+    ) or '<tr><td colspan="2" style="padding:12px 0;font-size:13px;color:#6b7280;">—</td></tr>'
+
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Your credentials were verified <b style="color:#00A78B;">{week_impressions} time{'s' if week_impressions != 1 else ''}</b> this week — typically that means recruiters, hiring managers, or partners are checking your qualifications. Great signal of professional interest.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-radius:6px;margin:8px 0;">
+  <tr>
+    <td style="padding:6px 16px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;">Most-verified this week</td>
+    <td style="padding:6px 16px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;text-align:right;">Verifies</td>
+  </tr>
+  <tr><td colspan="2" style="padding:0 16px 12px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">{rows_html}</table></td></tr>
+</table>
+<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:14px 0 0 0;">
+  Perfect time to double-check that your <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a> and public profile reflect your latest credentials.
+</p>
+"""
+    html = _wrap(
+        kicker="Weekly Credential Report · ITHR Academy",
+        heading=f"{week_impressions} verification{'s' if week_impressions != 1 else ''} this week.",
+        body_html=body,
+        cta_label="View my passport",
+        cta_url=passport_url,
+        footer_note=f"To pause these weekly summaries, adjust your notification settings at {dash_url}/settings.",
+    )
+    text = (
+        f"Hi {name},\n\n"
+        f"Your credentials were verified {week_impressions} time(s) this past week.\n\n"
+        + "\n".join(f'  {c.get("course_title","?")} — {c.get("impressions",0)}×' for c in (top_credentials[:5] or []))
+        + f"\n\nPassport: {passport_url}\n\n— ITHR Academy"
+    )
+    return await _fire(email, f"You had {week_impressions} credential verification(s) this week", html, text, tag="digest-impressions")

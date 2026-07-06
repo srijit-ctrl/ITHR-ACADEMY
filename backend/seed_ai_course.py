@@ -209,11 +209,13 @@ async def generate_all(dry_run: bool = False, force: bool = False) -> None:
     cursor = db.courses.find(query, {"slug": 1, "title": 1, "_id": 0})
     slugs = [c["slug"] async for c in cursor]
     log.info(f"Batch generation for {len(slugs)} courses: {slugs}")
-    for slug in slugs:
+    for idx, slug in enumerate(slugs, start=1):
+        log.info(f"=== ({idx}/{len(slugs)}) {slug} ===")
         try:
             await generate_for_slug(slug, dry_run=dry_run, force=force)
         except Exception as e:
             log.exception(f"[{slug}] Fatal error during generation: {e}")
+    log.info(f"=== Batch generation complete: {len(slugs)} courses processed. ===")
 
 
 def main():
