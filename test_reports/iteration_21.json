@@ -1,0 +1,48 @@
+{
+  "summary": "Iter-21 acceptance testing of NEW password reset feature (forgot-password + reset-password via Resend). Backend: 10/10 pytest PASS covering (a) forgot-password happy path with token row inserted + SHA-256 hash + expires_at + user_id linkage, (b) unknown email returns identical generic 200 with NO row inserted (no enumeration leak), (c) malformed email → 422 pydantic EmailStr, (d) rate-limit silent throttle — 8 rapid requests all return 200 but only 3 new rows (email-per-hour cap = 3), (e) reset-password happy path where old password login returns 401 AND new password login returns 200 with fresh JWT AND token row is marked consumed=true + consumed_at set, (f) expired token → 400 with 'expired' in detail, (g) consumed-token reuse → 400 with 'invalid or has already been used', (h) totally-bogus token → 400, (i) new_password shorter than 8 chars → 422, (j) MongoDB indexes verified: unique on token_hash, TTL with expireAfterSeconds=0 on expires_at, plus index on user_id. Frontend: 3/3 flows PASS — /forgot-password (submit disabled until email typed → success screen quoting user email → 'Back to sign in' navigates to /login), /login (data-testid='login-forgot-password' exists next to Password label and navigates to /forgot-password), /reset-password (two-password form with live 4-rule validation, all 4 rules turn text-success green when length≥8 + uppercase + digit + match, submit enabled only then), and the FULL E2E happy path — seeded a real DB token, visited /reset-password?token=<raw>, submitted NewPass123!, saw 'You're all set. Redirecting you to sign in…' screen, auto-redirected to /login within 2.5s, and the green login-reset-banner 'Your password has been reset. Sign in with your new password.' rendered correctly. ZERO non-401 console errors across all UI tests. Resend sandbox restriction (only srijit@ithr360.com accepted) is documented and NOT flagged as a bug per the review request.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration21_password_reset.py",
+    "/app/test_reports/pytest/iter21_password_reset.xml"
+  ],
+  "action_items": [
+    "None — feature is production-ready under the documented Resend sandbox constraint (verify a domain in Resend to unlock outbound delivery to arbitrary recipients).",
+    "OPTIONAL: consider setting COOKIE_SAMESITE consistently and verify emails receive the branded HTML in production (only owner email currently receives during sandbox mode)."
+  ],
+  "critical_code_review_comments": [
+    "password_reset_router.py — CORRECT: Uses secrets.token_urlsafe(32) for token entropy and stores only SHA-256 hex; raw token is only ever in the email. Even a DB dump cannot reveal usable reset tokens.",
+    "password_reset_router.py — CORRECT: forgot-password always returns identical {'ok': True, 'message': 'If an account exists...'} shape for existing user, unknown user, Google-auth user, AND rate-limited callers. No response-shape or response-time leak (rate limit is checked BEFORE the user lookup so a probe cannot even distinguish rate-limited-vs-not from timing).",
+    "password_reset_router.py — CORRECT: reset-password uses expires_at datetime normalisation for both tz-naive (Mongo BSON) and tz-aware (test-seeded ISO string) cases. This defends against the classic 'naive datetime crashes < aware datetime' TypeError.",
+    "password_reset_router.py — CORRECT: On successful reset, both the used token AND any OTHER outstanding tokens for the same user are invalidated ('reset_completed' reason). This closes the reuse loophole where a user could have multiple pending reset links.",
+    "password_reset_router.py — CORRECT: Resend send is wrapped in asyncio.to_thread + try/except that logs.exception; NEVER raises. So a Resend outage or sandbox-rejection can never leak a 500 to the client.",
+    "server.py — CORRECT: Password-reset TTL index uses expireAfterSeconds=0 with a datetime field, which is the canonical MongoDB TTL pattern. TTL scanner runs every ~60s so expired rows self-purge with no manual sweeper.",
+    "ForgotPassword.jsx — CORRECT: Submit button disabled={loading || !email.trim()} so a whitespace-only email can't fire a request. Success screen deliberately shows the SAME UI regardless of whether the account exists (matches backend enumeration-safe semantics).",
+    "ResetPassword.jsx — CORRECT: All 4 rules (length, upper, digit, match) enforced client-side AND submit is disabled when any is unsatisfied OR token param is missing. Client validation is a UX nicety; the backend 8-char min_length pydantic Field is the actual security control.",
+    "ResetPassword.jsx — CORRECT: On success, navigates via <router-state> passwordReset=true so the Login page shows the reset banner. This avoids a query-string secret that could be indexed by an analytics tool.",
+    "Login.jsx — CORRECT: data-testid='login-forgot-password' is on the small 'Forgot?' link next to Password. Location.state.passwordReset consumption is one-shot (banner disappears on next navigation) — no stale banner UX.",
+    "MINOR observation (not a bug): The Reset Password page uses `text-brand` (teal) for error text on brand/5 background. It is legible but not the semantic 'danger' colour some designers might expect. Consistent with the rest of the app's error style, so leave as-is unless a design pass changes the global error palette.",
+    "MINOR observation (not a bug): Rate limit is per-worker if run without a shared Mongo counter — but since this DOES use Mongo (pw_reset_rate collection), it survives worker restarts and is worker-agnostic. Good design."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration21_password_reset.py (new — 10 tests)",
+    "/app/memory/test_credentials.md (added 'Password Reset (Iter 21)' section with endpoints, DB schema, seeding recipe, and rate-limit reset command)"
+  ],
+  "success_rate": {
+    "backend": "10/10 (100%) on /app/backend/tests/test_iteration21_password_reset.py",
+    "frontend": "4/4 flows PASS (100%): /forgot-password form + success + back-to-login, /login → Forgot? link, /reset-password form + live rule validation, and the full E2E reset → auto-redirect → login banner."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod. Fresh iter21 users registered per-run: iter21.reset+<ms>@example.com / OldPass123! (rotated to NewPass123! during the reset-password happy path). Additional E2E user: iter21.e2e+<ms>@example.com. All under iter21.* naming — safe to leave in DB.",
+  "seed_data_creation": "1 module-scoped user per test-run (iter21.reset+<ms>@example.com) plus 1 unknown-email probe (never inserted). 4+ transient password_reset_tokens rows per run (happy/expired/consumed/misc) — the TTL index will auto-purge the expired ones and the consumed ones remain as an audit trail. Rate-limit test wipes pw_reset_rate between tests via delete_many.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter-21 delivers the password-reset feature end-to-end. /app/backend/tests/test_iteration21_password_reset.py is a hermetic 10-test regression suite (uses SYNC pymongo to avoid the motor+xdist event-loop-closed issue that bit the first attempt). To re-run just this suite: `cd /app/backend && python -m pytest tests/test_iteration21_password_reset.py -v`. Resend outbound delivery is LIVE but sandbox-restricted — the test suite deliberately does not assert on Resend delivery, only on the DB side effects. To E2E-test the reset-password page in the browser, seed a token as shown in test_iteration21_password_reset.py::TestResetPassword::test_reset_happy_path and visit /reset-password?token=<raw>.",
+  "rca of the issue": "N/A — no bugs found. Feature is behaviour-correct per the review request. First test-run attempt failed with 'Event loop is closed' when combining motor (async Mongo) + pytest-xdist loadscope + module-scoped fixtures; fixed by switching the test file to sync pymongo. The password_reset_router.py itself uses async motor correctly under FastAPI's own event loop — the sync client is a TEST-ONLY convenience."
+}

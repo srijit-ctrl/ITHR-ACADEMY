@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function googleSignIn() {
@@ -17,6 +17,7 @@ export default function Login() {
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
+    const showPasswordResetBanner = location.state?.passwordReset === true;
 
     const submit = async (e) => {
         e.preventDefault();
@@ -39,6 +40,13 @@ export default function Login() {
                 <div className="overline mb-4">Welcome back</div>
                 <h1 className="font-serif text-4xl tracking-tighter leading-none mb-3">Sign in</h1>
                 <p className="text-muted-foreground mb-8">Access your dashboard, courses, and certifications.</p>
+
+                {showPasswordResetBanner && (
+                    <div data-testid="login-reset-banner" className="flex items-start gap-2 text-sm text-success bg-success/5 border border-success/20 rounded-sm px-4 py-2.5 mb-6">
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>Your password has been reset. Sign in with your new password.</span>
+                    </div>
+                )}
 
                 <button
                     onClick={googleSignIn}
@@ -70,7 +78,16 @@ export default function Login() {
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground block mb-2">Password</label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">Password</label>
+                            <Link
+                                to="/forgot-password"
+                                data-testid="login-forgot-password"
+                                className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand hover:underline"
+                            >
+                                Forgot?
+                            </Link>
+                        </div>
                         <input
                             type="password"
                             value={password}

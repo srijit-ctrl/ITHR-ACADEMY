@@ -13,7 +13,7 @@ from core import db, logger, mongo_client, now_iso
 from routers import (
     admin_router, assessment_router, auth_router, catalog_router, checkout_router,
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
-    mentor_router, passport_router, paths_router,
+    mentor_router, passport_router, password_reset_router, paths_router,
     recommendation_router, trust_router, tutor_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
@@ -107,6 +107,10 @@ async def seed_database():
     await db.org_members.create_index([("org_id", 1), ("user_id", 1)], unique=True)
     await db.rec_rationales.create_index("key", unique=True)
     await db.users.create_index("passport_slug", unique=True, sparse=True)
+    # Password-reset tokens: TTL auto-purge + fast lookup by hash
+    await db.password_reset_tokens.create_index("token_hash", unique=True)
+    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.password_reset_tokens.create_index("user_id")
 
     # Seed randomized assessment banks (idempotent)
     from seed_assessments import seed_all as seed_assessment_banks
@@ -123,6 +127,7 @@ async def seed_database():
 for r in (
     dashboard_router.router,  # health/root first
     auth_router.router,
+    password_reset_router.router,
     catalog_router.router,
     assessment_router.router,
     tutor_router.router,
