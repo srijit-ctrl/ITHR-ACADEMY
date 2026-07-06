@@ -170,11 +170,20 @@ async def create_org_with_admin(
 
 @router.get("/orgs")
 async def list_all_orgs(_super_admin_id: str = Depends(get_current_super_admin)):
-    orgs = await db.organizations.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
-    # Attach live member count in a single aggregation
-    for org in orgs:
-        member_count = await db.org_members.count_documents({"org_id": org["id"]})
-        org["seats_used"] = member_count
+    # Single aggregation: fetch orgs + live member counts in one round-trip.
+    pipeline = [
+        {"$sort": {"created_at": -1}},
+        {"$limit": 500},
+        {"$lookup": {
+            "from": "org_members",
+            "localField": "id",
+            "foreignField": "org_id",
+            "as": "_members",
+        }},
+        {"$addFields": {"seats_used": {"$size": "$_members"}}},
+        {"$project": {"_id": 0, "_members": 0}},
+    ]
+    orgs = await db.organizations.aggregate(pipeline).to_list(500)
     return {"organizations": orgs, "total": len(orgs)}
 
 
