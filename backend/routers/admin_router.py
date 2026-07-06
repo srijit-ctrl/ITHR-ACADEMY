@@ -386,6 +386,31 @@ async def export_activity_csv(
     )
 
 
+# ---- Cache management (super-admin ops) -----------------------------------
+@router.get("/cache/stats")
+async def cache_stats(_super_admin_id: str = Depends(get_current_super_admin)):
+    """Return light diagnostics of the in-process TTL cache."""
+    from core_cache import stats
+    return stats()
+
+
+@router.post("/cache/purge")
+async def cache_purge(
+    prefix: str | None = None,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Drop cache entries. Nuclear (no prefix) or scoped to a key_prefix.
+
+    Known prefixes:
+      - platform_analytics — /api/admin/analytics
+      - org_analytics — /api/enterprise/organizations/analytics
+      - catalog_courses — /api/courses list
+    """
+    from core_cache import bust
+    dropped = bust(prefix=prefix)
+    return {"dropped": dropped, "prefix": prefix}
+
+
 # ---- Weekly digest runners -----------------------------------------------
 @router.post("/digests/impressions/run")
 async def run_impressions_digest_endpoint(

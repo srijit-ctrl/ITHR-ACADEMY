@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from core import db
+from core_cache import cached
 
 # ---- date helpers ----------------------------------------------------------
 
@@ -153,7 +154,16 @@ async def _day_series_via_aggregation(
 
 
 async def platform_analytics(days: int = 30) -> dict:
-    """Return aggregated metrics for the super-admin console."""
+    """Return aggregated metrics for the super-admin console.
+
+    Cached (120s TTL, keyed by `days`). Callers who need a fresh number
+    should hit `POST /api/admin/cache/purge?prefix=platform_analytics`.
+    """
+    return await _platform_analytics_uncached(days)
+
+
+@cached(ttl_seconds=120, key_prefix="platform_analytics")
+async def _platform_analytics_uncached(days: int = 30) -> dict:
     _start, labels = _daterange(days)
     start_iso = _start.isoformat()
 
@@ -263,7 +273,15 @@ def _org_funnel(all_enrollments: list[dict], all_certs: list[dict]) -> list[dict
 
 
 async def org_analytics(org_id: str, days: int = 30) -> dict:
-    """Return aggregated metrics for a single org's admin dashboard."""
+    """Return aggregated metrics for a single org's admin dashboard.
+
+    Cached (90s TTL, keyed by (org_id, days)).
+    """
+    return await _org_analytics_uncached(org_id, days)
+
+
+@cached(ttl_seconds=90, key_prefix="org_analytics")
+async def _org_analytics_uncached(org_id: str, days: int = 30) -> dict:
     start, labels = _daterange(days)
     start_iso = start.isoformat()
 

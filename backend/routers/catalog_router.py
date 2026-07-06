@@ -6,10 +6,22 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
 from core import compute_freshness, db, now_iso
+from core_cache import cached
 from models import Course, CourseSummary, Enrollment, LessonCompleteRequest
 from seed_data import CATEGORIES, CERTIFICATION_PATHS, INDUSTRIES
 
 router = APIRouter(prefix="/api", tags=["catalog"])
+
+
+@cached(ttl_seconds=180, key_prefix="catalog_courses")
+async def _cached_course_docs(query_key: str, query: dict) -> list[dict]:
+    """Cached fetch of course docs matching a filter.
+
+    `query_key` is passed as a deterministic string to the decorator so
+    dict-value queries key correctly (dicts aren't hashable for cache keys
+    but the caller pre-serializes to a stable string).
+    """
+    return await db.courses.find(query, {"_id": 0}).to_list(200)
 
 
 @router.get("/catalog/industries")
@@ -47,7 +59,10 @@ async def list_courses(
             {"subtitle": {"$regex": q, "$options": "i"}},
             {"category": {"$regex": q, "$options": "i"}},
         ]
-    docs = await db.courses.find(query, {"_id": 0}).to_list(200)
+    # Stable string key so the cache decorator can hash it
+    import json as _json
+    query_key = _json.dumps(query, sort_keys=True, default=str)
+    docs = await _cached_course_docs(query_key, query)
     out = []
     for d in docs:
         score, days = compute_freshness(d)
