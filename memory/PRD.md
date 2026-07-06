@@ -385,8 +385,40 @@ Second-round fixes from the follow-up Code Review. Focus on **real** issues; the
 - Complexity refactors of `TryALesson.jsx` / `InlineTutor.jsx` / `AITutorPanel.jsx` / `EnterprisePortal.jsx` — high regression risk, no behavioural benefit. Deferred as P2 tech-debt.
 - `assessment_router.py::random` — used with an explicit user-visible seed for **reproducible** shuffling (documented design choice), not for security tokens. Safe as-is.
 
-**Testing verdict (iteration_20.json):**
-- Backend: **14/14 (100%)** on new refactor suite (`test_iteration20_refactors.py`), 26/29 on iter-15+iter-16 baseline (3 failures are the SAME pre-existing `.test`-TLD email_validator issue documented for 5+ iterations).
-- Frontend: **5/5 (100%)** — Landing, Catalog, CourseDetail, Intelligence, SuperAdmin. Zero React key warnings, zero non-401 console errors, zero infinite re-render warnings.
+### Iteration 21 — Password Reset via Resend (Feb 2026)
+
+New forgot-password / reset-password flow with real transactional email delivery.
+
+**Backend** — new router `/app/backend/routers/password_reset_router.py`:
+- `POST /api/auth/forgot-password` — accepts `{email}`, always returns 200 with a generic message (prevents user enumeration). Generates a `secrets.token_urlsafe(32)` raw token, stores only its SHA-256 hash + `expires_at` + `user_id` in `db.password_reset_tokens`, and dispatches an HTML+text branded Resend email via `asyncio.to_thread(resend.Emails.send, ...)`.
+- `POST /api/auth/reset-password` — accepts `{token, new_password}`, verifies token freshness + un-consumed status, updates `password_hash`, marks the token `consumed=true`, and invalidates any other pending tokens for the same user. Returns 400 on expired / invalid / consumed / user-missing paths; 422 on pydantic-level input violations.
+- Rate limits — 5 requests/hr per IP, 3 requests/hr per email; enforced via a lightweight `db.pw_reset_rate` counter that survives restarts without needing Redis. Silent throttle (always 200) so no side-channel leak.
+- MongoDB indexes added at seed time: unique on `token_hash`, TTL on `expires_at` (`expireAfterSeconds=0`), plus a non-unique index on `user_id`.
+- Google-OAuth-only users (`auth_provider="google"`) are silently skipped — they have no password to reset.
+
+**Frontend:**
+- `pages/ForgotPassword.jsx` — email entry form with generic success screen ("If an account exists for X, we've sent a reset link"). Enumeration-safe.
+- `pages/ResetPassword.jsx` — reads `?token=` from query, shows a 2-password form with live 4-rule validation (length≥8, uppercase, digit, match). On success, shows "You're all set" then auto-redirects to `/login` with `location.state.passwordReset=true`.
+- `pages/Login.jsx` — "Forgot?" link next to the Password label (data-testid `login-forgot-password`). After a reset, shows a green success banner via `location.state.passwordReset`.
+- `App.js` — two new public routes `/forgot-password` and `/reset-password`.
+
+**Config (`backend/.env` — new keys):**
+- `RESEND_API_KEY=<user-provided>` — from user's Resend account.
+- `SENDER_EMAIL=onboarding@resend.dev` — Resend sandbox sender. Flip to `no-reply@ithr.tech` (or any verified domain address) once the domain is verified at https://resend.com/domains — zero code change.
+- `PASSWORD_RESET_TOKEN_TTL_MINUTES=60` — default 1-hour expiry (adjustable).
+- `FRONTEND_URL=https://enterprise-ai-learn-2.preview.emergentagent.com` — used for the reset link URL in the email body.
+
+**Resend sandbox limitation (not a bug):** until a sender domain is verified in the user's Resend dashboard, Resend only accepts sends addressed to the account owner (currently `srijit@ithr360.com`). Sends to other recipients raise a `ResendError` server-side but the 200 API response to the client is unchanged (deliberate — no enumeration leak). All error paths are logged via `logger.exception`.
+
+**Testing verdict (iteration_21.json):**
+- Backend: **10/10 (100%)** on the new `test_iteration21_password_reset.py` suite — forgot-happy-path, no-enumeration on unknown email, malformed email → 422, rate-limit silent throttle, reset-happy-path (old pw fails 401 / new pw succeeds 200 / token marked consumed), expired-token → 400, consumed-token reuse → 400, bogus-token → 400, short-password → 422, all 3 required Mongo indexes verified.
+- Frontend: **4/4 (100%)** — /forgot-password submit → success → back-to-login, /login Forgot? link works, /reset-password live rule validation, full E2E happy path (seed DB token → visit /reset-password?token=… → submit → auto-redirect to /login with success banner). Zero non-401 console errors.
+
+**Backlog (P1/P2) — unchanged**
+- P1: Stripe webhook proration hardening during seat adjustments.
+- P2: WeasyPrint PDF + Print CSS palette → ITHR Teal/Navy.
+- P2: Verify sender domain in Resend + flip `SENDER_EMAIL` to `no-reply@ithr.tech`.
+- P2: Component splits for the 4 large React files (deferred).
+- P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 
 
