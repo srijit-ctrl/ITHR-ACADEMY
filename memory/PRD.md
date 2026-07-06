@@ -956,3 +956,27 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 
 **Testing:** Locust baseline run 0 failures / 124 reqs / p95 130ms aggregated; frontend UI smoke-test confirms flagship bundle card + 3 tier cards + all CTAs render; backend + frontend lint clean.
 
+
+### Iteration 37.1 — Weekly Podcast Cron (GitHub Actions) + Prod Load Baseline (Feb 2026)
+
+**A) GitHub Actions cron for weekly podcast** — `/app/.github/workflows/weekly-podcast.yml`
+- Schedule: `0 9 * * 1` (every Monday 09:00 UTC)
+- Also supports `workflow_dispatch` for manual trigger + fanout-email toggle from the Actions UI
+- Steps: fresh 15-min JWT login → `POST /api/admin/podcast/generate` → optional `POST /api/admin/podcast/{id}/email` fanout → verify `/api/podcast/latest` + RSS is publicly reachable
+- **Secrets required in GitHub repo settings:**
+  - `SUPER_ADMIN_EMAIL` = superadmin@ithr.online
+  - `SUPER_ADMIN_PASSWORD` = <prod super-admin password>
+  - Optional repo variable `PODCAST_EMAIL_FANOUT=true` to auto-fanout
+
+**B) Production load test — first ever prod baseline**
+- Target: `https://ithr.online` · 10 VUs · 2 min · ramp 2/s
+- Persisted at `/app/backend/tests/load/baselines/2026-02-06_prod_stats.csv`
+- **Result: 0 real failures / 439 requests** (6 × 429 rate-limits on /api/demo/ask — the platform's IP-based protection working correctly, documented in README)
+- Prod p95 numbers (all under target):
+  - `/api/courses` — 190ms (target < 800ms)
+  - `/api/intelligence/briefing` — 210ms (target < 900ms)
+  - `/api/podcast/latest` — 260ms (target < 400ms)
+  - `/api/podcast/rss.xml` — 240ms (target < 500ms)
+  - `POST /api/demo/ask` SSE — 280ms (target < 3.5s)
+- Two p99.9 outliers on podcast endpoints (~2s) suggest occasional cold-DB heartbeat — worth watching but not blocking.
+

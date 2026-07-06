@@ -1,0 +1,96 @@
+name: Weekly Executive Briefing Podcast
+
+# Runs every Monday at 09:00 UTC (Monday morning across US/EU/APAC business hours).
+# Uses a super-admin bearer token stored as a GitHub secret. The generate call
+# is idempotent per ISO-week — a second run inside the same week overwrites
+# the same episode document, so accidental double-runs are harmless.
+#
+# Setup (one-time):
+#   1. Go to your repo Settings → Secrets and variables → Actions → New repo secret
+#   2. Name: SUPER_ADMIN_TOKEN
+#      Value: (run this once locally and copy the "token" field)
+#        curl -X POST https://ithr.online/api/auth/login \
+#          -H 'Content-Type: application/json' \
+#          -d '{"email":"superadmin@ithr.online","password":"YOUR_PASSWORD"}'
+#      Note: access tokens expire after 15 min. This workflow re-authenticates
+#      at run time using SUPER_ADMIN_EMAIL + SUPER_ADMIN_PASSWORD, not a
+#      pre-issued token — so we actually need those two secrets instead.
+#   3. Add secrets:
+#        SUPER_ADMIN_EMAIL     = superadmin@ithr.online
+#        SUPER_ADMIN_PASSWORD  = <your prod super-admin password>
+#        (optional) PODCAST_EMAIL_FANOUT = "true"  to also email opted-in learners
+
+on:
+  schedule:
+    # 09:00 UTC every Monday
+    - cron: '0 9 * * 1'
+  # Allow manual trigger from the GitHub Actions UI for ad-hoc generation
+  workflow_dispatch:
+    inputs:
+      fanout_email:
+        description: 'Also send the announcement email to opted-in learners?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  generate-episode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      HOST: https://ithr.online
+
+    steps:
+      - name: Authenticate (fresh 15-min access token)
+        id: auth
+        run: |
+          set -euo pipefail
+          RES=$(curl -sS -X POST "$HOST/api/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"${{ secrets.SUPER_ADMIN_EMAIL }}\",\"password\":\"${{ secrets.SUPER_ADMIN_PASSWORD }}\"}")
+          TOKEN=$(echo "$RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Login failed: $RES" >&2
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Generate weekly episode
+        id: generate
+        run: |
+          set -euo pipefail
+          RES=$(curl -sS -X POST "$HOST/api/admin/podcast/generate" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}")
+          echo "$RES" | python3 -m json.tool
+          EP_ID=$(echo "$RES" | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+          if [ -z "$EP_ID" ]; then
+            echo "No episode id returned" >&2
+            exit 1
+          fi
+          echo "episode_id=$EP_ID" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Podcast::Generated $EP_ID"
+
+      - name: Fan-out announcement email (optional)
+        if: ${{ github.event.inputs.fanout_email == 'true' || vars.PODCAST_EMAIL_FANOUT == 'true' }}
+        run: |
+          set -euo pipefail
+          curl -sS -X POST "$HOST/api/admin/podcast/${{ steps.generate.outputs.episode_id }}/email" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.token }}" \
+            | python3 -m json.tool
+
+      - name: Verify episode is publicly reachable
+        run: |
+          set -euo pipefail
+          # Latest metadata
+          curl -sS "$HOST/api/podcast/latest" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d['id'] == '${{ steps.generate.outputs.episode_id }}', f'latest is not the new episode: {d}'
+          print(f\"OK — latest is {d['id']} — {d['title']}\")
+          "
+          # RSS updated
+          curl -sSI "$HOST/api/podcast/rss.xml" | head -3
