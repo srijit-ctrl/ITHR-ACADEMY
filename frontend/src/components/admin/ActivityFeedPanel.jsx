@@ -46,8 +46,10 @@ export default function ActivityFeedPanel() {
                     return dedup.slice(0, FEED_LIMIT);
                 });
             }
-        } catch {
-            // Silent — polling recovers on next tick
+        } catch (e) {
+            // Silent — polling recovers on next tick. Log to devtools only
+            // so operators can spot sustained failures without console spam.
+            console.debug("[ActivityFeed] poll failed:", e?.message);
         } finally {
             if (isInitial) setLoading(false);
         }
