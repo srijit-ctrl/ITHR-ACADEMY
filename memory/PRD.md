@@ -414,11 +414,40 @@ New forgot-password / reset-password flow with real transactional email delivery
 - Backend: **10/10 (100%)** on the new `test_iteration21_password_reset.py` suite — forgot-happy-path, no-enumeration on unknown email, malformed email → 422, rate-limit silent throttle, reset-happy-path (old pw fails 401 / new pw succeeds 200 / token marked consumed), expired-token → 400, consumed-token reuse → 400, bogus-token → 400, short-password → 422, all 3 required Mongo indexes verified.
 - Frontend: **4/4 (100%)** — /forgot-password submit → success → back-to-login, /login Forgot? link works, /reset-password live rule validation, full E2E happy path (seed DB token → visit /reset-password?token=… → submit → auto-redirect to /login with success banner). Zero non-401 console errors.
 
+### Iteration 22 — Large-file Component Splits (Feb 2026)
+
+Per-user request: split all 4 large React files into focused sub-components. Behaviour identical; complexity dramatically lower.
+
+**Before → After (lines):**
+- `pages/EnterprisePortal.jsx`: **573 → 201** (-65%). Now a pure composition shell over four sub-components.
+- `components/TryALesson.jsx`: **197 → 42** (-79%). Composes `<DemoLessonBody>` + `<DemoChat>` via the `useDemoLesson()` hook.
+- `components/InlineTutor.jsx`: **163 → 80** (-51%). Uses `<QuickPrompts>` + `<TutorConversation>` + `useTutorStream()` hook.
+- `components/AITutorPanel.jsx`: **151 → 23** (-85%). Two children: `<TutorLauncher>` (closed) + `<TutorDrawer>` (open).
+
+**New files created:**
+- `components/enterprise/StatCard.jsx` (15) — small stat card, reusable.
+- `components/enterprise/SeatEditorModal.jsx` (100) — owner-only seat adjustment modal with debounced live preview.
+- `components/enterprise/MemberList.jsx` (271) — member table + invite form + Create-User modal + TempCreds modal.
+- `components/enterprise/EnterpriseSidebar.jsx` (82) — Departments + Top courses + Billing history.
+- `components/demo/useDemoLesson.js` (92) — SSE streaming chat hook for the anonymous demo widget.
+- `components/demo/DemoLessonBody.jsx` (34), `DemoChat.jsx` (85).
+- `components/tutor/QuickPrompts.jsx` (41), `TutorConversation.jsx` (43), `useTutorStream.js` (77), `TutorLauncher.jsx` (21), `TutorDrawer.jsx` (134).
+
+**Iter-22 initial regression (found + fixed in iter-23):**
+- **HIGH severity**: TempCredsModal never rendered after `createUserDirect` succeeded because parent's `load()` toggled `loading=true`, which unmounted MemberList and wiped its local `tempCreds` state.
+- **Fix**: `load()` now accepts `{silent: true}` — skips the full-screen spinner on mid-flow reloads. `MemberList` and `SeatEditorModal` callbacks now use `() => load({ silent: true })` so child modal state survives the refresh.
+
+**Testing verdict (iteration_23.json — post-fix):**
+- Backend: **36/36** (100%) on iter-15 + iter-16 + iter-21 baseline. Zero regressions (no backend files touched).
+- Frontend: **5/5 targeted flows PASS (100%)** post-fix. HIGH regression from iter-22 confirmed fixed. Sanity: SeatEditorModal + TryALesson streaming both clean.
+
+**Resend domain verification — status: PENDING USER ACTION**
+- User owns `ithr.tech` and wants sender `no-reply@ithr.tech`. User must add SPF + DKIM DNS records at their DNS provider (Resend will show the exact records once they add the domain at https://resend.com/domains). Once verified, agent will swap `SENDER_EMAIL` in `backend/.env` — zero code change needed.
+
 **Backlog (P1/P2) — unchanged**
 - P1: Stripe webhook proration hardening during seat adjustments.
 - P2: WeasyPrint PDF + Print CSS palette → ITHR Teal/Navy.
-- P2: Verify sender domain in Resend + flip `SENDER_EMAIL` to `no-reply@ithr.tech`.
-- P2: Component splits for the 4 large React files (deferred).
+- P2: Additional transactional emails (welcome / cert-earned / org-invite) — same Resend plumbing.
 - P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 
 
