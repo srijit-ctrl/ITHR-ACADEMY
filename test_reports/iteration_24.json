@@ -1,0 +1,48 @@
+{
+  "summary": "Iter-24 verification: 3 new transactional emails (welcome/cert-earned/org-invite) + palette-locked WeasyPrint PDF + Ask-Aletheia CertificateTutor widget. Backend: 7/7 new tests PASS — welcome/cert/invite emails fire-and-forget with real Resend sends (log line '[email/<tag>] Sent to <email> (resend id: <id>)' present within ~2s of API call), sender is 'no-reply@ithr.tech' (ithr.tech domain verified — no sandbox restriction), all three endpoints return in <1s and are non-blocking on Resend. Sample cert PDF endpoint still returns 200 + 25.8KB valid PDF (%PDF-1.7) with ITHR Teal #00A78B + Navy #16335E palette locked at template source. Frontend: /certificate/SAMPLE-ITHR-2026-001 (protected route) renders CertificateTutor widget (data-testid=cert-tutor) with 3 quick-ask buttons (data-testid^=cert-tutor-quick-0..2) and cert-tutor-input; clicking quick-ask streams a real 1205-char Aletheia response; typing 'What is agentic AI...' + Enter streams a follow-up (grew to 2371 chars total) via useTutorStream. Zero console errors. Regression: iter15+16+21 suites at 36/39 (92.3%) — 3 failures are pre-existing '.test'-TLD email-validator quirk in TestEnterpriseAdminCreateUser flagged as flaky for 5+ iterations in review request (NOT regressions from this iter).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "email_service._fire + all 3 email endpoints",
+        "issue": "Resend account is on the free tier (2 requests/sec cap). Under parallel load (pytest-xdist 2 workers, or a burst of ~5 signups within 1s) the third+ concurrent send raises RateLimitError. All raise points are swallowed via logger.exception so nothing blocks — but the affected recipient does NOT get an email. For a customer-facing prod deployment, either upgrade the Resend plan or add an internal token-bucket queue (e.g., aiolimiter) in email_service._fire keyed at ~1.8 req/s. Test suite works around this by throttling 0.8s between test invocations."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration24_emails.py",
+    "/app/test_reports/pytest/iter24_emails.xml",
+    "/app/test_reports/pytest/iter24_regression.xml"
+  ],
+  "action_items": [
+    "OPTIONAL P2: Add an internal 1.8 req/s token-bucket rate limiter in email_service._fire so bursts of signups/cert-issues don't silently drop welcome/cert emails on Resend's 2 req/s free-tier cap. Currently swallowed via logger.exception — no user-visible failure, but no email delivered either.",
+    "OPTIONAL P3 (pre-existing, iter-19 known): TestEnterpriseAdminCreateUser fixtures in test_iteration15.py generate test emails with '.test' TLD (e.g., cto+xxx@acme-xxx.test); pydantic EmailStr rejects '.test' as a reserved TLD → 422. Not a code bug; fix is to use '.example.com' or another IANA-reserved-but-Pydantic-accepted TLD in the test fixture. Not blocking anything."
+  ],
+  "critical_code_review_comments": [
+    "email_service.py — Excellent shared wrapper. Single _fire() with logger.exception, common _wrap() shell, dedicated tags per email type ('welcome', 'cert', 'invite'). All three public functions return bool, never raise — matches the 'never block signup/cert-issuance on email' contract stated in the review request.",
+    "auth_router.register (L102-108) — asyncio.create_task properly wrapped in try/except → dispatched fire-and-forget; if wrap-import fails, register still returns 200. Elapsed <3s in tests confirms it never blocks. Good.",
+    "assessment_router._issue_certificate_if_new (L204-215) — Same fire-and-forget pattern via asyncio.create_task. Correct placement: only fires for NEW certs (existing certs return early at L184-186), so re-submitting a passing quiz for the same course doesn't spam the email. Good.",
+    "enterprise_router.create_invite (L117-131) — Fires invite email after invite doc insert; admin_user is fetched inside the try/except to avoid the create_task capturing a stale reference. Correct.",
+    "assessment_router PDF template (L384-462) — Palette lock is at the CSS-string source, not a runtime config. This is intentional and defensible (WeasyPrint parses a static string), but if the ITHR brand ever changes hex codes, both the CSS in email_service._wrap AND the PDF template in assessment_router must be updated in lockstep. Consider extracting to a shared brand_constants.py module. Non-blocking.",
+    "CertificateTutor.jsx — Cleanly reuses useTutorStream/TutorConversation from the tutor package; no code duplication with InlineTutor/AITutorPanel. quickAsks array keys use array index (L52 key={i}) — acceptable here since the array is static and length is fixed at 3.",
+    "Certificate.jsx L140 — CertificateTutor is rendered inside the '.max-w-4xl mx-auto' wrapper, which means the widget respects the cert-page grid. Section internal max-w-3xl is narrower than the credential card — good for readability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration24_emails.py (NEW — 7 tests, 100% pass)"
+  ],
+  "success_rate": {
+    "backend": "iter-24 new suite 7/7 = 100%. Regression on iter-15+16+21 = 36/39 = 92.3% (3 pre-existing .test-TLD failures per review request — NOT iter-24 regressions).",
+    "frontend": "5/5 CertificateTutor acceptance points PASS (widget renders, 3 quick-asks, quick-ask click streams real response, input+Enter streams follow-up, 0 console errors)."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod (from .env). Iter-24 test users created (safe to leave — all with iter24.* prefix): iter24.ui+<ts>@example.com, iter24.owner+<ts>@example.com, iter24.forgot+<ts>@example.com, iter24.cert+<ts>@example.com, iter24.welcome+<ts>@example.com — password 'UITestPass123!' or 'WelcomePass123!' or similar per-fixture.",
+  "seed_data_creation": "~5 test learners + 1 test org ('Iter24 Test Org <hex6>') + 1 org-invite + 1 fresh certificate under iter24.cert+*. All prefixed for easy identification and safe to leave.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Resend domain ithr.tech is VERIFIED — sends to arbitrary recipients (any @example.com etc.) now succeed with resend ids. The only failure mode observed is Resend's 2 req/s FREE-TIER rate limit under parallel/burst load — surface as RateLimitError in backend.err.log, swallowed by email_service._fire, no client impact but no email delivered to that recipient. If you run these tests under pytest-xdist parallel, use '-n 0' (serial) or accept flaky expectations. Iter-24 test file has an autouse fixture that sleeps 0.8s before each test to stay under the cap. Sender confirmed 'no-reply@ithr.tech' in backend/.env AND live in the actual Resend send params (verified via log line 'from: ITHR Academy <no-reply@ithr.tech>' when tracing). Nothing else to preserve — clean baseline for iter-25.",
+  "rca of the issue": "N/A — no bugs found in iter-24 features. Only environmental note: Resend free-tier 2 req/s limit affects burst scenarios (parallel tests, or >2 registrations in same second). Mitigation options documented under action_items (upgrade Resend plan OR add internal token-bucket queue). Not a functional defect."
+}

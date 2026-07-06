@@ -97,6 +97,16 @@ async def register(payload: UserRegister, response: Response):
         # Non-fatal — user is still registered. Log loudly so future silent
         # regressions of the "seq/code stay null" class don't slip through.
         logger.exception("Founding-member allocation raised during registration")
+
+    # Send the welcome email as a fire-and-forget task so a slow / failing
+    # Resend call never blocks the register response.
+    try:
+        import asyncio as _asyncio
+        from email_service import send_welcome_email
+        _asyncio.create_task(send_welcome_email(doc["email"], doc.get("full_name") or ""))
+    except Exception:
+        logger.exception("Welcome-email dispatch failed (non-fatal)")
+
     access = create_access_token(user_id, doc["email"], doc["role"])
     _set_refresh_cookie(response, user_id)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))

@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, API_BASE } from "@/lib/api";
 import { Award, ShieldCheck, Share2, Download, Loader2, Linkedin, Copy, Check } from "lucide-react";
 import { ITHRSeal } from "@/components/brand/ITHRBrand";
+import CertificateTutor from "@/components/CertificateTutor";
 
 export default function Certificate() {
     const { certId } = useParams();
@@ -135,6 +136,8 @@ export default function Certificate() {
                 <div className="mt-10 text-center text-xs text-muted-foreground max-w-2xl mx-auto">
                     This credential is verifiable at <span className="font-mono">{shareUrl}</span> — anyone can scan the QR to confirm authenticity. ITHR Technologies maintains a public registry of all issued credentials.
                 </div>
+
+                <CertificateTutor certificate={cert} />
             </div>
         </div>
     );

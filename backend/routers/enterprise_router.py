@@ -113,6 +113,23 @@ async def create_invite(payload: dict, user_id: str = Depends(get_current_user_i
     }
     await db.org_invites.insert_one(invite)
     invite.pop("_id", None)
+
+    # Fire the invite email — fire-and-forget so the API stays snappy.
+    try:
+        import asyncio as _asyncio
+        from email_service import send_org_invite_email
+        # Look up the inviter's name for personalization
+        admin_user = await db.users.find_one({"id": user_id}, {"_id": 0, "full_name": 1})
+        _asyncio.create_task(send_org_invite_email(
+            email=email,
+            org_name=org["name"],
+            invite_code=org["invite_code"],
+            admin_name=(admin_user or {}).get("full_name") or "your team admin",
+        ))
+    except Exception:
+        # never block invite creation on email
+        pass
+
     return {"invite": invite, "invite_url": f"/enterprise/join?code={org['invite_code']}&email={email}"}
 
 

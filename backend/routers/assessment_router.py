@@ -201,6 +201,18 @@ async def _issue_certificate_if_new(
         {"$set": {"completed": True, "completed_at": now_iso(), "progress_pct": 100.0}},
     )
     await db.users.update_one({"id": user_id}, {"$inc": {"xp": 500}})
+    # Fire the cert-earned email — fire-and-forget so the API path stays fast.
+    try:
+        import asyncio as _asyncio
+        from email_service import send_certificate_email
+        _asyncio.create_task(send_certificate_email(
+            email=user["email"], full_name=user["full_name"],
+            course_title=course["title"], certificate_id=cert_obj.certificate_id,
+            score=int(round(score, 0)),
+        ))
+    except Exception:
+        # never block cert issuance on email
+        pass
     # If this is the founder's free-cert course, flag it as claimed so future
     # certs on other courses are billable as usual.
     try:
@@ -326,7 +338,6 @@ async def certificate_pdf(certificate_id: str):
 
     import base64
     import os
-    from datetime import datetime
 
     from weasyprint import HTML
 
@@ -334,7 +345,7 @@ async def certificate_pdf(certificate_id: str):
     base_url = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
     verify_url = f"{base_url}/verify/{certificate_id}" if base_url else f"/verify/{certificate_id}"
     qr_buf = io.BytesIO()
-    segno.make(verify_url, error="H").save(qr_buf, kind="svg", scale=6, dark="#0d1321", light="#ffffff", border=1, xmldecl=False)
+    segno.make(verify_url, error="H").save(qr_buf, kind="svg", scale=6, dark="#16335E", light="#ffffff", border=1, xmldecl=False)
     qr_b64 = base64.b64encode(qr_buf.getvalue()).decode("ascii")
 
     issued_raw = cert.get("issued_at", "")
@@ -370,28 +381,29 @@ _CERT_PDF_TEMPLATE = r"""
 <!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
+  /* ITHR Brand palette lock (Iter 24) — Teal #00A78B + Navy #16335E + Gold #C5A253 */
   @page {{ size: A4 landscape; margin: 0; }}
-  body {{ margin: 0; font-family: 'Helvetica', Arial, sans-serif; color: #0d1321; }}
+  body {{ margin: 0; font-family: 'Calibri', 'Tahoma', 'Helvetica', Arial, sans-serif; color: #16335E; }}
   .sheet {{
     width: 297mm; height: 210mm; padding: 18mm 22mm;
     box-sizing: border-box; position: relative;
     background: #ffffff;
     background-image:
-      linear-gradient(0deg, transparent 24%, rgba(0,168,151,0.02) 25%, rgba(0,168,151,0.02) 26%, transparent 27%, transparent 74%, rgba(0,168,151,0.02) 75%, rgba(0,168,151,0.02) 76%, transparent 77%);
+      linear-gradient(0deg, transparent 24%, rgba(0,167,139,0.025) 25%, rgba(0,167,139,0.025) 26%, transparent 27%, transparent 74%, rgba(0,167,139,0.025) 75%, rgba(0,167,139,0.025) 76%, transparent 77%);
     background-size: 100% 60px;
   }}
-  /* Ornamental gold borders */
+  /* Ornamental gold borders — kept for ceremonial contrast */
   .sheet::before, .sheet::after {{
     content: ''; position: absolute; left: 10mm; right: 10mm; height: 3mm;
-    background: linear-gradient(90deg, transparent, #d4a836 20%, #d4a836 80%, transparent);
+    background: linear-gradient(90deg, transparent, #C5A253 20%, #C5A253 80%, transparent);
   }}
   .sheet::before {{ top: 8mm; }}
   .sheet::after  {{ bottom: 8mm; }}
 
-  /* Inner double rule */
+  /* Inner double rule — navy outer, gold inner */
   .inner-rule {{
-    position: absolute; inset: 14mm 18mm; border: 0.6mm solid #d4a836;
-    box-shadow: inset 0 0 0 1mm #ffffff, inset 0 0 0 1.4mm #0d1321;
+    position: absolute; inset: 14mm 18mm; border: 0.6mm solid #C5A253;
+    box-shadow: inset 0 0 0 1mm #ffffff, inset 0 0 0 1.4mm #16335E;
     pointer-events: none;
   }}
 
@@ -402,35 +414,35 @@ _CERT_PDF_TEMPLATE = r"""
   .brand-lockup {{ display: flex; align-items: center; gap: 6mm; }}
   .seal {{
     width: 28mm; height: 28mm; border-radius: 50%;
-    background: radial-gradient(circle at 30% 25%, #1a2540 0%, #0d1321 100%);
-    box-shadow: 0 0 0 1mm #d4a836, 0 0 0 1.6mm #ffffff, 0 0 0 1.9mm #d4a836;
+    background: radial-gradient(circle at 30% 25%, #21467a 0%, #16335E 100%);
+    box-shadow: 0 0 0 1mm #C5A253, 0 0 0 1.6mm #ffffff, 0 0 0 1.9mm #C5A253;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     color: #ffffff; text-align: center;
   }}
-  .seal-est   {{ font-size: 6pt; letter-spacing: 2pt; color: #d4a836; text-transform: uppercase; }}
+  .seal-est   {{ font-size: 6pt; letter-spacing: 2pt; color: #C5A253; text-transform: uppercase; }}
   .seal-mark  {{ font-family: 'Georgia', serif; font-size: 14pt; letter-spacing: 1pt; margin: 1mm 0; }}
-  .seal-tag   {{ font-size: 5pt; letter-spacing: 1.5pt; color: rgba(255,255,255,0.8); text-transform: uppercase; }}
-  .seal-line  {{ width: 8mm; height: 0.3mm; background: #d4a836; margin: 1mm 0; }}
+  .seal-tag   {{ font-size: 5pt; letter-spacing: 1.5pt; color: rgba(255,255,255,0.85); text-transform: uppercase; }}
+  .seal-line  {{ width: 8mm; height: 0.3mm; background: #C5A253; margin: 1mm 0; }}
 
-  .brand-name    {{ font-family: 'Georgia', serif; font-size: 22pt; letter-spacing: -0.5pt; margin: 0; }}
-  .brand-name .accent {{ color: #00a897; }}
+  .brand-name    {{ font-family: 'Georgia', serif; font-size: 22pt; letter-spacing: -0.5pt; margin: 0; color: #16335E; }}
+  .brand-name .accent {{ color: #00A78B; }}
   .brand-tag     {{ font-size: 8pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; margin-top: 1.5mm; }}
 
   .award-block  {{ text-align: right; }}
-  .award-title  {{ font-size: 8pt; letter-spacing: 3pt; color: #d4a836; text-transform: uppercase; }}
-  .award-num    {{ font-family: 'Georgia', serif; font-size: 18pt; }}
+  .award-title  {{ font-size: 8pt; letter-spacing: 3pt; color: #C5A253; text-transform: uppercase; }}
+  .award-num    {{ font-family: 'Georgia', serif; font-size: 18pt; color: #16335E; }}
 
   .body {{ text-align: center; margin-top: 6mm; position: relative; }}
   .presents  {{ font-size: 9pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; }}
-  .holder    {{ font-family: 'Georgia', serif; font-size: 48pt; letter-spacing: -1pt; margin: 4mm 0; color: #0d1321; }}
+  .holder    {{ font-family: 'Georgia', serif; font-size: 48pt; letter-spacing: -1pt; margin: 4mm 0; color: #16335E; }}
   .completed {{ font-size: 9pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; margin-top: 2mm; }}
-  .course    {{ font-family: 'Georgia', serif; font-style: italic; font-size: 22pt; margin: 4mm 0 3mm; color: #00a897; }}
+  .course    {{ font-family: 'Georgia', serif; font-style: italic; font-size: 22pt; margin: 4mm 0 3mm; color: #00A78B; }}
   .score     {{ font-size: 11pt; color: #4a5768; }}
-  .score b   {{ color: #0d1321; }}
+  .score b   {{ color: #16335E; }}
 
   .divider-gold {{
     width: 40mm; height: 0.4mm;
-    background: linear-gradient(90deg, transparent, #d4a836, transparent);
+    background: linear-gradient(90deg, transparent, #C5A253, transparent);
     margin: 6mm auto;
   }}
 
@@ -440,14 +452,14 @@ _CERT_PDF_TEMPLATE = r"""
   }}
   .fact {{ font-size: 8pt; }}
   .fact-label {{ letter-spacing: 2pt; color: #7d8ba0; text-transform: uppercase; font-size: 6.5pt; margin-bottom: 1mm; }}
-  .fact-value {{ font-family: 'Courier', monospace; color: #0d1321; }}
+  .fact-value {{ font-family: 'Courier', monospace; color: #16335E; }}
 
   .qr-frame {{
-    padding: 2mm; border: 0.5mm solid #d4a836; background: #ffffff;
+    padding: 2mm; border: 0.5mm solid #C5A253; background: #ffffff;
   }}
   .qr-frame img {{ width: 24mm; height: 24mm; display: block; }}
 
-  .signature-line {{ border-top: 0.3mm solid #0d1321; padding-top: 1.5mm; width: 55mm; text-align: center; font-family: 'Georgia', serif; font-style: italic; }}
+  .signature-line {{ border-top: 0.3mm solid #16335E; padding-top: 1.5mm; width: 55mm; text-align: center; font-family: 'Georgia', serif; font-style: italic; color: #16335E; }}
   .signature-role {{ font-size: 7pt; letter-spacing: 2pt; color: #7d8ba0; text-transform: uppercase; margin-top: 1mm; }}
 </style></head>
 <body>
