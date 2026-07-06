@@ -31,8 +31,8 @@ export default function EnterprisePortal() {
     const [billing, setBilling] = useState([]);
     const [showAnalytics, setShowAnalytics] = useState(false);
 
-    const load = () => {
-        setLoading(true);
+    const load = ({ silent = false } = {}) => {
+        if (!silent) setLoading(true);
         api.get("/enterprise/organizations/dashboard")
             .then((r) => setDashboard(r.data))
             .catch((e) => {
@@ -164,7 +164,7 @@ export default function EnterprisePortal() {
                     seatBusy={seatBusy}
                     setSeatBusy={setSeatBusy}
                     onClose={() => setShowSeatEditor(false)}
-                    onSuccess={load}
+                    onSuccess={() => load({ silent: true })}
                 />
 
                 {/* Analytics panel — collapsed by default */}
@@ -184,7 +184,7 @@ export default function EnterprisePortal() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
                     <div className="lg:col-span-8">
-                        <MemberList dashboard={dashboard} isAdmin={isAdmin} onReload={load} />
+                        <MemberList dashboard={dashboard} isAdmin={isAdmin} onReload={() => load({ silent: true })} />
                     </div>
                     <div className="lg:col-span-4">
                         <EnterpriseSidebar

@@ -1,0 +1,45 @@
+{
+  "summary": "Iter-23 targeted regression re-test — HIGH-severity TempCredsModal regression from iter-22 is CONFIRMED FIXED. The iter-23 fix in EnterprisePortal.jsx (load() now accepts {silent:true}; onReload callbacks passed to MemberList + SeatEditorModal use `() => load({silent:true})`) correctly prevents the parent from unmounting MemberList mid-flow, so the local `tempCreds` state now survives the post-create reload. Full E2E verified: (1) org owner logged in, (2) 'Create user directly' modal opened, (3) submitted valid @-domain user, (4) 200 response with temp_password, (5) TempCredsModal (data-testid=temp-creds-modal) now RENDERS with email + temp password visible, (6) 'Copy both' works, (7) Close button dismisses modal, (8) new user appears in MemberList after silent reload with NO full-screen spinner flash. Sanity spot-checks (SeatEditorModal preview flow, Landing TryALesson streaming) all pass with no side effects.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "EnterprisePortal → Manage seats modal",
+        "issues": [
+          "Pre-existing (NOT a regression, NOT introduced by this fix): typing a seat count BELOW the min=10 (e.g., 9) still enables the Apply button because the disable predicate only checks `seatTarget === org.seat_count`. HTML5 min attribute is bypassed since setSeatTarget uses parseInt on any value. Backend will reject, so this is cosmetic UX only. Consider adding `|| seatTarget < 10` to the disabled check."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_22.json",
+    "/app/test_reports/iteration_23.json"
+  ],
+  "action_items": [
+    "NONE for the iter-22 regression — main agent's fix is verified correct.",
+    "OPTIONAL (P3, pre-existing): tighten SeatEditorModal apply-button disabled check to include `seatTarget < 10` so sub-min values can't be submitted (currently the backend rejects them, so this is purely a UX cleanup)."
+  ],
+  "critical_code_review_comments": [
+    "EnterprisePortal.jsx L34-43 — the `{ silent }` option pattern is idiomatic and minimal. The mount-level `useEffect(() => { load(); }, [])` still calls the loud (non-silent) load, so the initial full-screen loader is preserved. All child-triggered reloads (MemberList, SeatEditorModal, post-checkout fulfillment via useEffect on searchParams) go through the silent path — good.",
+    "Post-checkout fulfillment (L57-71) still calls the LOUD `load()` after a successful seat purchase. That is intentional and correct since the user is returning from an external redirect and the full-screen loader is expected UX. No change needed.",
+    "MemberList.jsx unchanged as expected — tempCreds still lives locally. This works ONLY because the parent no longer unmounts the component during reload. If a future refactor reverts the parent to a loud reload, this bug will silently reappear. Consider adding a code comment on tempCreds explaining the invariant (parent must silent-reload).",
+    "SeatEditorModal receives onSuccess={() => load({silent:true})} — good. The modal already calls onClose() before onSuccess() in applySeatChange (L44-45), so the modal's own state does not depend on surviving the reload (unlike MemberList.tempCreds did). Correct.",
+    "No console errors, no React warnings, no infinite-render logs observed on any surface during this run."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "not re-run (per review-request instructions — untouched since iter-22 100% pass)",
+    "frontend": "5/5 targeted flows PASS (100%). PASS: (1) org-owner login → /enterprise/portal loads, (2) Create-user modal opens, (3) submit-create-user → TempCredsModal RENDERS with correct email + non-empty temp password (HIGH regression FIXED), (4) Copy both + Close dismissal work, (5) new user appears in MemberList post silent-reload with no full-screen spinner flash. Sanity: SeatEditorModal preview works for +2 seat increase, cancel dismisses cleanly; Landing/TryALesson streaming returns 857-char response — no refactor side-effects elsewhere."
+  },
+  "test_credentials": "Iter23 org-admin (fresh provision this run): email=cto+ed96a2@acmecorped96a2.com, password=Z5LuGOAIYG9HF1, org_id=ddbacb1b-cf7c-4663-b6c0-99269f2461db, invite_code=5V2ERZ4K. Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod. New user created via UI during flow: iter23.newuser302346@acmecorped96a2.com (safe to leave — iter23.* prefix).",
+  "seed_data_creation": "1 new org (Iter23 Acme ed96a2) + 1 admin + 1 directly-created member under acmecorped96a2.com. Safe to keep for future regression runs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter-22 HIGH regression (TempCredsModal not rendering after createUserDirect) is FIXED and verified. The fix is a 3-line change in EnterprisePortal.jsx: `load()` accepts `{silent:true}` and only sets `loading=true` on the initial load; MemberList + SeatEditorModal onReload callbacks pass silent:true so mid-flow child-owned state (tempCreds, seat preview) survives the reload. Fresh org test creds are in test_credentials above — reuse them for future runs or provision a new one via POST /api/admin/orgs (super_admin). No further action needed on this regression path.",
+  "rca of the issue": "Iter-22 root cause was `EnterprisePortal.load()` unconditionally calling `setLoading(true)` on every invocation. Combined with the L79 early-return `<Loader />` when loading is true, ALL descendant components unmounted on every dashboard refresh. Post-split, child-owned state (MemberList.tempCreds) got destroyed before the TempCredsModal could paint. Iter-23 fix: `load({silent=false} = {})` now only sets `loading=true` when `!silent`; parent passes `onReload={() => load({silent:true})}` to MemberList and `onSuccess={() => load({silent:true})}` to SeatEditorModal. Initial mount still uses the loud path so the first-paint spinner UX is preserved. Verified end-to-end via Playwright: submit-create-user → temp-creds-modal renders in <8s → email + password textContent match server response → new member row present in dashboard after silent refresh."
+}
