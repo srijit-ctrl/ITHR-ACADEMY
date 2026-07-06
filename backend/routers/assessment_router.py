@@ -129,7 +129,7 @@ async def start_assessment_session(
     if not bank:
         raise HTTPException(status_code=400, detail="No assessment available for this course")
 
-    rng = random.Random(seed or random.SystemRandom().randint(0, 2**32 - 1))
+    rng = random.Random(seed) if seed is not None else random.SystemRandom()
 
     if adaptive:
         mode = await _resolve_adaptive_mode(user_id, course["id"])

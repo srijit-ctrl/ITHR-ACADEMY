@@ -22,8 +22,8 @@ BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("RE
 MONGO_URL = "mongodb://localhost:27017"
 DB_NAME = "test_database"
 
-SUPER_ADMIN_EMAIL = "superadmin@ithr.tech"
-SUPER_ADMIN_PASSWORD = "preview-only-rotate-in-prod"
+SUPER_ADMIN_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@ithr.tech")
+SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "preview-only-rotate-in-prod")
 
 
 # ---------- fixtures --------------------------------------------------------

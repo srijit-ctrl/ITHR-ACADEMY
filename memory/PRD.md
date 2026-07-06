@@ -579,3 +579,32 @@ Batch of 4 backlog items in one session.
 - P2: CSV export button on Activity feed (proposed in iter-28 close-out).
 
 
+
+
+### Iteration 29 — Code Quality Report Triage (Feb 2026)
+
+Handoff dropped a Code Quality Recommendations Report. Investigated all findings and applied the two that were **actually valid**; documented false positives so future agents don't re-litigate them.
+
+**Applied fixes (real issues):**
+1. `backend/tests/test_iteration28_activity_feed.py` — `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` now sourced from env (`os.environ.get(...)`) with the placeholder as fallback for preview parity.
+2. `backend/routers/assessment_router.py` — replaced `random.Random(seed or SystemRandom().randint(...))` with `random.Random(seed) if seed is not None else random.SystemRandom()`. Preserves reproducibility when a seed is passed, uses OS-level entropy otherwise. Smoke-tested `/api/courses/{slug}/assessment/session` — returns 5-question randomized paper OK.
+
+**Verified false positives (documented so future agents skip them):**
+- **React hook stale-closure claims** (Quiz.jsx, LessonViewer.jsx, SuperAdminPortal.jsx, Intelligence.jsx, AuthContext.jsx) → all loaders already wrapped in `useCallback` with correct deps; `eslint-plugin-react-hooks` reports **zero issues** across all five files.
+- **`is True/False/None` in tests → `==`** → this is **correct Python style** per PEP 8 (identity checks for singletons). Replacing would be a regression.
+- **12 stray `console.log` claim** → only 4 `console.debug` calls exist, all inside `catch` blocks for legitimate diagnostic logging. No stray `console.log` in codebase.
+- **`seed_super_admin.py` `PLACEHOLDER_PASSWORD` "hardcoded secret"** → this is a *sentinel constant* used to detect misconfiguration in production. Extensively documented in the module docstring. Not a secret.
+- **`eval()` in `seed_assessments.py`** → previously verified safe (used for parsing static seed data), keeping as-is.
+- **DOMPurify frontend warnings** → verified safe in prior iteration.
+
+**Skipped (user opted for Priority 1 + 2 only in this session, but hooks were verified clean anyway):**
+- Backend complexity refactor (digest_router `_build_digest_html`, enterprise_router `fulfill_seat_increment`, admin_router, auth_router, purge_test_data). Functions work correctly; deferred as optional cleanup.
+- Frontend complexity refactor (MemberList, AnalyticsPanels/OrgAnalyticsPanel, CourseIntro, ActivityFeedPanel, DemoChat). Deferred.
+
+**Testing:** Backend restarted clean; assessment session endpoint smoke-tested via curl (super-admin login → course fetch → session generation → 200 OK with expected shape).
+
+**Backlog (P1/P2) — updated**
+- P2: Resume Sora 2 batch + AI course pipeline after Emergent LLM key top-up.
+- P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
+- P2: CSV export button on Activity feed.
+- P3 (optional): Backend/frontend complexity refactor for the 10 files listed above — no correctness impact, purely maintainability.
