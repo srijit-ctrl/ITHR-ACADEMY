@@ -1,12 +1,15 @@
-import { useEffect } from "react";
-import { api } from "@/lib/api";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { useSeatEditor } from "@/hooks/useSeatEditor";
+
+const seatChangeLabel = (previewAction) => {
+    if (previewAction === "checkout") return "Proceed to checkout";
+    if (previewAction === "credit") return "Apply reduction";
+    return "Apply";
+};
 
 /**
- * Owner-only seat-adjustment modal.
- * Owns none of the state — everything is passed in from EnterprisePortal so
- * the parent can freely re-run its `load()` after a successful change.
+ * Owner-only seat-adjustment modal. Presentational shell — the debounced
+ * preview + apply orchestration lives in `useSeatEditor`.
  */
 export default function SeatEditorModal({
     open, org, summary,
@@ -15,38 +18,11 @@ export default function SeatEditorModal({
     seatBusy, setSeatBusy,
     onClose, onSuccess,
 }) {
-    // Live preview of seat change (debounced 200ms)
-    useEffect(() => {
-        if (!open) return;
-        const t = setTimeout(() => {
-            api.post("/enterprise/organizations/seats/preview", { seat_count: seatTarget })
-                .then((r) => setSeatPreview(r.data))
-                .catch(() => setSeatPreview(null));
-        }, 200);
-        return () => clearTimeout(t);
-    }, [seatTarget, open, setSeatPreview]);
+    const { applySeatChange } = useSeatEditor({
+        open, seatTarget, setSeatPreview, setSeatBusy, onClose, onSuccess,
+    });
 
     if (!open) return null;
-
-    const applySeatChange = async () => {
-        setSeatBusy(true);
-        try {
-            const res = await api.post("/enterprise/organizations/seats", {
-                seat_count: seatTarget,
-                origin_url: window.location.origin,
-            });
-            if (res.data.action === "checkout" && res.data.checkout_url) {
-                window.location.href = res.data.checkout_url;
-                return;
-            }
-            if (res.data.action === "credit") toast.success(res.data.message);
-            else toast.info("No change applied.");
-            onClose();
-            onSuccess();
-        } catch (e) {
-            toast.error(e?.response?.data?.detail || "Seat update failed");
-        } finally { setSeatBusy(false); }
-    };
 
     return (
         <div className="fixed inset-0 z-50 bg-foreground/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -57,7 +33,9 @@ export default function SeatEditorModal({
                 </div>
                 <div className="p-6 space-y-5">
                     <div>
-                        <label htmlFor="seat-target-input" className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">Seat count (min 10)</label>
+                        <label htmlFor="seat-target-input" className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                            Seat count (min 10)
+                        </label>
                         <input
                             id="seat-target-input"
                             type="number"
@@ -68,11 +46,16 @@ export default function SeatEditorModal({
                             data-testid="seat-target"
                             className="mt-1 w-full bg-surface-alt border border-border rounded-sm px-4 py-2 text-lg focus:outline-none focus:border-brand"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">Currently: {org.seat_count} · In use: {summary.seats_used}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Currently: {org.seat_count} · In use: {summary.seats_used}
+                        </p>
                     </div>
 
                     {seatPreview && seatPreview.action !== "noop" && (
-                        <div className={`border p-4 ${seatPreview.action === "checkout" ? "border-brand bg-brand/5" : "border-border bg-surface-alt"}`} data-testid="seat-preview">
+                        <div
+                            className={`border p-4 ${seatPreview.action === "checkout" ? "border-brand bg-brand/5" : "border-border bg-surface-alt"}`}
+                            data-testid="seat-preview"
+                        >
                             <div className="text-[10px] font-mono uppercase tracking-[0.15em] mb-1">
                                 {seatPreview.action === "checkout" ? "Charge summary" : "Credit note"}
                             </div>
@@ -88,9 +71,9 @@ export default function SeatEditorModal({
                             data-testid="apply-seat-change"
                             className="btn-primary"
                         >
-                            {seatBusy ? <Loader2 className="w-4 h-4 animate-spin" /> :
-                                seatPreview?.action === "checkout" ? "Proceed to checkout" :
-                                seatPreview?.action === "credit" ? "Apply reduction" : "Apply"}
+                            {seatBusy
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : seatChangeLabel(seatPreview?.action)}
                         </button>
                     </div>
                 </div>

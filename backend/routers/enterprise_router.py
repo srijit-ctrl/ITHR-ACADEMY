@@ -443,75 +443,56 @@ async def update_seats(payload: dict, request: Request, user_id: str = Depends(g
     return await _start_seat_increment_checkout(org, delta, new_count, user_id, origin_url, request)
 
 
-@router.post("/organizations/seats/fulfill/{session_id}")
-async def fulfill_seat_increment(session_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
-    """Called by the client on redirect back to portal — verifies checkout and bumps seat count.
-
-    Hardening (iter-29):
-      - Atomic "claim" via find_one_and_update so concurrent calls can't
-        double-fulfill even if Stripe/webhook + client-redirect race.
-      - Verifies the amount actually paid at Stripe matches the amount we
-        recorded when creating the session (defence against session-metadata
-        tampering).
-      - Never lets the fulfilled seat_count fall below the org's current
-        seats_used (someone may have removed a member between checkout
-        creation and payment completion — a decrease would leave dangling
-        members).
-      - Emits an activity event so the fulfillment shows up in the live feed.
-    """
-    org, member = await _resolve_org_for_user(user_id, require_admin=True)
-    if member["role"] != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner may fulfill seat purchases")
-
+async def _load_seat_txn(session_id: str, org_id: str) -> dict:
+    """Fetch the seat-increment txn and validate ownership. Raises HTTPException on failure."""
     txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn or txn.get("type") != "seat_increment":
         raise HTTPException(status_code=404, detail="Seat increment transaction not found")
-    if txn.get("org_id") != org["id"]:
+    if txn.get("org_id") != org_id:
         raise HTTPException(status_code=403, detail="This transaction does not belong to your org")
+    return txn
 
-    # Fast-path idempotency: already fulfilled → return current state.
-    if txn.get("payment_status") == "paid" and txn.get("fulfilled_at"):
-        return {"already_fulfilled": True, "seat_count": org.get("seat_count")}
 
-    from core import get_stripe, log_activity
-    stripe = get_stripe(request)
+async def _verify_stripe_payment(stripe, session_id: str, txn: dict) -> tuple[object, int | None]:
+    """Verify Stripe checkout status + amount match. Returns (status_resp, paid_cents)."""
     try:
         status_resp = await stripe.get_checkout_status(session_id)
     except Exception as e:
         logger.exception("Stripe seat-increment status failed")
         raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
 
-    if status_resp.payment_status != "paid":
-        # Not yet paid — just refresh the txn status so the client sees it.
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
-            {"$set": {"payment_status": status_resp.payment_status, "status": status_resp.status, "updated_at": now_iso()}},
-        )
-        return {"fulfilled": False, "payment_status": status_resp.payment_status, "seat_count": org.get("seat_count")}
-
-    # Amount tampering defence: compare paid amount vs recorded expectation.
-    # Stripe SDK exposes amount_total in cents; our txn.amount is in dollars.
     paid_cents = getattr(status_resp, "amount_total", None)
-    expected_cents = int(round(float(txn["amount"]) * 100))
-    if paid_cents is not None and paid_cents != expected_cents:
-        logger.error(
-            f"[fulfill] Amount mismatch session={session_id} "
-            f"paid_cents={paid_cents} expected_cents={expected_cents}"
-        )
-        raise HTTPException(status_code=409, detail="Payment amount does not match transaction record")
+    if status_resp.payment_status == "paid" and paid_cents is not None:
+        expected_cents = int(round(float(txn["amount"]) * 100))
+        if paid_cents != expected_cents:
+            logger.error(
+                f"[fulfill] Amount mismatch session={session_id} "
+                f"paid_cents={paid_cents} expected_cents={expected_cents}"
+            )
+            raise HTTPException(status_code=409, detail="Payment amount does not match transaction record")
+    return status_resp, paid_cents
 
-    # Downgrade-guard: never let the fulfilled seat_count drop below seats_used.
-    current_used = org.get("seats_used", 0)
+
+def _resolve_fulfill_target(txn: dict, current_seats_used: int) -> int:
+    """Downgrade-guard: never let fulfilled seat_count drop below seats_used."""
     target = int(txn["target_seat_count"])
-    if target < current_used:
-        # Someone must have added members via a different path — bump the
-        # target to at least seats_used so we don't leave orphans.
+    if target < current_seats_used:
         logger.warning(
-            f"[fulfill] target_seat_count {target} < seats_used {current_used}; using seats_used"
+            f"[fulfill] target_seat_count {target} < seats_used {current_seats_used}; using seats_used"
         )
-        target = current_used
+        return current_seats_used
+    return target
 
-    # Atomic "claim" — only the first caller to flip status→paid + set fulfilled_at wins.
+
+async def _claim_and_apply_fulfillment(
+    session_id: str, status_resp, paid_cents: int | None,
+    org: dict, txn: dict, target: int, user_id: str,
+) -> dict | None:
+    """Atomic claim + org update + billing event + activity log.
+
+    Returns None if another concurrent call claimed first (idempotent no-op),
+    otherwise returns the claimed txn document.
+    """
     claimed = await db.payment_transactions.find_one_and_update(
         {
             "session_id": session_id,
@@ -530,9 +511,7 @@ async def fulfill_seat_increment(session_id: str, request: Request, user_id: str
         return_document=True,
     )
     if not claimed:
-        # Another concurrent call fulfilled first — return the current state.
-        fresh_org = await db.organizations.find_one({"id": org["id"]}, {"_id": 0, "seat_count": 1})
-        return {"already_fulfilled": True, "seat_count": (fresh_org or {}).get("seat_count")}
+        return None
 
     await db.organizations.update_one({"id": org["id"]}, {"$set": {"seat_count": target}})
     await db.org_billing_events.insert_one({
@@ -546,9 +525,9 @@ async def fulfill_seat_increment(session_id: str, request: Request, user_id: str
         "created_at": now_iso(),
     })
 
-    # Activity feed
     try:
         import asyncio as _asyncio
+        from core import log_activity
         _asyncio.create_task(log_activity(
             kind="seat_change",
             message=f'{org["name"]} added {int(txn["seats_delta"])} seats (now {target})',
@@ -557,6 +536,59 @@ async def fulfill_seat_increment(session_id: str, request: Request, user_id: str
         ))
     except Exception:
         pass
+
+    return claimed
+
+
+@router.post("/organizations/seats/fulfill/{session_id}")
+async def fulfill_seat_increment(session_id: str, request: Request, user_id: str = Depends(get_current_user_id)):
+    """Called by the client on redirect back to portal — verifies checkout and bumps seat count.
+
+    Hardening (iter-29):
+      - Atomic "claim" via find_one_and_update so concurrent calls can't
+        double-fulfill even if Stripe/webhook + client-redirect race.
+      - Verifies the amount actually paid at Stripe matches the amount we
+        recorded when creating the session (defence against session-metadata
+        tampering).
+      - Never lets the fulfilled seat_count fall below the org's current
+        seats_used (someone may have removed a member between checkout
+        creation and payment completion — a decrease would leave dangling
+        members).
+      - Emits an activity event so the fulfillment shows up in the live feed.
+
+    Iter-30: extracted into `_load_seat_txn`, `_verify_stripe_payment`,
+    `_resolve_fulfill_target`, and `_claim_and_apply_fulfillment` for
+    testability and lower cyclomatic complexity.
+    """
+    org, member = await _resolve_org_for_user(user_id, require_admin=True)
+    if member["role"] != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner may fulfill seat purchases")
+
+    txn = await _load_seat_txn(session_id, org["id"])
+
+    # Fast-path idempotency: already fulfilled → return current state.
+    if txn.get("payment_status") == "paid" and txn.get("fulfilled_at"):
+        return {"already_fulfilled": True, "seat_count": org.get("seat_count")}
+
+    from core import get_stripe
+    stripe = get_stripe(request)
+    status_resp, paid_cents = await _verify_stripe_payment(stripe, session_id, txn)
+
+    if status_resp.payment_status != "paid":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"payment_status": status_resp.payment_status, "status": status_resp.status, "updated_at": now_iso()}},
+        )
+        return {"fulfilled": False, "payment_status": status_resp.payment_status, "seat_count": org.get("seat_count")}
+
+    target = _resolve_fulfill_target(txn, org.get("seats_used", 0))
+    claimed = await _claim_and_apply_fulfillment(
+        session_id, status_resp, paid_cents, org, txn, target, user_id,
+    )
+    if not claimed:
+        # Concurrent call fulfilled first — return current state
+        fresh_org = await db.organizations.find_one({"id": org["id"]}, {"_id": 0, "seat_count": 1})
+        return {"already_fulfilled": True, "seat_count": (fresh_org or {}).get("seat_count")}
 
     return {"fulfilled": True, "payment_status": "paid", "seat_count": target}
 

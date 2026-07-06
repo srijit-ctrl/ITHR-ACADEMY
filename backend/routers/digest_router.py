@@ -32,21 +32,19 @@ IMPACT_COLOR = {
 }
 
 
-async def _build_digest_html(org: dict, summary: dict) -> tuple[str, dict]:
-    """Assemble the HTML digest + return (html, meta)."""
+async def _load_digest_data() -> tuple[list[dict], list[dict]]:
+    """Fetch critical intelligence signals + pending curriculum patches for the digest."""
     cached = await db.intelligence_cache.find_one({"key": INTELLIGENCE_CACHE_KEY}, {"_id": 0})
-    signals = []
-    if cached:
-        signals = (cached.get("payload") or {}).get("signals", [])
+    signals = (cached.get("payload") or {}).get("signals", []) if cached else []
     critical_signals = [s for s in signals if s.get("impact") in ("Critical", "High")][:6]
-
-    # Recent patches for the org's active courses
     patches = await db.curriculum_patches.find(
         {"status": "proposed"}, {"_id": 0}
     ).sort("created_at", -1).to_list(10)
+    return critical_signals, patches
 
-    # Pull a few enterprise-relevant KPIs
-    kpi_html = f"""
+
+def _kpi_row_html(summary: dict) -> str:
+    return f"""
     <table role="presentation" width="100%" style="border-collapse:collapse;margin:0 0 32px;">
       <tr>
         {_kpi_cell("Readiness", f"{summary.get('readiness_index','—')}", "/ 100")}
@@ -57,50 +55,55 @@ async def _build_digest_html(org: dict, summary: dict) -> tuple[str, dict]:
     </table>
     """
 
-    signals_html = "".join(
+
+def _signal_card_html(s: dict) -> str:
+    color = IMPACT_COLOR.get(s.get("impact", "Medium"), "#5b7ba8")
+    return f"""
+    <table role="presentation" width="100%" style="border-collapse:collapse;margin:0 0 14px;border:1px solid #d7dde6;">
+      <tr>
+        <td style="padding:16px 20px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:{color};margin-bottom:4px;">
+            {s.get('impact','Medium').upper()} · {s.get('category','')}
+          </div>
+          <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;line-height:1.25;color:#0d1321;margin:0 0 6px;">
+            {_esc(s.get('title',''))}
+          </div>
+          <div style="font-family:Arial,sans-serif;font-size:13px;color:#4a5768;margin-bottom:8px;">
+            {_esc(s.get('summary',''))[:220]}
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#00a897;">
+            → {_esc(s.get('recommended_action',''))[:120]}
+          </div>
+        </td>
+      </tr>
+    </table>
+    """
+
+
+def _patches_section_html(patches: list[dict]) -> str:
+    if not patches:
+        return ""
+    rows = "".join(
         f"""
-        <table role="presentation" width="100%" style="border-collapse:collapse;margin:0 0 14px;border:1px solid #d7dde6;">
-          <tr>
-            <td style="padding:16px 20px;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:{IMPACT_COLOR.get(s.get('impact','Medium'),'#5b7ba8')};margin-bottom:4px;">
-                {s.get('impact','Medium').upper()} · {s.get('category','')}
-              </div>
-              <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;line-height:1.25;color:#0d1321;margin:0 0 6px;">
-                {_esc(s.get('title',''))}
-              </div>
-              <div style="font-family:Arial,sans-serif;font-size:13px;color:#4a5768;margin-bottom:8px;">
-                {_esc(s.get('summary',''))[:220]}
-              </div>
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#00a897;">
-                → {_esc(s.get('recommended_action',''))[:120]}
-              </div>
-            </td>
-          </tr>
-        </table>
-        """
-        for s in critical_signals
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #eef1f5;font-family:Arial,sans-serif;font-size:13px;">
+            <div style="color:#0d1321;font-weight:600;">{_esc(p.get('proposed_title',''))}</div>
+            <div style="color:#7d8ba0;font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px;">
+              {_esc(p.get('course_slug',''))} · Module {p.get('module_number','?')}
+            </div>
+          </td>
+        </tr>
+        """ for p in patches[:5]
     )
+    return f"""
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00a897;margin:32px 0 12px;">Pending curriculum patches</div>
+    <table role="presentation" width="100%" style="border-collapse:collapse;border:1px solid #d7dde6;">{rows}</table>
+    """
 
-    patches_html = ""
-    if patches:
-        rows = "".join(
-            f"""
-            <tr>
-              <td style="padding:10px 16px;border-bottom:1px solid #eef1f5;font-family:Arial,sans-serif;font-size:13px;">
-                <div style="color:#0d1321;font-weight:600;">{_esc(p.get('proposed_title',''))}</div>
-                <div style="color:#7d8ba0;font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:1.5px;margin-top:2px;">
-                  {_esc(p.get('course_slug',''))} · Module {p.get('module_number','?')}
-                </div>
-              </td>
-            </tr>
-            """ for p in patches[:5]
-        )
-        patches_html = f"""
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00a897;margin:32px 0 12px;">Pending curriculum patches</div>
-        <table role="presentation" width="100%" style="border-collapse:collapse;border:1px solid #d7dde6;">{rows}</table>
-        """
 
-    html = f"""
+def _digest_shell_html(org: dict, kpi_html: str, body_html: str, briefing_url: str) -> str:
+    """Wrap the KPI + body content in the ITHR-branded email envelope."""
+    return f"""
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>ITHR Weekly Intelligence Digest</title></head>
 <body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,sans-serif;color:#0d1321;">
@@ -136,18 +139,11 @@ async def _build_digest_html(org: dict, summary: dict) -> tuple[str, dict]:
           </tr>
 
           <tr><td style="padding:24px 32px 0;">{kpi_html}</td></tr>
-
-          <tr>
-            <td style="padding:0 32px 24px;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00a897;margin-bottom:16px;">Critical intelligence · Top {len(critical_signals)}</div>
-              {signals_html or '<div style="font-family:Arial,sans-serif;font-size:13px;color:#7d8ba0;">No critical signals in this window.</div>'}
-              {patches_html}
-            </td>
-          </tr>
+          <tr><td style="padding:0 32px 24px;">{body_html}</td></tr>
 
           <tr>
             <td style="padding:0 32px 40px;">
-              <a href="https://enterprise-ai-learn-2.preview.emergentagent.com/intelligence" style="display:inline-block;background:#00a897;color:#ffffff;padding:12px 24px;font-family:Arial,sans-serif;font-size:14px;font-weight:600;text-decoration:none;">Open full briefing →</a>
+              <a href="{briefing_url}" style="display:inline-block;background:#00a897;color:#ffffff;padding:12px 24px;font-family:Arial,sans-serif;font-size:14px;font-weight:600;text-decoration:none;">Open full briefing →</a>
             </td>
           </tr>
 
@@ -164,6 +160,35 @@ async def _build_digest_html(org: dict, summary: dict) -> tuple[str, dict]:
   </table>
 </body></html>
 """
+
+
+async def _build_digest_html(org: dict, summary: dict) -> tuple[str, dict]:
+    """Assemble the HTML digest + return (html, meta).
+
+    Orchestrates: (1) data load, (2) KPI + signals + patches section render,
+    (3) shell wrap. Broken into helpers so each section is independently
+    testable and swappable.
+    """
+    import os
+    critical_signals, patches = await _load_digest_data()
+
+    kpi_html = _kpi_row_html(summary)
+    signals_html = "".join(_signal_card_html(s) for s in critical_signals)
+    if not signals_html:
+        signals_html = '<div style="font-family:Arial,sans-serif;font-size:13px;color:#7d8ba0;">No critical signals in this window.</div>'
+    patches_html = _patches_section_html(patches)
+
+    body_html = f"""
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#00a897;margin-bottom:16px;">Critical intelligence · Top {len(critical_signals)}</div>
+      {signals_html}
+      {patches_html}
+    """
+
+    # Briefing URL from env — no hardcoded preview host so prod links land on learn.ithr.tech
+    base_url = os.environ.get("PUBLIC_APP_URL", "").rstrip("/") or "https://learn.ithr.tech"
+    briefing_url = f"{base_url}/intelligence"
+
+    html = _digest_shell_html(org, kpi_html, body_html, briefing_url)
     meta = {
         "critical_signal_count": len(critical_signals),
         "pending_patch_count": len(patches),
