@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import segno
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from auth import get_current_user_id
@@ -294,12 +294,41 @@ async def my_certificates(user_id: str = Depends(get_current_user_id)):
 
 
 @router.get("/certificates/verify/{certificate_id}")
-async def verify_certificate(certificate_id: str):
+async def verify_certificate(certificate_id: str, request: Request):
     cert = await db.certificates.find_one(
         {"certificate_id": certificate_id}, {"_id": 0}
     )
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
+
+    # Notify the holder that their credential was verified — throttled to
+    # at most one email per 6 hours per cert, so a page refresh doesn't spam.
+    try:
+        import asyncio as _asyncio
+        import hashlib
+        from datetime import datetime, timedelta, timezone
+        from email_service import send_credential_verification_alert
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+        last = cert.get("last_verify_alert_at", "")
+        if last < cutoff and certificate_id != "SAMPLE-ITHR-2026-001":
+            client_ip = (request.client.host if request.client else "unknown") or "unknown"
+            ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()
+            holder = await db.users.find_one({"id": cert["user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
+            if holder:
+                now_utc = datetime.now(timezone.utc).isoformat()
+                await db.certificates.update_one(
+                    {"certificate_id": certificate_id},
+                    {"$set": {"last_verify_alert_at": now_utc}},
+                )
+                _asyncio.create_task(send_credential_verification_alert(
+                    email=holder["email"], full_name=holder.get("full_name") or "",
+                    certificate_id=certificate_id, course_title=cert.get("course_title", ""),
+                    verifier_ip_hash=ip_hash, verified_at=now_utc[:19].replace("T", " "),
+                ))
+    except Exception:
+        # Never fail a public verify because of an email hiccup.
+        pass
+
     return {"valid": True, "certificate": cert}
 
 

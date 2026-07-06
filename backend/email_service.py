@@ -199,3 +199,177 @@ async def send_org_invite_email(
         "— ITHR Academy"
     )
     return await _fire(email, f"You're invited to {org_name} on ITHR Academy", html, text, tag="invite")
+
+
+# ---- Payment confirmation -------------------------------------------------
+
+
+async def send_payment_confirmation_email(
+    email: str, full_name: str, item_description: str, amount: float,
+    currency: str = "usd", invoice_id: str | None = None, receipt_url: str | None = None,
+) -> bool:
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    name = _safe(full_name or "there")
+    item = _safe(item_description)
+    amt_str = f"${amount:,.2f} {currency.upper()}"
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 16px 0;">
+  Thank you for your payment. Your enrollment / seat purchase is confirmed and access is live.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-radius:6px;margin:0 0 8px 0;">
+  <tr><td style="padding:16px 20px;">
+    <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;margin-bottom:4px;">Item</div>
+    <div style="font-size:15px;color:#16335E;font-weight:600;">{item}</div>
+    <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;margin:14px 0 4px;">Amount</div>
+    <div style="font-size:22px;color:#00A78B;font-weight:600;">{amt_str}</div>
+    {f'<div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;margin:14px 0 4px;">Invoice ID</div><div style="font-family:monospace;font-size:13px;color:#16335E;">{_safe(invoice_id)}</div>' if invoice_id else ''}
+  </td></tr>
+</table>
+{f'<p style="font-size:13px;margin:16px 0 0 0;"><a href="{receipt_url}" style="color:#00A78B;">View full receipt →</a></p>' if receipt_url else ''}
+"""
+    html = _wrap(
+        kicker="Payment Confirmed · ITHR Academy",
+        heading=f"You're all set, {name}.",
+        body_html=body,
+        cta_label="Continue to my dashboard",
+        cta_url=dash_url,
+        footer_note="This payment was processed securely via Stripe. Reach out to billing@ithr.tech for any billing questions.",
+    )
+    text = (
+        f"Hi {name},\n\n"
+        f"Payment confirmed for {item}.\n"
+        f"Amount: {amt_str}\n"
+        + (f"Invoice: {invoice_id}\n" if invoice_id else "")
+        + (f"Receipt: {receipt_url}\n" if receipt_url else "")
+        + f"\nContinue: {dash_url}\n\n— ITHR Academy"
+    )
+    return await _fire(email, "Payment confirmed — ITHR Academy", html, text, tag="payment")
+
+
+# ---- Validity expiration --------------------------------------------------
+
+
+async def send_validity_expiration_email(
+    email: str, full_name: str, credential_or_plan: str, expires_on: str, renewal_url: str | None = None,
+) -> bool:
+    name = _safe(full_name or "there")
+    item = _safe(credential_or_plan)
+    cta_url = renewal_url or f"{FRONTEND_URL}/pricing"
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  A quick heads-up: your <b style="color:#16335E;">{item}</b> is scheduled to expire on <b style="color:#00A78B;">{_safe(expires_on)}</b>.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Renewing now keeps your credentials verifiable, your team's seats active, and your dashboard streak intact — with no re-onboarding required.
+</p>
+<p style="font-size:13px;line-height:1.6;color:#6b7280;margin:16px 0 0 0;">
+  Not planning to renew? No action needed — you'll receive one final reminder 24 hours before the expiration date, then access winds down gracefully.
+</p>
+"""
+    html = _wrap(
+        kicker="Renewal Reminder · ITHR Academy",
+        heading=f"Your {item} expires soon.",
+        body_html=body,
+        cta_label="Renew now",
+        cta_url=cta_url,
+        footer_note="",
+    )
+    text = (
+        f"Hi {name},\n\n"
+        f"Your {item} expires on {expires_on}. Renew: {cta_url}\n\n— ITHR Academy"
+    )
+    return await _fire(email, f"Renewal reminder: {credential_or_plan}", html, text, tag="expiration")
+
+
+# ---- Complaint / Support response ----------------------------------------
+
+
+async def send_complaint_response_email(
+    email: str, full_name: str, ticket_ref: str, response_text: str, agent_name: str = "The ITHR Support Team",
+) -> bool:
+    name = _safe(full_name or "there")
+    # Escape the response body but keep line breaks
+    safe_response = _safe(response_text).replace("\n", "<br>")
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 16px 0;">
+  Thank you for reaching out. Here is our response to your inquiry (reference <span style="font-family:monospace;color:#00A78B;">{_safe(ticket_ref)}</span>):
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-left:4px solid #00A78B;border-radius:0 6px 6px 0;margin:0 0 16px 0;">
+  <tr><td style="padding:16px 20px;font-size:14px;line-height:1.65;color:#16335E;">{safe_response}</td></tr>
+</table>
+<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0;">
+  If this fully answers your question, feel free to close the thread. If not, simply reply to this email and it will route back to me directly — we&apos;ll keep working until it&apos;s resolved.
+</p>
+<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:14px 0 0 0;">
+  — {_safe(agent_name)}
+</p>
+"""
+    html = _wrap(
+        kicker=f"Support Response · Ref {_safe(ticket_ref)}",
+        heading="A response to your inquiry.",
+        body_html=body,
+        cta_label="Reply / open ticket",
+        cta_url=f"{FRONTEND_URL}/support?ref={ticket_ref}",
+        footer_note="You can reply directly to this email — all replies are logged against your ticket automatically.",
+    )
+    text = (
+        f"Hi {name},\n\nRe: {ticket_ref}\n\n{response_text}\n\n— {agent_name}\nITHR Support"
+    )
+    return await _fire(email, f"Re: your ITHR support ticket [{ticket_ref}]", html, text, tag="support")
+
+
+# ---- Credential verification alert (holder is notified) ------------------
+
+
+async def send_credential_verification_alert(
+    email: str, full_name: str, certificate_id: str, course_title: str,
+    verifier_ip_hash: str, verified_at: str,
+) -> bool:
+    """Fire when someone visits the public verify page for a cert.
+
+    Sends a heads-up to the CREDENTIAL HOLDER so they know their cert
+    is being checked (e.g., during a hiring interview). Positioning:
+    "signal of interest" — this is a feature, not a security alert.
+    """
+    name = _safe(full_name or "there")
+    course = _safe(course_title)
+    verify_url = f"{FRONTEND_URL}/verify/{certificate_id}"
+    passport_url = f"{FRONTEND_URL}/passport"
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Someone just verified your <b style="color:#16335E;">{course}</b> credential on the public verification page. That usually means a recruiter, hiring manager, or partner is checking your qualifications right now.
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-radius:6px;margin:12px 0;">
+  <tr><td style="padding:12px 16px;font-size:12px;color:#6b7280;">
+    <div><b style="color:#16335E;">Credential:</b> {course}</div>
+    <div><b style="color:#16335E;">ID:</b> <span style="font-family:monospace;">{_safe(certificate_id)}</span></div>
+    <div><b style="color:#16335E;">Verified at:</b> {_safe(verified_at)} UTC</div>
+    <div><b style="color:#16335E;">Verifier (hashed):</b> <span style="font-family:monospace;font-size:10px;">{_safe(verifier_ip_hash)[:12]}…</span></div>
+  </td></tr>
+</table>
+<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:14px 0 0 0;">
+  A great time to make sure your <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a> is up to date — that&apos;s what verifiers see when they scan the QR code.
+</p>
+"""
+    html = _wrap(
+        kicker="Credential Verified · ITHR Academy",
+        heading="Someone just verified your credential.",
+        body_html=body,
+        cta_label="View my passport",
+        cta_url=passport_url,
+        footer_note=(
+            "This is a positive signal — verifiers only reach this page when they want to confirm your qualifications. "
+            "If you did NOT expect this and don't recognize any pending job/partnership contexts, "
+            f"you can still view the public record at {verify_url}."
+        ),
+    )
+    text = (
+        f"Hi {name},\n\n"
+        f"Someone verified your {course} credential ({certificate_id}) at {verified_at} UTC.\n\n"
+        f"View public record: {verify_url}\nAI Skills Passport: {passport_url}\n\n— ITHR Academy"
+    )
+    return await _fire(email, f'Your "{course_title}" credential was just verified', html, text, tag="verify-alert")

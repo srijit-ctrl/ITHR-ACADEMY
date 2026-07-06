@@ -89,6 +89,20 @@ async def checkout_status(session_id: str, request: Request, user_id: str = Depe
             expires_at = datetime.now(timezone.utc) + timedelta(days=pkg["duration_days"])
             await db.users.update_one({"id": txn["user_id"]}, {"$set": {"subscription_tier": pkg["tier"], "subscription_expires_at": expires_at.isoformat(), "subscription_package": txn["package_id"]}})
             updates["fulfilled_at"] = now_iso()
+            # Payment-confirmation email (fire-and-forget)
+            try:
+                import asyncio as _asyncio
+                from email_service import send_payment_confirmation_email
+                user_doc = await db.users.find_one({"id": txn["user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
+                if user_doc:
+                    _asyncio.create_task(send_payment_confirmation_email(
+                        email=user_doc["email"], full_name=user_doc.get("full_name") or "",
+                        item_description=f"{pkg.get('name', txn['package_id'])} — {pkg.get('duration_days', 0)}-day access",
+                        amount=float(txn["amount"]), currency=txn.get("currency", "usd"),
+                        invoice_id=session_id,
+                    ))
+            except Exception:
+                logger.exception("Payment-confirm email dispatch failed (non-fatal)")
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": updates})
 
     return {"payment_status": status_resp.payment_status, "status": status_resp.status, "package_id": txn["package_id"], "tier": txn["tier"], "amount": txn["amount"], "currency": txn["currency"], "amount_total_cents": status_resp.amount_total}

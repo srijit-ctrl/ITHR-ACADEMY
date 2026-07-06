@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, BarChart3 } from "lucide-react";
+import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, BarChart3, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { PlatformAnalyticsPanel } from "@/components/AnalyticsPanels";
 
@@ -109,6 +109,7 @@ export default function SuperAdminPortal() {
                     <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")} label="Analytics" count={""} testId="tab-analytics" />
                     <TabButton active={tab === "orgs"} onClick={() => setTab("orgs")} label="Organizations" count={orgs.length} testId="tab-orgs" />
                     <TabButton active={tab === "users"} onClick={() => setTab("users")} label="Users" count={totalUsers} testId="tab-users" />
+                    <TabButton active={tab === "emails"} onClick={() => setTab("emails")} label="Send email" count={""} testId="tab-emails" />
                 </div>
 
                 {tab === "analytics" && <PlatformAnalyticsPanel />}
@@ -132,6 +133,8 @@ export default function SuperAdminPortal() {
                 {tab === "users" && (
                     <UserTable users={users} totalUsers={totalUsers} onResetPassword={handleResetPassword} />
                 )}
+
+                {tab === "emails" && <EmailDispatchPanel />}
             </div>
 
             {showCreate && (
@@ -181,7 +184,7 @@ function TabButton({ active, onClick, label, count, testId }) {
 
 function OrgTable({ orgs, onDelete, busy }) {
     if (busy) return <div className="card-flat p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></div>;
-    if (orgs.length === 0) return <div className="card-flat p-8 text-center text-sm text-muted-foreground">No enterprise organizations yet. Click "New enterprise org" to provision one.</div>;
+    if (orgs.length === 0) return <div className="card-flat p-8 text-center text-sm text-muted-foreground">No enterprise organizations yet. Click &quot;New enterprise org&quot; to provision one.</div>;
     return (
         <div className="card-flat divide-y divide-border" data-testid="orgs-table">
             <div className="grid grid-cols-12 gap-3 p-4 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
@@ -404,6 +407,166 @@ function FullScreenLoader() {
     return (
         <div className="min-h-screen flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-brand" />
+        </div>
+    );
+}
+
+
+/**
+ * Admin-driven transactional emails (complaint response + validity expiration).
+ * Welcome/cert/invite/payment/verify-alert emails fire automatically —
+ * these are the two that need a human in the loop.
+ */
+function EmailDispatchPanel() {
+    const [kind, setKind] = useState("complaint");
+    const [email, setEmail] = useState("");
+    const [fullName, setFullName] = useState("");
+    // Complaint fields
+    const [ticketRef, setTicketRef] = useState("");
+    const [responseText, setResponseText] = useState("");
+    const [agentName, setAgentName] = useState("The ITHR Support Team");
+    // Expiration fields
+    const [credential, setCredential] = useState("");
+    const [expiresOn, setExpiresOn] = useState("");
+    const [renewalUrl, setRenewalUrl] = useState("");
+
+    const [sending, setSending] = useState(false);
+
+    const canSend = email.includes("@") && (
+        kind === "complaint" ? (ticketRef && responseText) : (credential && expiresOn)
+    );
+
+    const send = async () => {
+        setSending(true);
+        try {
+            if (kind === "complaint") {
+                await api.post("/admin/emails/complaint-response", {
+                    email, full_name: fullName, ticket_ref: ticketRef,
+                    response_text: responseText, agent_name: agentName,
+                });
+            } else {
+                await api.post("/admin/emails/validity-expiration", {
+                    email, full_name: fullName, credential_or_plan: credential,
+                    expires_on: expiresOn, renewal_url: renewalUrl || undefined,
+                });
+            }
+            toast.success(`Email sent to ${email}`);
+            setTicketRef(""); setResponseText(""); setCredential(""); setExpiresOn(""); setRenewalUrl("");
+        } catch (e) {
+            toast.error(e.response?.data?.detail || "Send failed");
+        } finally { setSending(false); }
+    };
+
+    return (
+        <div data-testid="email-dispatch-panel">
+            <div className="mb-6 flex items-center gap-3">
+                <Mail className="w-5 h-5 text-brand" />
+                <h2 className="font-serif text-2xl">Manual email dispatch</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+                Automated lifecycle emails (welcome, cert-earned, payment, credential-verified) fire without action.
+                These two are human-driven — send them to a specific user when a support ticket needs a written response,
+                or when a credential/subscription is about to expire.
+            </p>
+
+            <div className="flex gap-1 mb-6 border-b border-border">
+                <button
+                    onClick={() => setKind("complaint")}
+                    data-testid="email-kind-complaint"
+                    className={`px-4 py-2 text-sm border-b-2 -mb-px ${kind === "complaint" ? "border-brand text-foreground" : "border-transparent text-muted-foreground"}`}
+                >
+                    Complaint / Support response
+                </button>
+                <button
+                    onClick={() => setKind("expiration")}
+                    data-testid="email-kind-expiration"
+                    className={`px-4 py-2 text-sm border-b-2 -mb-px ${kind === "expiration" ? "border-brand text-foreground" : "border-transparent text-muted-foreground"}`}
+                >
+                    Validity expiration
+                </button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Recipient email</label>
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                        data-testid="email-recipient"
+                        className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand" placeholder="learner@company.com" />
+                </div>
+                <div>
+                    <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Full name (auto-lookup if blank)</label>
+                    <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
+                        data-testid="email-fullname"
+                        className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand" />
+                </div>
+            </div>
+
+            {kind === "complaint" && (
+                <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Ticket reference</label>
+                            <input value={ticketRef} onChange={(e) => setTicketRef(e.target.value)}
+                                data-testid="email-ticket-ref"
+                                placeholder="TKT-1234"
+                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm font-mono focus:outline-none focus:border-brand" />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Signed by</label>
+                            <input value={agentName} onChange={(e) => setAgentName(e.target.value)}
+                                data-testid="email-agent-name"
+                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Response body (line breaks preserved)</label>
+                        <textarea value={responseText} onChange={(e) => setResponseText(e.target.value)}
+                            data-testid="email-response-text"
+                            rows={6}
+                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm leading-relaxed focus:outline-none focus:border-brand"
+                            placeholder="Thank you for reaching out. We have looked into this and…" />
+                    </div>
+                </div>
+            )}
+
+            {kind === "expiration" && (
+                <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Credential / plan name</label>
+                            <input value={credential} onChange={(e) => setCredential(e.target.value)}
+                                data-testid="email-credential"
+                                placeholder="Practitioner tier"
+                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand" />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Expires on</label>
+                            <input value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)}
+                                data-testid="email-expires-on"
+                                placeholder="March 15, 2026"
+                                className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground block mb-1.5">Renewal URL (optional — defaults to /pricing)</label>
+                        <input value={renewalUrl} onChange={(e) => setRenewalUrl(e.target.value)}
+                            data-testid="email-renewal-url"
+                            placeholder="https://…"
+                            className="w-full bg-surface border border-border rounded-sm px-3 py-2 text-sm font-mono focus:outline-none focus:border-brand" />
+                    </div>
+                </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+                <button
+                    onClick={send}
+                    disabled={!canSend || sending}
+                    data-testid="email-send"
+                    className="btn-primary"
+                >
+                    {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4" /> Send email</>}
+                </button>
+            </div>
         </div>
     );
 }

@@ -1,0 +1,43 @@
+{
+  "summary": "Iter-25 verification: (1) super-admin analytics reflects the @example.com purge (baseline of 55 users / 25 orgs / 640 seats / 1 cert confirmed pre-test; drifted to 72 users / 28 orgs / 720 seats / 2 certs after this iter's own regression runs — matches expected 'test-created drift' band), (2) two new super-admin email endpoints (/api/admin/emails/complaint-response and /api/admin/emails/validity-expiration) work end-to-end with real Resend sends (resend ids captured in backend logs — [email/support] 4a94668f from the UI dispatch panel + 26cc2a36 from pytest; [email/expiration] 865ba79a + b9658db9 from pytest); both correctly reject non-super-admin callers with 403 and reject missing-required-fields with 400; (3) SAMPLE-ITHR-2026-001 verify is explicitly suppressed (NO [email/verify-alert] log line after 3s), 6-hour throttle logic + hashlib.sha256(IP) source-inspected in assessment_router.py; (4) payment-confirmation email dispatch path exists in checkout_router.py at the paid-transition guard (idempotency check 'txn.get(\"payment_status\") != \"paid\"' + fire-and-forget asyncio.create_task) — code-path verified via source inspection since actually triggering Stripe paid transition requires a live checkout. Frontend /admin: StatCards render live numbers, tab-emails opens EmailDispatchPanel (data-testid=email-dispatch-panel), complaint/expiration toggle works, filling recipient+ticket+body+click Send fires backend send (verified via backend log resend id 4a94668f). Zero console errors. Regression: iter15+16+21+24 suites 42 passed / 4 skipped / 0 failures — no regressions from the purge or new email endpoints.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration25_emails.py",
+    "/app/test_reports/pytest/iter25_emails.xml",
+    "/app/test_reports/pytest/iter25_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_router.py:222-273 — Two new POST endpoints. Both use raw dict payloads instead of Pydantic models, which is why the 400 branch has to re-check required-field presence manually. Consider promoting to typed Pydantic bodies (ComplaintResponseIn, ValidityExpirationIn) for OpenAPI docs and cleaner 422 validation. Non-blocking — current behavior is functionally correct and 400 is arguably more user-friendly than 422 for a super-admin console.",
+    "assessment_router.py:296-330 — /certificates/verify/{id} email throttle is correctly implemented: (a) 6-hour cutoff via `last < cutoff` string comparison of ISO timestamps (works because ISO-8601 is lexicographically sortable), (b) explicit SAMPLE-ITHR-2026-001 suppression, (c) verifier IP hashed with sha256 before storage/email. One subtle behavior worth noting: on the very first verify (no last_verify_alert_at field yet), `cert.get('last_verify_alert_at', '')` returns '', and '' < cutoff is True — so the first fire path is taken. Good default. Consider adding a comment documenting that '' < cutoff intentionally allows the first hit.",
+    "checkout_router.py:98-105 — Payment-confirm email dispatch is properly guarded by the idempotency check `txn.get('payment_status') != 'paid'` on the outer if. However, the item_description reads `pkg.get('name', txn['package_id'])` — the PAYMENT_PACKAGES dict uses key 'label' (line 13), not 'name'. So the pkg.get('name', ...) will ALWAYS fall through to the package_id string. Minor cosmetic bug in the email content — the email says 'practitioner_monthly — 30-day access' instead of 'Practitioner — Monthly — 30-day access'. Fix: replace pkg.get('name', txn['package_id']) with pkg.get('label', txn['package_id']).",
+    "email_service.py — Excellent module extension. All 4 new emails follow the same _fire()/_wrap() pattern from iter-24; consistent tagging ('payment', 'expiration', 'support', 'verify-alert'); all return bool and never raise. send_credential_verification_alert's verifier_ip_hash is sliced to 12 chars in the email body ('{_safe(verifier_ip_hash)[:12]}…') — good UX (fingerprint feel without leaking the full hash).",
+    "purge_test_data.py — Not exercised in tests (script is a one-shot ops tool, not an endpoint). Its correctness is inferred from the post-purge analytics numbers matching the review request baseline (55/25/1 pre-drift).",
+    "SuperAdminPortal.jsx — EmailDispatchPanel is well-scoped: uses data-testid on every input/button (email-recipient, email-fullname, email-ticket-ref, email-response-text, email-agent-name, email-credential, email-expires-on, email-renewal-url, email-send, email-kind-complaint, email-kind-expiration), form clears on success, sending state disables the button. Toast text 'Email sent to <email>' — clear feedback.",
+    "SuperAdminPortal.jsx:104 — StatCard for seats uses `orgs.reduce((s, o) => s + (o.seat_count || 0), 0)`. This aggregates orgs.seat_count (the CONFIGURED seat allocation, not seats_used). That matches the review request wording ('total seats issued'). Correct.",
+    "admin_router.py:239, 266 — Auto-lookup of full_name when the super-admin omits it is a nice UX touch; falls back to 'there' if the user record is missing. Good.",
+    "The 4 new email templates all reference `no-reply@ithr.tech` (verified Resend domain — no sandbox restrictions), and all deliver real resend ids for arbitrary recipients (@ithr360.com, @example.com etc.).",
+    "MINOR: In `checkout_router.py` line 100, `pkg.get('name', txn['package_id'])` should be `pkg.get('label', txn['package_id'])` — see comment #3 above. Purely cosmetic in the confirmation email body."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration25_emails.py (NEW — 10 tests, 100% pass)"
+  ],
+  "success_rate": {
+    "backend": "iter-25 new suite 10/10 = 100%. Regression on iter-15+16+21+24 = 42/42 passed (+ 4 pre-existing skips) = 100%.",
+    "frontend": "5/5 acceptance checks PASS (tab-emails renders, EmailDispatchPanel loads, kind toggle works, form fill+send fires backend log line, 0 console errors)."
+  },
+  "test_credentials": "Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod (confirmed still present after purge). Test learner (iter25.learner+<ts>@example.com / IterTest25!Pass) auto-created by fixture — safe to leave.",
+  "seed_data_creation": "1 test learner from iter-25 fixture (iter25.learner+*). No new orgs or certs created by iter-25 tests. The 15-17 unit drift on totals since baseline is from iter15/16/21/24 regression runs, not from iter-25 code.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Post-iter-25 baseline: 72 users / 28 orgs / 720 seats / 2 certs (last verified 02:57 UTC). SAMPLE-ITHR-2026-001 cert is preserved and its verify endpoint is confirmed to NOT fire an email (explicit suppression). Founder-perk claimed=15 (started at 1, incremented during regression runs). Resend domain ithr.tech remains fully verified — no sandbox restrictions on any recipient. Note the one cosmetic bug flagged in critical_code_review_comments #3: checkout_router.py:100 uses `pkg.get('name', txn['package_id'])` where 'name' is not a key in PAYMENT_PACKAGES — should be 'label'. Not user-blocking (only affects payment-confirmation email body wording) and no tests exist yet for live-payment email; feel free to hand back to E1 or leave for a follow-up.",
+  "rca of the issue": "N/A — no functional bugs. One minor cosmetic dict-key mismatch in checkout_router.py:100 (`pkg.get('name', ...)` should be `pkg.get('label', ...)`) noted in code review. RCA: PAYMENT_PACKAGES was defined with key 'label' since inception, and the new email dispatch code reached for 'name' as if there was a rename. Fix: single-line change. Impact: only the payment-confirmation email body text — endpoint response, DB state, and Resend send are all unaffected."
+}

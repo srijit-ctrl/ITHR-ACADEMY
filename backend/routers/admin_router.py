@@ -216,3 +216,58 @@ async def platform_analytics_endpoint(
     from analytics import platform_analytics
     days = max(7, min(90, days))
     return await platform_analytics(days=days)
+
+
+# ---- Manual email dispatch (super-admin driven) --------------------------
+@router.post("/emails/complaint-response")
+async def admin_send_complaint_response(
+    payload: dict,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Send a support-ticket response email to a specified user.
+
+    Body: {email, ticket_ref, response_text, agent_name?, full_name?}
+    """
+    from email_service import send_complaint_response_email
+    to_email = (payload.get("email") or "").strip().lower()
+    ticket_ref = (payload.get("ticket_ref") or "").strip()
+    response_text = (payload.get("response_text") or "").strip()
+    if not (to_email and ticket_ref and response_text):
+        raise HTTPException(status_code=400, detail="email, ticket_ref, and response_text are required")
+    full_name = payload.get("full_name")
+    if not full_name:
+        u = await db.users.find_one({"email": to_email}, {"_id": 0, "full_name": 1})
+        full_name = (u or {}).get("full_name")
+    sent = await send_complaint_response_email(
+        email=to_email, full_name=full_name or "there",
+        ticket_ref=ticket_ref, response_text=response_text,
+        agent_name=payload.get("agent_name") or "The ITHR Support Team",
+    )
+    return {"sent": sent, "email": to_email, "ticket_ref": ticket_ref}
+
+
+@router.post("/emails/validity-expiration")
+async def admin_send_validity_expiration(
+    payload: dict,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Send a renewal-reminder email to a specified user.
+
+    Body: {email, credential_or_plan, expires_on, renewal_url?, full_name?}
+    """
+    from email_service import send_validity_expiration_email
+    to_email = (payload.get("email") or "").strip().lower()
+    credential = (payload.get("credential_or_plan") or "").strip()
+    expires_on = (payload.get("expires_on") or "").strip()
+    if not (to_email and credential and expires_on):
+        raise HTTPException(status_code=400, detail="email, credential_or_plan, and expires_on are required")
+    full_name = payload.get("full_name")
+    if not full_name:
+        u = await db.users.find_one({"email": to_email}, {"_id": 0, "full_name": 1})
+        full_name = (u or {}).get("full_name")
+    sent = await send_validity_expiration_email(
+        email=to_email, full_name=full_name or "there",
+        credential_or_plan=credential, expires_on=expires_on,
+        renewal_url=payload.get("renewal_url"),
+    )
+    return {"sent": sent, "email": to_email}
