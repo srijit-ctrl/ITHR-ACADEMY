@@ -6,6 +6,7 @@ import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, Bar
 import { toast } from "sonner";
 import { PlatformAnalyticsPanel } from "@/components/AnalyticsPanels";
 import ActivityFeedPanel from "@/components/admin/ActivityFeedPanel";
+import KpiDashboard from "@/components/admin/KpiDashboard";
 
 /**
  * Super-Admin console.
@@ -114,12 +115,15 @@ export default function SuperAdminPortal() {
                 </div>
 
                 {tab === "analytics" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2">
-                            <PlatformAnalyticsPanel />
-                        </div>
-                        <div className="lg:col-span-1">
-                            <ActivityFeedPanel />
+                    <div className="space-y-6">
+                        <KpiDashboard />
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2">
+                                <PlatformAnalyticsPanel />
+                            </div>
+                            <div className="lg:col-span-1">
+                                <ActivityFeedPanel />
+                            </div>
                         </div>
                     </div>
                 )}

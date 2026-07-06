@@ -12,7 +12,7 @@ import os
 import uuid
 
 import httpx
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 
 from auth import (
     JWT_REFRESH_EXPIRY_DAYS,
@@ -125,12 +125,16 @@ async def register(payload: UserRegister, response: Response):
 
 
 @router.post("/auth/login", response_model=AuthResponse)
-async def login(payload: UserLogin, response: Response):
+async def login(payload: UserLogin, request: Request, response: Response):
     doc = await db.users.find_one({"email": payload.email.lower()})
     if not doc or not verify_password(payload.password, doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     access = create_access_token(doc["id"], doc["email"], doc["role"])
     _set_refresh_cookie(response, doc["id"])
+    # Fire-and-forget login tracking (updates last_login_at, login_count,
+    # IP + geo + language). Never blocks the auth response.
+    from login_tracking import schedule_login_tracking
+    schedule_login_tracking(doc["id"], request)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
 
 

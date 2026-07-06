@@ -762,3 +762,55 @@ Triggered by production `learn.ithr.tech` being unreachable at the CloudFront ed
 - Point `learn.ithr.online` DNS at the Emergent deployment host (either directly via CNAME, or via a working CloudFront distribution — depends on Emergent Support's resolution path for the old ithr.tech setup).
 - Once DNS + hosting are wired, all email links (welcome, certificate, org invite, payment receipt, digest CTA, reset-password) will land at the correct URL because they're all templated from `FRONTEND_URL` / `PUBLIC_APP_URL`.
 
+
+### Iteration 34 — Super-Admin KPI Dashboard + Login Tracking + Geo (Feb 2026)
+
+User asked for a rich KPI overview. Delivered end-to-end in a single session.
+
+**Backend infrastructure added:**
+- `backend/login_tracking.py` — fire-and-forget module attached to `POST /api/auth/login`. On every successful login:
+  - Updates the user's `last_login_at`, `login_count`, `last_ip`, `last_country`, `last_city`, `last_language`.
+  - Inserts a `user_login_logs` doc with IP, UA, accept-language, primary language tag, country, country_code, city, timestamp.
+  - Free geo lookup via `ip-api.com` (no key, 45 req/min, 24h per-IP cache in `ip_geo_cache` collection).
+  - All wrapped in a try/except — a geo lookup timeout or API outage never blocks the auth response.
+- `backend/routers/admin_dashboard_router.py` — new router prefix `/api/admin/dashboard`:
+  - `GET /` — full snapshot returning KPIs, signups+enrollments series, top courses, band/language distributions, geo card. Cached via `@cached` at various TTLs (45s to 180s per section).
+  - `GET /timeseries?metric={signups|enrollments|exam_attempts|orders}&days={1-365}` — on-demand time series for the range picker.
+- Login tracking added to `auth_router.login` via `schedule_login_tracking(user_id, request)` (asyncio create_task).
+
+**KPI payload** (verified via curl):
+```
+total_users, active_7d, active_30d, enrollments_total,
+exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
+```
+
+**Frontend added:**
+- `frontend/src/components/admin/KpiDashboard.jsx` — new component with:
+  - Row of 7 KPI cards (6 metrics + LLM key health pill with animated pulse dot).
+  - Signups + Enrollments line chart over 30d (recharts).
+  - Top courses horizontal bar chart.
+  - Geo card — big-number readouts (countries · cities · logins), Globe icon, top-5 countries with proper Unicode flag emojis derived from ISO-3166-alpha-2 codes.
+  - Band distribution pie chart (course difficulty).
+  - Language distribution pie chart (from Accept-Language primary tags of logins).
+  - Time-series-on-demand card with metric dropdown + range toggles (7d / 30d / 90d).
+- Wired into `SuperAdminPortal.jsx` above the existing Platform Analytics + Activity Feed pair in the Analytics tab.
+
+**Testing:**
+- Backend: `/api/admin/dashboard` returns all 6 top-level keys, all types correct, 30-point time series, real geo data (my curl test showed `🇺🇸 United States 1`).
+- Frontend: Login flow succeeds, `[data-testid="kpi-dashboard"]` and `[data-testid="geo-card"]` selectors both matched by playwright.
+- Cache purge endpoint tested — dashboard refreshes on demand via `POST /api/admin/cache/purge`.
+
+**Super-admin password rotation (Iter 34.5):**
+- Fresh production password issued: `Pine-Yew-Loft*015` (memorable-format for accurate copy-paste). User must set in Emergent Secrets + redeploy.
+- Preview retains `preview-only-rotate-in-prod` placeholder for dev convenience.
+
+**Known limitations to communicate:**
+- 16 of 18 test enrollments in preview DB are orphans (course_ids reference courses deleted during prior test iterations). Band distribution shows correct 2 real rows + 16 "Unknown". Production will populate cleanly.
+- LLM key health = env var presence check only; does NOT actively ping the LLM (would burn budget on every dashboard reload). Sufficient for a red/green indicator.
+
+**Backlog (unchanged):**
+- P2: Load tests (k6/Locust) — deferred.
+- P2: Sora 2 batch + AI course pipeline after LLM key top-up.
+- P3: Distributed Redis cache backend if traffic exceeds ~5 pod replicas.
+- P4: Two nits from iter-30 review.
+
