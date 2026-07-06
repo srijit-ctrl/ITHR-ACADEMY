@@ -132,25 +132,40 @@ async def _platform_totals() -> dict:
 # ---- platform-wide (super admin) ------------------------------------------
 
 
+async def _day_series_via_aggregation(
+    collection, date_field: str, start_iso: str, labels: list[str],
+) -> list[dict]:
+    """Group documents into per-day counts via a MongoDB aggregation.
+
+    Replaces the "fetch 50k docs → bucket in Python" pattern. The pipeline
+    projects `YYYY-MM-DD` from the ISO date field, groups + counts, and we
+    then merge into the pre-computed label list to guarantee zero-fill for
+    days with no docs.
+    """
+    pipeline = [
+        {"$match": {date_field: {"$gte": start_iso}}},
+        {"$project": {"day": {"$substr": [f"${date_field}", 0, 10]}}},
+        {"$group": {"_id": "$day", "count": {"$sum": 1}}},
+    ]
+    rows = await collection.aggregate(pipeline).to_list(len(labels) + 10)
+    counts = {r["_id"]: r["count"] for r in rows}
+    return [{"date": d, "count": counts.get(d, 0)} for d in labels]
+
+
 async def platform_analytics(days: int = 30) -> dict:
     """Return aggregated metrics for the super-admin console."""
-    start, labels = _daterange(days)
-    start_iso = start.isoformat()
-
-    signups_docs = await db.users.find(
-        {"created_at": {"$gte": start_iso}},
-        {"_id": 0, "created_at": 1},
-    ).to_list(50000)
-    certs_docs = await db.certificates.find(
-        {"issued_at": {"$gte": start_iso}},
-        {"_id": 0, "issued_at": 1},
-    ).to_list(50000)
+    _start, labels = _daterange(days)
+    start_iso = _start.isoformat()
 
     return {
         "window_days": days,
         "totals": await _platform_totals(),
-        "signups_per_day": _fill_series(labels, signups_docs, "created_at"),
-        "certs_per_day": _fill_series(labels, certs_docs, "issued_at"),
+        "signups_per_day": await _day_series_via_aggregation(
+            db.users, "created_at", start_iso, labels,
+        ),
+        "certs_per_day": await _day_series_via_aggregation(
+            db.certificates, "issued_at", start_iso, labels,
+        ),
         "founder_perk": await _platform_founder_perk(),
         "top_orgs_by_certs": await _platform_top_orgs(start_iso),
         "top_courses_by_enrollment": await _platform_top_courses(start_iso),
