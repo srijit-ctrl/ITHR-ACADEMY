@@ -1,17 +1,41 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Loader2, Send, Sparkles } from "lucide-react";
+import useVoiceIO from "@/components/tutor/useVoiceIO";
+import VoiceControls from "@/components/tutor/VoiceControls";
 
 /**
  * Right-side streaming chat for the anonymous demo. Composes the suggestion
  * grid → active conversation → input row → limit-reached CTA states.
+ * Voice-enabled: mic transcribes into `ask`, and the speaker plays back
+ * the last assistant reply. Mic-triggered questions auto-play the answer.
  */
 export default function DemoChat({ lesson, messages, input, setInput, streaming, limitReached, ask }) {
     const scrollRef = useRef(null);
+    const voice = useVoiceIO();
+    const [autoplayNext, setAutoplayNext] = useState(false);
+    const spokenIdRef = useRef(null);
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages, streaming]);
+
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && m.content);
+
+    useEffect(() => {
+        if (!autoplayNext || streaming || !lastAssistant?.content) return;
+        if (spokenIdRef.current === lastAssistant.id) return;
+        spokenIdRef.current = lastAssistant.id;
+        voice.speak(lastAssistant.content);
+        setAutoplayNext(false);
+    }, [streaming, lastAssistant, autoplayNext, voice]);
+
+    const handleMicTranscript = async (text) => {
+        if (!text) return;
+        setInput("");
+        setAutoplayNext(true);
+        await ask(text);
+    };
 
     return (
         <div className="lg:col-span-2 step-card flex flex-col min-h-[500px]" data-testid="demo-chat">
@@ -19,16 +43,22 @@ export default function DemoChat({ lesson, messages, input, setInput, streaming,
                 <div className="w-9 h-9 bg-foreground text-background flex items-center justify-center rounded-sm">
                     <span className="font-serif text-lg">A</span>
                 </div>
-                <div>
+                <div className="flex-1">
                     <div className="font-serif text-base leading-none">Aletheia</div>
-                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">AI Tutor · streaming</div>
+                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">AI Tutor · streaming · voice</div>
                 </div>
+                <VoiceControls
+                    voice={voice}
+                    onTranscript={handleMicTranscript}
+                    lastAssistantText={lastAssistant?.content || ""}
+                    testidPrefix="demo-voice"
+                />
             </div>
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 mb-4 max-h-[420px] pr-1">
                 {messages.length === 0 ? (
                     <div>
-                        <p className="text-sm text-muted-foreground mb-4">Not sure where to start? Try one of these:</p>
+                        <p className="text-sm text-muted-foreground mb-4">Not sure where to start? Try one of these — or tap the mic:</p>
                         <div className="space-y-2">
                             {lesson.suggested_questions.map((q) => (
                                 <button
@@ -64,7 +94,7 @@ export default function DemoChat({ lesson, messages, input, setInput, streaming,
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && ask()}
-                        placeholder="Ask Aletheia anything…"
+                        placeholder="Ask Aletheia anything… or tap the mic"
                         disabled={streaming}
                         data-testid="demo-input"
                         className="flex-1 bg-surface border border-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-brand"

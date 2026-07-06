@@ -45,7 +45,7 @@ DB_NAME = os.environ.get("DB_NAME")
 if not (MONGO_URL and DB_NAME):
     raise SystemExit("MONGO_URL + DB_NAME must be set.")
 
-PROTECTED_EMAILS = {"superadmin@ithr.tech"}
+PROTECTED_EMAILS = {"superadmin@ithr.tech", "superadmin@ithr.online", "srijit@ithr360.com"}
 PROTECTED_CERT_IDS = {"SAMPLE-ITHR-2026-001"}
 
 

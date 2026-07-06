@@ -471,7 +471,7 @@ async def certificate_pdf(certificate_id: str):
     base_url = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
     verify_url = f"{base_url}/verify/{certificate_id}" if base_url else f"/verify/{certificate_id}"
     qr_buf = io.BytesIO()
-    segno.make(verify_url, error="H").save(qr_buf, kind="svg", scale=6, dark="#16335E", light="#ffffff", border=1, xmldecl=False)
+    segno.make(verify_url, error="H").save(qr_buf, kind="svg", scale=6, dark="#142544", light="#ffffff", border=1, xmldecl=False)
     qr_b64 = base64.b64encode(qr_buf.getvalue()).decode("ascii")
 
     issued_raw = cert.get("issued_at", "")
@@ -488,6 +488,7 @@ async def certificate_pdf(certificate_id: str):
         issued=issued,
         qr_b64=qr_b64,
         verify_url=_html_escape(verify_url),
+        script_font_b64=_SCRIPT_FONT_B64,
     )
 
     pdf_buf = io.BytesIO()
@@ -499,6 +500,21 @@ async def certificate_pdf(certificate_id: str):
     )
 
 
+def _load_script_font_b64() -> str:
+    """Base64 the bundled Great Vibes TTF so WeasyPrint has zero external deps."""
+    import base64
+    import os
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts", "GreatVibes-Regular.ttf")
+    try:
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode("ascii")
+    except FileNotFoundError:
+        return ""
+
+
+_SCRIPT_FONT_B64 = _load_script_font_b64()
+
+
 def _html_escape(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -507,139 +523,187 @@ _CERT_PDF_TEMPLATE = r"""
 <!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>
-  /* ITHR Brand palette lock (Iter 24) — Teal #00A78B + Navy #16335E + Gold #C5A253 */
+  @font-face {{
+    font-family: 'Aletheia Script';
+    src: url(data:font/ttf;base64,{script_font_b64}) format('truetype');
+    font-weight: normal; font-style: normal;
+  }}
+  /* ITHR Executive Certificate — cream parchment, navy typography, gold seal.
+     Aesthetic reference: MIT Sloan + Stanford GSB executive credentials. */
   @page {{ size: A4 landscape; margin: 0; }}
-  body {{ margin: 0; font-family: 'Calibri', 'Tahoma', 'Helvetica', Arial, sans-serif; color: #16335E; }}
+  body {{ margin: 0; font-family: 'Times New Roman', 'Georgia', serif; color: #142544; }}
+
   .sheet {{
-    width: 297mm; height: 210mm; padding: 18mm 22mm;
+    width: 297mm; height: 210mm; padding: 0;
     box-sizing: border-box; position: relative;
-    background: #ffffff;
-    background-image:
-      linear-gradient(0deg, transparent 24%, rgba(0,167,139,0.025) 25%, rgba(0,167,139,0.025) 26%, transparent 27%, transparent 74%, rgba(0,167,139,0.025) 75%, rgba(0,167,139,0.025) 76%, transparent 77%);
-    background-size: 100% 60px;
-  }}
-  /* Ornamental gold borders — kept for ceremonial contrast */
-  .sheet::before, .sheet::after {{
-    content: ''; position: absolute; left: 10mm; right: 10mm; height: 3mm;
-    background: linear-gradient(90deg, transparent, #C5A253 20%, #C5A253 80%, transparent);
-  }}
-  .sheet::before {{ top: 8mm; }}
-  .sheet::after  {{ bottom: 8mm; }}
-
-  /* Inner double rule — navy outer, gold inner */
-  .inner-rule {{
-    position: absolute; inset: 14mm 18mm; border: 0.6mm solid #C5A253;
-    box-shadow: inset 0 0 0 1mm #ffffff, inset 0 0 0 1.4mm #16335E;
-    pointer-events: none;
+    background:
+      radial-gradient(ellipse at 20% 10%, rgba(197,162,83,0.06) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 90%, rgba(20,37,68,0.05) 0%, transparent 60%),
+      linear-gradient(180deg, #fbf6ea 0%, #f4ecd5 100%);
   }}
 
+  /* Ornamental double-frame */
+  .frame-outer {{ position: absolute; inset: 9mm; border: 0.5mm solid #142544; }}
+  .frame-inner {{
+    position: absolute; inset: 12mm; border: 0.35mm solid #B08840;
+    box-shadow: inset 0 0 0 1.5mm #fbf6ea, inset 0 0 0 1.8mm #B08840;
+  }}
+  .corner {{ position: absolute; width: 18mm; height: 18mm; border: 0.5mm solid #B08840; pointer-events: none; }}
+  .corner.tl {{ top: 14mm; left: 14mm; border-right: none; border-bottom: none; }}
+  .corner.tr {{ top: 14mm; right: 14mm; border-left: none; border-bottom: none; }}
+  .corner.bl {{ bottom: 14mm; left: 14mm; border-right: none; border-top: none; }}
+  .corner.br {{ bottom: 14mm; right: 14mm; border-left: none; border-top: none; }}
+
+  .content {{
+    position: absolute; inset: 18mm 30mm 20mm;
+  }}
+
+  /* Header */
   .header {{
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 8mm; position: relative;
+    padding-bottom: 4mm; border-bottom: 0.2mm solid rgba(176, 136, 64, 0.35);
   }}
-  .brand-lockup {{ display: flex; align-items: center; gap: 6mm; }}
-  .seal {{
-    width: 28mm; height: 28mm; border-radius: 50%;
-    background: radial-gradient(circle at 30% 25%, #21467a 0%, #16335E 100%);
-    box-shadow: 0 0 0 1mm #C5A253, 0 0 0 1.6mm #ffffff, 0 0 0 1.9mm #C5A253;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #ffffff; text-align: center;
+  .brand {{ letter-spacing: 6pt; font-size: 9pt; color: #142544; text-transform: uppercase; font-family: 'Georgia', serif; }}
+  .brand .amp {{ color: #B08840; margin: 0 2pt; }}
+  .issuer-note {{ font-size: 7.5pt; letter-spacing: 1.5pt; color: #6b6350; text-transform: uppercase; text-align: right; }}
+
+  /* Title */
+  .title-wrap {{ text-align: center; margin-top: 8mm; }}
+  .certifies {{ font-size: 8.5pt; letter-spacing: 5pt; color: #7a6a4a; text-transform: uppercase; }}
+  .cert-title {{
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 32pt; letter-spacing: 4pt; text-transform: uppercase;
+    color: #142544; margin: 3mm 0 1mm;
   }}
-  .seal-est   {{ font-size: 6pt; letter-spacing: 2pt; color: #C5A253; text-transform: uppercase; }}
-  .seal-mark  {{ font-family: 'Georgia', serif; font-size: 14pt; letter-spacing: 1pt; margin: 1mm 0; }}
-  .seal-tag   {{ font-size: 5pt; letter-spacing: 1.5pt; color: rgba(255,255,255,0.85); text-transform: uppercase; }}
-  .seal-line  {{ width: 8mm; height: 0.3mm; background: #C5A253; margin: 1mm 0; }}
-
-  .brand-name    {{ font-family: 'Georgia', serif; font-size: 22pt; letter-spacing: -0.5pt; margin: 0; color: #16335E; }}
-  .brand-name .accent {{ color: #00A78B; }}
-  .brand-tag     {{ font-size: 8pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; margin-top: 1.5mm; }}
-
-  .award-block  {{ text-align: right; }}
-  .award-title  {{ font-size: 8pt; letter-spacing: 3pt; color: #C5A253; text-transform: uppercase; }}
-  .award-num    {{ font-family: 'Georgia', serif; font-size: 18pt; color: #16335E; }}
-
-  .body {{ text-align: center; margin-top: 6mm; position: relative; }}
-  .presents  {{ font-size: 9pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; }}
-  .holder    {{ font-family: 'Georgia', serif; font-size: 48pt; letter-spacing: -1pt; margin: 4mm 0; color: #16335E; }}
-  .completed {{ font-size: 9pt; letter-spacing: 3pt; color: #4a5768; text-transform: uppercase; margin-top: 2mm; }}
-  .course    {{ font-family: 'Georgia', serif; font-style: italic; font-size: 22pt; margin: 4mm 0 3mm; color: #00A78B; }}
-  .score     {{ font-size: 11pt; color: #4a5768; }}
-  .score b   {{ color: #16335E; }}
-
-  .divider-gold {{
-    width: 40mm; height: 0.4mm;
-    background: linear-gradient(90deg, transparent, #C5A253, transparent);
-    margin: 6mm auto;
+  .cert-sub {{ font-size: 9pt; letter-spacing: 4pt; color: #B08840; text-transform: uppercase; }}
+  .rule-ornament {{
+    display: flex; align-items: center; justify-content: center; gap: 4mm;
+    margin: 5mm auto 3mm; width: 90mm;
   }}
+  .rule-ornament .r {{ flex: 1; height: 0.25mm; background: linear-gradient(90deg, transparent, #B08840, transparent); }}
+  .rule-ornament .dot {{ width: 1.6mm; height: 1.6mm; background: #B08840; transform: rotate(45deg); }}
 
+  /* Holder */
+  .presented {{ text-align: center; font-size: 9pt; letter-spacing: 3.5pt; color: #6b6350; text-transform: uppercase; }}
+  .holder {{
+    text-align: center; font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 40pt; letter-spacing: -0.5pt; color: #142544;
+    margin: 3mm 0 3mm; font-weight: normal;
+  }}
+  .completed {{ text-align: center; font-size: 9pt; letter-spacing: 3.5pt; color: #6b6350; text-transform: uppercase; }}
+  .course {{
+    text-align: center; font-family: 'Georgia', serif; font-style: italic;
+    font-size: 18pt; color: #142544; margin: 2mm auto 2mm; max-width: 220mm; line-height: 1.2;
+  }}
+  .score {{ text-align: center; font-size: 10.5pt; color: #6b6350; margin-top: 1mm; }}
+  .score .val {{ color: #142544; font-weight: bold; }}
+
+  /* Footer */
   .footer {{
-    display: flex; justify-content: space-between; align-items: flex-end;
-    margin-top: 6mm; position: relative;
+    position: absolute; left: 30mm; right: 30mm; bottom: 22mm;
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm;
   }}
-  .fact {{ font-size: 8pt; }}
-  .fact-label {{ letter-spacing: 2pt; color: #7d8ba0; text-transform: uppercase; font-size: 6.5pt; margin-bottom: 1mm; }}
-  .fact-value {{ font-family: 'Courier', monospace; color: #16335E; }}
 
+  .sig-block {{ text-align: center; width: 78mm; }}
+  .signature {{
+    font-family: 'Aletheia Script', 'Georgia', cursive;
+    font-size: 30pt; color: #142544; line-height: 1; margin-bottom: 1mm; letter-spacing: 0.5pt;
+  }}
+  .sig-line {{ border-top: 0.3mm solid #142544; width: 68mm; margin: 0 auto; }}
+  .sig-role {{ font-size: 7pt; letter-spacing: 3pt; color: #7a6a4a; text-transform: uppercase; margin-top: 1.5mm; font-family: 'Georgia', serif; }}
+
+  /* Gold seal */
+  .seal-wrap {{ position: relative; width: 38mm; height: 38mm; margin-bottom: 4mm; }}
+  .seal {{
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, #f2d789 0%, #d4a752 30%, #B08840 60%, #8a6a2a 100%);
+    box-shadow:
+      0 0 0 0.6mm #fbf6ea,
+      0 0 0 1.0mm #B08840,
+      0 0 0 1.6mm #fbf6ea,
+      0 0 0 1.8mm #142544;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #142544; text-align: center; padding: 3mm;
+  }}
+  .seal-ring-text {{ font-size: 4.5pt; letter-spacing: 2pt; text-transform: uppercase; color: #4a3a18; }}
+  .seal-mono {{ font-family: 'Georgia', serif; font-size: 14pt; letter-spacing: 2pt; color: #142544; margin: 1mm 0; }}
+  .seal-line {{ width: 10mm; height: 0.3mm; background: #142544; }}
+  .seal-tag {{ font-size: 4.5pt; letter-spacing: 2pt; color: #4a3a18; text-transform: uppercase; margin-top: 1mm; }}
+  .seal-star {{ font-size: 6pt; color: #4a3a18; margin-top: 0.5mm; }}
+
+  /* Right column */
+  .facts {{ text-align: right; width: 78mm; }}
+  .fact-row {{ margin-bottom: 2mm; }}
+  .fact-label {{ font-size: 6.5pt; letter-spacing: 2.5pt; color: #7a6a4a; text-transform: uppercase; }}
+  .fact-value {{ font-family: 'Georgia', serif; font-size: 9pt; color: #142544; margin-top: 0.5mm; }}
   .qr-frame {{
-    padding: 2mm; border: 0.5mm solid #C5A253; background: #ffffff;
+    margin-top: 2mm; margin-left: auto; padding: 1.6mm; border: 0.3mm solid #B08840;
+    background: #ffffff; width: 22mm; box-sizing: content-box;
   }}
-  .qr-frame img {{ width: 24mm; height: 24mm; display: block; }}
-
-  .signature-line {{ border-top: 0.3mm solid #16335E; padding-top: 1.5mm; width: 55mm; text-align: center; font-family: 'Georgia', serif; font-style: italic; color: #16335E; }}
-  .signature-role {{ font-size: 7pt; letter-spacing: 2pt; color: #7d8ba0; text-transform: uppercase; margin-top: 1mm; }}
+  .qr-frame img {{ width: 22mm; height: 22mm; display: block; }}
+  .verify-note {{ font-size: 6pt; color: #7a6a4a; margin-top: 1mm; letter-spacing: 0.5pt; }}
 </style></head>
 <body>
   <div class="sheet">
-    <div class="inner-rule"></div>
+    <div class="frame-outer"></div>
+    <div class="frame-inner"></div>
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
 
-    <div class="header">
-      <div class="brand-lockup">
-        <div class="seal">
-          <div class="seal-est">Est. 2026</div>
-          <div class="seal-mark">ITHR</div>
-          <div class="seal-line"></div>
-          <div class="seal-tag">Academy</div>
-        </div>
-        <div>
-          <div class="brand-name">ITHR <span class="accent">Academy</span></div>
-          <div class="brand-tag">Enterprise Agentic AI · Independent Issuer</div>
+    <div class="content">
+      <div class="header">
+        <div class="brand">I <span class="amp">·</span> T <span class="amp">·</span> H <span class="amp">·</span> R &nbsp;&nbsp; Academy</div>
+        <div class="issuer-note">Enterprise Agentic AI · Est. 2026 · Independent Issuer</div>
+      </div>
+
+      <div class="title-wrap">
+        <div class="certifies">The Institute hereby certifies</div>
+        <div class="cert-title">Certificate of Achievement</div>
+        <div class="cert-sub">Executive Program in Enterprise Agentic AI</div>
+        <div class="rule-ornament">
+          <div class="r"></div><div class="dot"></div><div class="r"></div>
         </div>
       </div>
-      <div class="award-block">
-        <div class="award-title">Certificate</div>
-        <div class="award-num">of Achievement</div>
-      </div>
-    </div>
 
-    <div class="body">
-      <div class="presents">This is to certify that</div>
+      <div class="presented">This is to formally recognize</div>
       <div class="holder">{holder}</div>
-      <div class="completed">has successfully completed the program</div>
+      <div class="completed">for having successfully completed the executive program</div>
       <div class="course">{course}</div>
-      <div class="score">with a score of <b>{score}%</b></div>
-      <div class="divider-gold"></div>
+      <div class="score">with a final assessment score of <span class="val">{score}%</span></div>
     </div>
 
     <div class="footer">
-      <div>
-        <div class="signature-line">Reyes Al-Fahad</div>
-        <div class="signature-role">Chief Learning Officer · ITHR</div>
+      <div class="sig-block">
+        <div class="signature">Abhilasha Tyagi</div>
+        <div class="sig-line"></div>
+        <div class="sig-role">Authorized Signatory</div>
       </div>
 
-      <div style="text-align:center;">
-        <div class="fact">
+      <div class="seal-wrap">
+        <div class="seal">
+          <div class="seal-ring-text">Institute of Trusted HR</div>
+          <div class="seal-mono">ITHR</div>
+          <div class="seal-line"></div>
+          <div class="seal-tag">Academy · MMXXVI</div>
+          <div class="seal-star">✦</div>
+        </div>
+      </div>
+
+      <div class="facts">
+        <div class="fact-row">
           <div class="fact-label">Credential ID</div>
           <div class="fact-value">{cert_id}</div>
         </div>
-        <div class="fact" style="margin-top:3mm;">
-          <div class="fact-label">Issued</div>
+        <div class="fact-row">
+          <div class="fact-label">Date of Issue</div>
           <div class="fact-value">{issued}</div>
         </div>
-        <div style="font-size:7pt;color:#7d8ba0;margin-top:3mm;">Verify at {verify_url}</div>
-      </div>
-
-      <div class="qr-frame">
-        <img src="data:image/svg+xml;base64,{qr_b64}" alt="QR" />
+        <div class="qr-frame">
+          <img src="data:image/svg+xml;base64,{qr_b64}" alt="QR" />
+        </div>
+        <div class="verify-note">Verify at {verify_url}</div>
       </div>
     </div>
   </div>

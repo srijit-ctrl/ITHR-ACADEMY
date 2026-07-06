@@ -814,3 +814,61 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - P3: Distributed Redis cache backend if traffic exceeds ~5 pod replicas.
 - P4: Two nits from iter-30 review.
 
+
+
+### Iteration 36 — Executive Certificate Redesign · Voice-Interactive Aletheia · Data Purge (Feb 2026)
+
+**1) Certificate redesign — Stanford/MIT executive style (backend)**
+- File: `/app/backend/routers/assessment_router.py`
+- Palette: **cream parchment** (`#fbf6ea → #f4ecd5`) + **navy** (`#142544`) + **antique gold** (`#B08840`)
+- Double-frame border + gold corner brackets, ornamental dot ornament rule
+- New title: "Certificate of Achievement · Executive Program in Enterprise Agentic AI"
+- Layered embossed gold **seal** with Roman date "Academy · MMXXVI"
+- **Great Vibes** cursive font (bundled TTF at `/app/backend/assets/fonts/GreatVibes-Regular.ttf`) — base64 embedded via `@font-face` so PDF renders identically in any WeasyPrint deploy
+- **Signatory:** "Abhilasha Tyagi" in Great Vibes script over a gold-toned line, role: **Authorized Signatory**
+- Right-side facts column: Credential ID · Date of Issue · QR (recoloured to navy) · verify URL note
+- Route unchanged: `GET /api/certificates/{id}/pdf`
+
+**2) Voice-Interactive Aletheia AI Tutor (STT + TTS)**
+- New router: `/app/backend/routers/voice_router.py` (mounted in `server.py`)
+  - `POST /api/voice/stt` — multipart `file` + `language` (default `en`) → whisper-1 transcript
+  - `POST /api/voice/tts` — JSON `{text, voice?, speed?}` → MP3 base64 (default voice `shimmer`)
+  - Both use `EMERGENT_LLM_KEY` via `emergentintegrations.llm.openai.OpenAISpeechToText` / `OpenAITextToSpeech`
+- Frontend hook: `/app/frontend/src/components/tutor/useVoiceIO.js`
+  - `startRecording()` → MediaRecorder (webm/opus preferred) buffered in memory
+  - `stopRecording()` → uploads blob, returns transcript
+  - `speak(text)` / `stopSpeaking()` — plays TTS from data URI
+- Frontend component: `/app/frontend/src/components/tutor/VoiceControls.jsx` — mic + speaker cluster with pulsing recording state and test-ids
+- Wired into all three surfaces:
+  - `CertificateTutor.jsx` (post-certification refresher tutor)
+  - `InlineTutor.jsx` (in-lesson tutor)
+  - `DemoChat.jsx` (anonymous landing-page demo)
+- Auto-play behaviour: when the mic was used to ask, the streamed reply is **auto-spoken** on stream-complete. Typed questions do not auto-speak (users can hit the speaker button to hear the last reply).
+
+**3) Data purge — real-time metrics only**
+- Script: `/app/backend/purge_test_data.py` (extended protected list now includes `superadmin@ithr.online`, `srijit@ithr360.com`)
+- Preview DB purged: **73 users**, 15 enrollments, 3 certificates, 3 orgs, 3 org_members, 3 org_invites, 2 quiz_attempts. KPI dashboard now shows only real traffic.
+- Production: same script — user must SSH into prod pod (or trigger via Emergent secrets task) and run `python3 -m purge_test_data --confirm`.
+
+**Testing status:**
+- `POST /api/voice/tts` — smoke tested via curl (returns ~87 KB MP3 base64 for a 60-char prompt).
+- Certificate PDF regenerated from `SAMPLE-ITHR-2026-001` — visual inspection via pdftoppm confirms new design (cream/gold/navy, embedded cursive signature, gold seal, no overflow).
+- Frontend UI smoke — mic + speaker buttons render on `try-a-lesson` demo (verified via data-testid counts).
+- Backend + Frontend lint: **clean.**
+
+**Files touched:**
+- `backend/routers/voice_router.py` (new)
+- `backend/routers/assessment_router.py` (certificate template rewrite + font loader)
+- `backend/purge_test_data.py` (protected list)
+- `backend/assets/fonts/GreatVibes-Regular.ttf` (new bundled asset, 457 KB)
+- `backend/server.py` (register voice_router)
+- `frontend/src/components/tutor/useVoiceIO.js` (new)
+- `frontend/src/components/tutor/VoiceControls.jsx` (new)
+- `frontend/src/components/CertificateTutor.jsx` (voice-enabled)
+- `frontend/src/components/InlineTutor.jsx` (voice-enabled)
+- `frontend/src/components/demo/DemoChat.jsx` (voice-enabled)
+
+**Backlog (unchanged):**
+- P2: Load tests (k6/Locust)
+- P2: Bundle pricing page for Enterprise HR suite
+- P2: Sora 2 batch + AI course pipeline
