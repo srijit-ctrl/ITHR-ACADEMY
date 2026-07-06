@@ -524,10 +524,29 @@ Third round of the Code Quality Report. **Same 3 false positives re-flagged for 
 - `_build_digest_html` 137 lines — string-template builder, no branch complexity. Splitting would fragment a stable, low-risk unit.
 - Console statements in `Mentor.jsx`, `Quiz.jsx`, `LessonViewer.jsx` — intentional diagnostic `console.debug` / `console.error` added in iter-19 for production observability. Not debug leftovers.
 
+### Iteration 28 — Live Activity Feed on Super-Admin Console (Feb 2026)
+
+New real-time widget for the super-admin. Polls `/api/admin/activity/recent` every 3s with `since=<latest_ts>` delta semantics — no SSE / streaming complexity, works reliably behind Kubernetes ingress + multi-worker uvicorn.
+
+**Backend:**
+- `db.activity_events` collection with `created_at` index. Documents: `{id, kind, message, actor_id, actor_name, target, created_at}`.
+- **`core.log_activity(kind, message, actor_id?, actor_name?, target?)`** — shared async helper. Fire-and-forget usage; never raises.
+- 4 event kinds wired: **signup** (POST /auth/register), **enrollment** (POST /courses/{slug}/enroll, only on NEW enroll), **certificate** (cert issuance in assessment_router), **org_created** (POST /admin/orgs).
+- **NEW endpoint** `GET /api/admin/activity/recent?limit&since` (super-admin gated) — returns `{events, count}`; sort DESC by created_at; `limit` clamped [1, 100]; `since=<iso>` returns events strictly newer than that stamp.
+
+**Frontend:**
+- New `components/admin/ActivityFeedPanel.jsx` — 3s polling with delta-fetch via `since=<latest_ts>`, dedup by event id, list capped at 25. Live pulse dot next to "Live activity" title; Pause/Resume toggle; empty state; icon per event kind (UserPlus/GraduationCap/Award/Building2); relative-time formatting (`Ns ago` / `Nm ago` / `Nh ago` / `Nd ago`).
+- Mounted on `SuperAdminPortal.jsx` Analytics tab in a lg:grid-cols-3 layout: PlatformAnalyticsPanel (2 cols) + ActivityFeedPanel (1 col).
+
+**Testing verdict (iteration_28.json):**
+- Backend: **12/12** (100%) — auth gating, response shape, sort/limit clamp, all 4 event emission paths, `since=` delta polling, dedup on already-enrolled.
+- Frontend: **8/8** (100%) — panel render, live pulse, event rows/icons/relative-timestamps, pause (0 requests during pause), resume, correct grid layout, zero key warnings.
+- Regression: iter-15/16/21/26 baseline unchanged (4 pre-existing failures — 3× iter-15 `.test`-TLD email validator + 1× iter-26 flake — documented 5+ iterations).
+
 **Backlog (P1/P2) — unchanged**
 - P1: Stripe webhook proration hardening.
 - P2: AI course-content pipeline live run (`seed_ai_course.py`) + Sora 2 intro videos.
-- P2: Weekly "credential impressions" digest email (proposed in iter-26 close-out).
+- P2: Weekly credential-impressions digest email.
 - P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 
 
