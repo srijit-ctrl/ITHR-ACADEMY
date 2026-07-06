@@ -608,3 +608,48 @@ Handoff dropped a Code Quality Recommendations Report. Investigated all findings
 - P2: Platform hardening for production (K8s, caching, CI/CD, load tests).
 - P2: CSV export button on Activity feed.
 - P3 (optional): Backend/frontend complexity refactor for the 10 files listed above — no correctness impact, purely maintainability.
+
+### Iteration 30 — P3 Complexity Refactor (Feb 2026)
+
+User picked "Option B — do the actual P3 refactor" after a Code Quality Report false-positive loop. Decomposed 4 large functions/components; every existing behavior preserved.
+
+**Backend refactors:**
+1. **`routers/digest_router.py`** — `_build_digest_html` (137 lines) split into 5 focused helpers:
+   - `_load_digest_data()` — intelligence signals + curriculum patches fetch
+   - `_kpi_row_html(summary)` — pure KPI row builder
+   - `_signal_card_html(signal)` — pure per-signal card builder
+   - `_patches_section_html(patches)` — pure patches section builder
+   - `_digest_shell_html(org, kpi_html, body_html, briefing_url)` — pure email envelope
+   - Also fixed a stale hardcoded preview URL — briefing link now reads from `PUBLIC_APP_URL` env.
+2. **`routers/enterprise_router.py`** — `fulfill_seat_increment` (114 lines, complexity 15) split into 4 helpers:
+   - `_load_seat_txn(session_id, org_id)` — txn fetch + ownership validation
+   - `_verify_stripe_payment(stripe, session_id, txn)` — status + amount tampering defense
+   - `_resolve_fulfill_target(txn, seats_used)` — pure downgrade-guard
+   - `_claim_and_apply_fulfillment(...)` — atomic claim + org update + billing event + activity log
+   - Orchestrator is now ~30 lines of readable flow.
+
+**Frontend refactors:**
+3. **`components/enterprise/MemberList.jsx`** (161 lines → 56-line orchestrator) split into:
+   - `components/enterprise/MembersTable.jsx` — presentational member rows
+   - `components/enterprise/InviteForm.jsx` — email-invite form with own state
+   - `components/enterprise/CreateUserModal.jsx` — direct-user-creation modal
+   - `components/enterprise/TempCredsModal.jsx` — one-time temp-password reveal
+   - `hooks/useMemberActions.js` — new hook holding invite/create/remove side effects; each action returns boolean `ok` so children can decide reset/close.
+4. **`components/enterprise/SeatEditorModal.jsx`** (complexity 17) — debounced preview polling + apply flow extracted to `hooks/useSeatEditor.js`. Modal is now a presentational shell.
+
+**Testing (iter-30):**
+- **Backend:** 26/26 pass (12/12 new iter-30 + 14/14 iter-20 regression sequential run). New pytest file `tests/test_iteration30_refactors.py` covering digest preview/send/log + fulfill_seat_increment auth-gating + 404 path.
+- **Frontend:** 8/8 acceptance scenarios pass — portal loads, member row renders, create-user modal opens + submits + surfaces TempCredsModal with 14-char password, remove-member button gated to non-owner rows, send-invite POSTs + clears form, seat-editor opens with 200ms debounced preview.
+- **Sanity regression:** `/api/health` 200, `/api/admin/analytics?days=30` returns zero-filled 30-bucket aggregation, `/api/admin/orgs` `$lookup` aggregation returns seats_used, assessment session endpoint returns randomized paper.
+- Zero critical/minor issues, zero UI/integration bugs.
+
+**Non-blocking P4 nits from code review (deferred):**
+- `digest_router.py` — `_esc` and `_kpi_cell` utils live below section builders; grouping them above section builders would improve top-down readability.
+- `SeatEditorModal.jsx` — 6 state props still hoisted to parent; a fuller P4 pass could migrate them all into `useSeatEditor` for a cleaner hook boundary.
+
+**Backlog (P1/P2) — unchanged**
+- P2: Resume Sora 2 batch + AI course pipeline after Emergent LLM key top-up.
+- P2: Platform hardening (K8s, caching, CI/CD, load tests).
+- P2: CSV export button on Activity feed.
+- P4: Two nits above.
+
