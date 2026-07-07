@@ -34,6 +34,13 @@ SYSTEM = (
 )
 
 
+def _clean_code_sample(value):
+    """LLM sometimes returns code_sample as {language, code} — coerce to str."""
+    if isinstance(value, dict):
+        return value.get("code") or None
+    return value if isinstance(value, str) and value.strip() else None
+
+
 async def _ask(prompt: str, retries: int = 2) -> dict:
     async with _sem:
         for attempt in range(retries + 1):
@@ -112,8 +119,8 @@ async def build_stub_course(course: dict) -> None:
                 title=gen.get("title") or src["title"],
                 content=gen["content"],
                 duration_min=src.get("duration_min", 12),
-                code_sample=gen.get("code_sample"),
-                key_takeaways=gen.get("key_takeaways", []),
+                code_sample=_clean_code_sample(gen.get("code_sample")),
+                key_takeaways=[t for t in gen.get("key_takeaways", []) if isinstance(t, str)],
             ))
         return Module(
             number=m["number"], title=m["title"], summary=m.get("summary", ""),
@@ -173,8 +180,8 @@ async def enrich_course(course: dict) -> None:
             for (li, old), gen in zip(chunk, data["lessons"]):
                 fields = {
                     "content": gen["content"],
-                    "key_takeaways": gen.get("key_takeaways", old.get("key_takeaways", [])),
-                    "code_sample": gen.get("code_sample") or old.get("code_sample"),
+                    "key_takeaways": [t for t in gen.get("key_takeaways", old.get("key_takeaways", [])) if isinstance(t, str)],
+                    "code_sample": _clean_code_sample(gen.get("code_sample")) or _clean_code_sample(old.get("code_sample")),
                 }
                 await db.courses.update_one(
                     {"slug": slug},

@@ -986,3 +986,18 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - Fix: moved the disable comment to the line above the useEffect. `CI=true yarn build` now compiles (verified). Testing agent iteration_39: audit log panel + all 7 super-admin tabs pass, 0 console errors, 100% frontend success.
 - Deployment agent static scan: PASS (no other blockers). User must Save to GitHub + Redeploy to verify prod.
 - Backlog unchanged: P0 Superadmin Tier 3 (MFA, password policy, API-key rotation, feature flags — user deferred decision), P1 Slack webhook leads, P2 SuperAdminPortal.jsx tab refactor, Redis cache, Sora 2 pipeline.
+
+## 2026-07-07 — Course delivery, certification & restyle batch
+**Feature 1 — Referral registration (TESTED ✅ iter40):** first 500 signups with code `FOUNDING500` (env FOUNDING_REFERRAL_CODE) bypass payment → payment_status=paid, paid_via_referral, referral_seq; Founding-Member welcome email via Resend; invalid code = 400 before account creation. Register page has referral input.
+**Feature 2 — Interactive video quizzes (TESTED ✅ iter40):** VideoLessonPlayer pauses at DB-defined checkpoints (video_checkpoints collection), MCQ overlay, server-side grading, 3 wrong attempts → full lesson-progress reset + video restarts; seek-guard prevents skipping. Super-admin "Video quizzes" tab (CRUD checkpoints + lesson video URL). Lesson ids now preserved across restarts (seed remap); lesson_videos + lesson_content_overrides re-applied at startup.
+**Feature 3 — Certificate on uploaded artwork (TESTED ✅ iter40/41 + visual):** WeasyPrint renders the two uploaded HTML designs (alternating by cert id) with dynamic name/course/date/ID + QR. Credential integrity verified vs live user+course before issuing (409 on mismatch). Per user follow-up: signatures REMOVED, QR-only verification, fine-print disclaimer "system-generated document… does not require a manual signature".
+**Restyle (TESTED ✅ iter41):** Deloitte/Baker Tilly style — navy sharp buttons, radius 0.25rem, sharp badges, gold accent-rule, ghost numbers, dot-pattern graphics (Landing/auth/catalog). Fonts: Tahoma headings, Calibri + Public Sans body.
+**Course content:** LLM generator (/app/backend/generate_course_content.py, resumable) built full 4-module curricula for all 17 stub courses (~12 rich lessons each) + partial enrichment of thin courses. ⚠️ EMERGENT LLM KEY BUDGET EXHAUSTED mid-run: 21/28 courses rich, 7 still thin. Re-run `python generate_course_content.py thin` after top-up. Tutor (text SSE + voice STT/TTS) verified working pre-exhaustion — tutor/voice will error until budget added.
+**Fixes:** CXO difficulty → Enterprise Leader (2 courses 500'd), code_sample dict coercion in generator, Lesson.video_url pydantic field, CI=true build passes.
+
+### Pending / Backlog
+- P0: Top up Emergent LLM key, re-run thin enrichment (7 courses)
+- P0 (user verify): redeploy to production (Save to GitHub → Redeploy)
+- P1: Superadmin Tier 3 (MFA, password policy, API-key rotation, feature flags)
+- P1: Slack webhook for Talent Ops leads
+- P2: SuperAdminPortal.jsx tab refactor into route components; Redis cache; Sora 2 pipeline

@@ -10,8 +10,6 @@ import io
 import os
 
 import segno
-from barcode import Code128
-from barcode.writer import SVGWriter
 
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "assets", "cert_templates")
 
@@ -29,24 +27,31 @@ _VERIFY_CSS = """
   .description{ margin-left:auto; margin-right:auto; }
   .spacer{ display:none; }
   .meta-row{ position:absolute; left:30mm; right:30mm; width:auto; bottom:50mm; margin:0; }
+  /* Signatures removed — the credential is system-issued and QR-verifiable. */
+  .sig-col{ display:none !important; }
   .bottom-block{
-    position:absolute; left:28mm; right:28mm; bottom:25mm;
+    position:absolute; left:28mm; right:28mm; bottom:27mm;
     width:auto; margin:0;
-    display:flex; align-items:flex-end; justify-content:space-between;
+    display:flex; align-items:flex-end; justify-content:center;
   }
   .seal{ width:22mm; height:22mm; }
   .verify-strip{
     position:absolute; z-index:6;
-    bottom:12.5mm; left:0; right:0;
-    display:flex; align-items:flex-end; justify-content:center; gap:12mm;
+    bottom:14mm; left:0; right:0;
+    display:flex; align-items:center; justify-content:center; gap:6mm;
   }
   .verify-cell{ text-align:center; }
-  .qr-img{ width:10.5mm; height:10.5mm; display:block; margin:0 auto; }
-  .bar-img{ height:6mm; width:auto; max-width:48mm; display:block; margin:0 auto; }
+  .qr-img{ width:11mm; height:11mm; display:block; margin:0 auto; }
   .verify-label{
     font-family:'Jost', sans-serif; font-size:5pt; letter-spacing:1.2px;
     color:#2C4A6B; text-transform:uppercase; margin-top:0.8mm;
   }
+  .verify-disclaimer{
+    max-width:118mm; text-align:left;
+    font-family:'Jost', sans-serif; font-size:5.4pt; line-height:1.5;
+    color:#5B6B7E; letter-spacing:0.3px;
+  }
+  .verify-disclaimer b{ color:#2C4A6B; }
 """
 
 _VERIFY_HTML = """
@@ -55,9 +60,10 @@ _VERIFY_HTML = """
       <img class="qr-img" src="data:image/svg+xml;base64,{qr_b64}" alt="Verification QR">
       <div class="verify-label">Scan to verify</div>
     </div>
-    <div class="verify-cell">
-      <img class="bar-img" src="data:image/svg+xml;base64,{bar_b64}" alt="Certificate barcode">
-      <div class="verify-label">{cert_id} &middot; {verify_url}</div>
+    <div class="verify-disclaimer">
+      <b>This is a system-generated document and does not require a manual signature.</b><br>
+      The authenticity of this certificate can be validated at any time by scanning the QR code
+      or visiting {verify_url} &middot; Certificate ID: {cert_id}.
     </div>
   </div>
 """
@@ -87,22 +93,6 @@ def _qr_b64(verify_url: str) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def _barcode_b64(cert_id: str) -> str:
-    buf = io.BytesIO()
-    Code128(cert_id, writer=SVGWriter()).write(
-        buf,
-        options={
-            "module_height": 7.0,
-            "module_width": 0.22,
-            "quiet_zone": 1.0,
-            "write_text": False,
-            "background": "#FBF8F1",
-            "foreground": "#152A47",
-        },
-    )
-    return base64.b64encode(buf.getvalue()).decode("ascii")
-
-
 def pick_design(certificate_id: str) -> str:
     """Alternate between the two uploaded designs, deterministic per cert id."""
     digest = hashlib.md5(certificate_id.encode()).hexdigest()
@@ -118,7 +108,6 @@ def render_certificate_html(cert: dict, verify_url: str, issued_display: str) ->
     html = html.replace("</style>", _VERIFY_CSS + "\n</style>", 1)
     verify_block = _VERIFY_HTML.format(
         qr_b64=_qr_b64(verify_url),
-        bar_b64=_barcode_b64(cert["certificate_id"]),
         cert_id=_escape(cert["certificate_id"]),
         verify_url=_escape(verify_url.replace("https://", "").replace("http://", "")),
     )
