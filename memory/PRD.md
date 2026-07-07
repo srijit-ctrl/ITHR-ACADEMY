@@ -1010,3 +1010,9 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - ITHR Academy shield logo (official /brand/ITHR_Academy_Shield.png) now top-center on BOTH the PDF certificate (replaces template crest, 30mm) and the web certificate page. Verified via rendered PDF + screenshot.
 - Competitive-depth content pass COMPLETE: all 28 courses rich — every lesson ≥1500 chars (most 3-5K, e.g. banking avg 4386 chars/lesson ≈ 700 words). Each lesson: named frameworks/regulations, enterprise case examples with metrics, "common pitfalls" angle, 4-5 takeaways. 518 lesson_content_overrides persisted; restart re-applies (verified).
 - Generator hardened: json_repair fallback + min-content validation + 5 retries + max_tokens 8192 → 0 module errors in final run.
+
+## 2026-07-07 (night) — Production readiness-failure fixed (TESTED ✅ iter42)
+- Prod deploy failed at pod readiness. ROOT CAUSE: `.env`/`.env.*`/`*.env` patterns had been re-added to .gitignore AND backend/.env + frontend/.env were untracked → prod pod had no MONGO_URL → crash loop.
+- FIX: removed the patterns (again — this regressed once before, see handoff warning), staged both .env files + frontend/yarn.lock into git, removed dev-only pymupdf/pdf2image from requirements.txt, removed stray root yarn.lock. Deployment agent re-scan: PASS. Iter42: git state verified, backend 100%, CI build clean.
+- ⚠️ RECURRENCE WATCH: if a future deploy fails at readiness again, FIRST check `git ls-files | grep .env` and .gitignore tail — something keeps re-adding the exclusions.
+- USER ACTION: Save to GitHub → Redeploy.
