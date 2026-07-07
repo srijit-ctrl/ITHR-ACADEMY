@@ -136,6 +136,9 @@ export default function Certificate() {
                 <div className="mt-10 text-center text-xs text-muted-foreground max-w-2xl mx-auto">
                     This credential is verifiable at <span className="font-mono">{shareUrl}</span> — anyone can scan the QR to confirm authenticity. ITHR Technologies maintains a public registry of all issued credentials.
                 </div>
+                <div className="mt-3 text-center text-[10px] text-muted-foreground/80 max-w-2xl mx-auto italic" data-testid="cert-system-disclaimer">
+                    This is a system-generated document and does not require a manual signature. Its authenticity can be validated at any time via the QR code or verification link above.
+                </div>
 
                 <CertificateTutor certificate={cert} />
             </div>

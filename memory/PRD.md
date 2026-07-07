@@ -1001,3 +1001,7 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - P1: Superadmin Tier 3 (MFA, password policy, API-key rotation, feature flags)
 - P1: Slack webhook for Talent Ops leads
 - P2: SuperAdminPortal.jsx tab refactor into route components; Redis cache; Sora 2 pipeline
+
+## 2026-07-07 (later) — Cert enhancement rollout + data hygiene
+- Issued certificates: PDFs render on demand → ALL previously-issued certs automatically use the new template (artwork, no signatures, QR-only, disclaimer). Added /app/backend/sync_certificates.py to re-align drifted cert records (run in prod pod if needed). Web certificate page now shows the same system-generated disclaimer.
+- Purge: extended purge_test_data.py (checkpoint_attempts, verify_impressions, activity_events, admin_audit_log cascades + orphan sweep). Executed in PREVIEW: 29 test users, Feed Test Corp org, 114 activity/audit rows, 18 test page_visits removed; orphan enrollment cleaned. Preview DB now: 4 real users, 1 org, sample cert only. ⚠️ PRODUCTION purge must be run by user in prod pod per /app/PROD_PURGE_RUNBOOK.md after next deploy.

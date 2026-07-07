@@ -148,6 +148,10 @@ async def purge(
         "password_reset_tokens":  await db.password_reset_tokens.count_documents({"user_id": {"$in": victim_user_ids}}),
         "user_login_logs":        await db.user_login_logs.count_documents({"user_id": {"$in": victim_user_ids}}),
         "tutor_sessions":         await db.tutor_sessions.count_documents({"user_id": {"$in": victim_user_ids}}),
+        "checkpoint_attempts":    await db.checkpoint_attempts.count_documents({"user_id": {"$in": victim_user_ids}}),
+        "verify_impressions":     await db.verify_impressions.count_documents({"user_id": {"$in": victim_user_ids}}),
+        "activity_events":        await db.activity_events.count_documents({"actor_id": {"$in": victim_user_ids}}),
+        "admin_audit_log":        await db.admin_audit_log.count_documents({"$or": [{"target_id": {"$in": victim_user_ids}}, {"actor_id": {"$in": victim_user_ids}}]}),
     }
     log.info(f"Cascade delete targets: {counts}")
 
@@ -186,6 +190,10 @@ async def purge(
         r_pwt = await db.password_reset_tokens.delete_many({"user_id": {"$in": victim_user_ids}})
         r_logs = await db.user_login_logs.delete_many({"user_id": {"$in": victim_user_ids}})
         r_tutor = await db.tutor_sessions.delete_many({"user_id": {"$in": victim_user_ids}})
+        r_cp = await db.checkpoint_attempts.delete_many({"user_id": {"$in": victim_user_ids}})
+        r_vi = await db.verify_impressions.delete_many({"user_id": {"$in": victim_user_ids}})
+        r_act = await db.activity_events.delete_many({"actor_id": {"$in": victim_user_ids}})
+        r_audit = await db.admin_audit_log.delete_many({"$or": [{"target_id": {"$in": victim_user_ids}}, {"actor_id": {"$in": victim_user_ids}}]})
         r_orgs = await db.organizations.delete_many({"id": {"$in": orphaned_orgs}})
         # Reset rate-limit buckets (may hold victim IPs/emails)
         await db.pw_reset_rate.delete_many({})
@@ -198,6 +206,8 @@ async def purge(
             f"assmt={r_assmt.deleted_count}  mentor={r_mentor.deleted_count}  "
             f"pay={r_pay.deleted_count}  pwt={r_pwt.deleted_count}  "
             f"login_logs={r_logs.deleted_count}  tutor={r_tutor.deleted_count}  "
+            f"checkpoints={r_cp.deleted_count}  impressions={r_vi.deleted_count}  "
+            f"activity={r_act.deleted_count}  audit={r_audit.deleted_count}  "
             f"orgs={r_orgs.deleted_count}"
         )
     else:
@@ -207,6 +217,18 @@ async def purge(
         r_sample = await db.certificates.delete_many({"certificate_id": {"$in": list(PROTECTED_CERT_IDS)}})
         log.info(f"SAMPLE certs dropped: {r_sample.deleted_count}. "
                  "Set SEED_SAMPLE_CERT=false in the pod env to prevent re-seeding on next backend restart.")
+
+    # Post-pass: sweep dashboard rows orphaned by this (or any earlier) purge —
+    # activity-feed events and user-targeted audit entries that reference users
+    # who no longer exist.
+    remaining_ids = [u["id"] async for u in db.users.find({}, {"_id": 0, "id": 1})]
+    r_act_orphan = await db.activity_events.delete_many(
+        {"actor_id": {"$nin": remaining_ids + [None]}}
+    )
+    r_audit_orphan = await db.admin_audit_log.delete_many(
+        {"action": {"$regex": r"^user\."}, "target_id": {"$nin": remaining_ids}}
+    )
+    log.info(f"Orphan sweep: activity_events={r_act_orphan.deleted_count}  admin_audit_log(user.*)={r_audit_orphan.deleted_count}")
 
     # Post-run sanity: real learner accounts remaining
     remaining = await db.users.count_documents({})
