@@ -170,9 +170,11 @@ async def seed_database():
     total = await db.courses.count_documents({})
     logger.info(f"Seed complete. Total courses: {total}.")
 
-    # Re-apply persisted lesson video URLs (course upserts above replace docs,
-    # which would otherwise wipe admin-configured lesson videos on restart).
+    # Re-apply persisted lesson video URLs + LLM-enriched lesson content
+    # (course upserts above replace docs, which would otherwise wipe
+    # admin-configured videos / generated content on restart).
     mappings = await db.lesson_videos.find({}, {"_id": 0}).to_list(500)
+    overrides = {o["lesson_id"]: o async for o in db.lesson_content_overrides.find({}, {"_id": 0})}
     applied = 0
     for m in mappings:
         course = await db.courses.find_one({"modules.lessons.id": m["lesson_id"]}, {"_id": 0, "id": 1, "modules": 1})
@@ -188,6 +190,25 @@ async def seed_database():
                     applied += 1
     if applied:
         logger.info(f"Re-applied {applied} lesson video URLs.")
+
+    if overrides:
+        content_applied = 0
+        async for course in db.courses.find({"has_full_content": True}, {"_id": 0, "id": 1, "modules": 1}):
+            sets = {}
+            for mi, mod in enumerate(course.get("modules", [])):
+                for li, l in enumerate(mod.get("lessons", [])):
+                    o = overrides.get(l.get("id"))
+                    if o and len(l.get("content", "")) < len(o.get("content", "")):
+                        prefix = f"modules.{mi}.lessons.{li}"
+                        sets[f"{prefix}.content"] = o["content"]
+                        sets[f"{prefix}.key_takeaways"] = o.get("key_takeaways", [])
+                        if o.get("code_sample"):
+                            sets[f"{prefix}.code_sample"] = o["code_sample"]
+            if sets:
+                await db.courses.update_one({"id": course["id"]}, {"$set": sets})
+                content_applied += 1
+        if content_applied:
+            logger.info(f"Re-applied enriched lesson content on {content_applied} courses.")
 
 
 # -------------------- Router mounting --------------------

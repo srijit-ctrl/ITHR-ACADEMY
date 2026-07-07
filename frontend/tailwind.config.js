@@ -15,7 +15,7 @@ module.exports = {
                    so all existing font-serif className usages resolve to Tahoma
                    without a global sweep). */
                 serif: ['Tahoma', 'Calibri', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
-                sans: ['Calibri', 'Tahoma', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
+                sans: ['Calibri', '"Public Sans"', 'Tahoma', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'system-ui', 'sans-serif'],
                 label: ['Calibri', 'Tahoma', '"Segoe UI"', 'system-ui', 'sans-serif'],
                 mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
             },

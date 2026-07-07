@@ -50,7 +50,7 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center container-page py-16">
+        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center container-page py-16 pattern-dots">
             <div className="w-full max-w-md">
                 <div className="overline mb-4">Create your account</div>
                 <h1 className="font-serif text-4xl tracking-tighter leading-none mb-3">Begin your credential.</h1>

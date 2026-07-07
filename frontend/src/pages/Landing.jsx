@@ -29,7 +29,7 @@ export default function Landing() {
     return (
         <div className="min-h-screen">
             {/* HERO — aiilm-inspired centered with soft blobs */}
-            <section className="relative overflow-hidden bg-white">
+            <section className="relative overflow-hidden bg-white pattern-dots">
                 {/* Floating soft blobs (aiilm signature) */}
                 <div className="blob blob-yellow" style={{ width: 340, height: 340, top: 40, right: -60 }} />
                 <div className="blob blob-pink"   style={{ width: 260, height: 260, top: 350, left: 240 }} />

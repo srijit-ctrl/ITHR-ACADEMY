@@ -8,7 +8,7 @@
       to Tahoma so hierarchy is preserved without a global sweep)
    - Mono (technical / kicker): IBM Plex Mono
 */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -66,7 +66,7 @@
         --border: 210 25% 88%;
         --input: 210 25% 88%;
         --ring: 38 51% 57%;                   /* gold focus ring */
-        --radius: 1rem;
+        --radius: 0.25rem;                    /* sharp consulting-grade corners */
     }
     .dark {
         /* ITHR Technologies — Dark theme (matches logo's black canvas) */
@@ -130,28 +130,28 @@
         @apply text-xs tracking-[0.2em] uppercase font-semibold text-brand font-sans;
     }
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 bg-brand text-white rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-transparent shadow-sm;
+        @apply inline-flex items-center justify-center gap-2 bg-brand-navy text-white rounded-sm px-7 py-3 font-semibold transition-all duration-200 border border-transparent shadow-sm;
     }
     .btn-ink {
-        @apply inline-flex items-center justify-center gap-2 bg-foreground text-background hover:opacity-90 rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-foreground shadow-sm;
+        @apply inline-flex items-center justify-center gap-2 bg-foreground text-background hover:opacity-90 rounded-sm px-7 py-3 font-semibold transition-all duration-200 border border-foreground shadow-sm;
     }
     .btn-outline {
-        @apply inline-flex items-center justify-center gap-2 border-2 border-border hover:border-brand hover:text-brand text-foreground rounded-full px-6 py-2.5 font-semibold transition-all duration-200 bg-white;
+        @apply inline-flex items-center justify-center gap-2 border border-brand-navy/30 hover:border-brand-navy hover:bg-brand-navy/5 text-brand-navy rounded-sm px-6 py-2.5 font-semibold transition-all duration-200 bg-white;
     }
     .card-sharp {
-        @apply bg-surface border border-border rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_48px_-24px_rgba(31,36,48,0.2)];
+        @apply bg-surface border border-border rounded-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand-gold/50 hover:shadow-[0_24px_48px_-24px_rgba(31,36,48,0.2)];
     }
     .card-flat {
-        @apply bg-surface border border-border rounded-2xl;
+        @apply bg-surface border border-border rounded-sm;
     }
     .badge-mono {
-        @apply inline-flex items-center px-3 py-1 rounded-full border border-border text-[11px] font-mono uppercase tracking-[0.15em] bg-surface-alt text-foreground;
+        @apply inline-flex items-center px-3 py-1 rounded-none border border-border text-[11px] font-mono uppercase tracking-[0.15em] bg-surface-alt text-foreground;
     }
     .badge-crimson {
-        @apply inline-flex items-center px-3 py-1 rounded-full border border-brand text-[11px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
+        @apply inline-flex items-center px-3 py-1 rounded-none border border-brand text-[11px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
     }
     .badge-brand {
-        @apply inline-flex items-center px-3 py-1 rounded-full border border-brand text-[11px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
+        @apply inline-flex items-center px-3 py-1 rounded-none border border-brand text-[11px] font-mono uppercase tracking-[0.15em] bg-brand/5 text-brand;
     }
     .glass-header {
         @apply backdrop-blur-xl bg-background/80 border-b border-border;
@@ -197,14 +197,14 @@
        Placed outside the .btn-primary @apply block because CSS nesting inside
        `@apply` doesn't compile with our Tailwind/PostCSS setup. */
     .btn-primary:hover {
-        background-color: hsl(var(--brand-hover));
+        background-color: hsl(var(--brand-navy-deep));
         transform: translateY(-1px);
-        box-shadow: 0 8px 24px -6px hsl(var(--brand) / 0.45),
-                    0 2px 4px -1px hsl(var(--brand-navy) / 0.15);
+        box-shadow: 0 8px 24px -6px hsl(var(--brand-navy) / 0.35),
+                    0 2px 4px -1px hsl(var(--brand-gold) / 0.25);
     }
     .btn-primary:active {
         transform: translateY(0);
-        box-shadow: 0 2px 6px -2px hsl(var(--brand) / 0.4);
+        box-shadow: 0 2px 6px -2px hsl(var(--brand-navy) / 0.4);
     }
     .btn-primary:disabled {
         opacity: 0.55;
@@ -303,12 +303,13 @@
     position: relative;
     background: hsl(var(--surface));
     border: 1px solid hsl(var(--border));
-    border-radius: 20px;
+    border-radius: 6px;
     padding: 32px;
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
 }
 .step-card:hover {
     transform: translateY(-4px);
+    border-color: hsl(var(--brand-gold) / 0.6);
     box-shadow: 0 24px 48px -24px hsl(var(--foreground) / 0.2);
 }
 .step-card .step-num {
@@ -322,16 +323,54 @@
 }
 .section-kicker {
     display: inline-block;
-    padding: 6px 16px;
-    border-radius: 999px;
-    background: hsl(var(--brand-purple-light));
-    color: hsl(var(--brand-purple));
+    padding: 6px 14px;
+    border-radius: 0;
+    border-left: 3px solid hsl(var(--brand-gold));
+    background: hsl(var(--brand-navy) / 0.04);
+    color: hsl(var(--brand-navy));
     font-family: 'IBM Plex Mono', monospace;
     font-size: 11px;
     letter-spacing: 3px;
     text-transform: uppercase;
     margin-bottom: 20px;
     font-weight: 600;
+}
+
+/* ---- Consulting-grade decorative graphics (Deloitte/Baker Tilly accents) ---- */
+.pattern-dots {
+    background-image: radial-gradient(hsl(216 52% 24% / 0.07) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+.pattern-grid {
+    background-image:
+        linear-gradient(hsl(216 52% 24% / 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, hsl(216 52% 24% / 0.05) 1px, transparent 1px);
+    background-size: 32px 32px;
+}
+.accent-rule {
+    border-left: 4px solid hsl(var(--brand-gold));
+    padding-left: 1.5rem;
+}
+.ghost-num {
+    font-family: Tahoma, Calibri, sans-serif;
+    font-weight: 800;
+    font-size: clamp(72px, 10vw, 128px);
+    line-height: 0.8;
+    color: hsl(var(--brand-navy) / 0.06);
+    user-select: none;
+    pointer-events: none;
+}
+.corner-accent {
+    position: relative;
+}
+.corner-accent::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 44px; height: 44px;
+    border-top: 2px solid hsl(var(--brand-gold) / 0.7);
+    border-right: 2px solid hsl(var(--brand-gold) / 0.7);
+    pointer-events: none;
 }
 
 /* Soft floating blob decorations for hero (aiilm signature) */

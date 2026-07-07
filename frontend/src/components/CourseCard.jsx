@@ -41,8 +41,8 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
                         <CourseIntroButton course={course} />
                     </div>
                 </div>
-                <div className="absolute top-3 left-3 flex gap-1.5">
-                    <span className="badge-mono bg-background/95 backdrop-blur">{course.category}</span>
+                <div className="absolute top-3 left-3 flex gap-1.5 max-w-[48%]">
+                    <span className="badge-mono bg-background/95 backdrop-blur truncate">{course.category}</span>
                 </div>
                 <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
                     {course.has_full_content && (

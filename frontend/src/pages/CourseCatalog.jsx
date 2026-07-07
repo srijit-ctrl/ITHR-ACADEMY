@@ -44,8 +44,9 @@ export default function CourseCatalog() {
 
     return (
         <div className="container-page py-12 md:py-16">
-            <div className="mb-12">
-                <div className="overline mb-4 fine-rule pl-4">The Full Catalog</div>
+            <div className="mb-12 accent-rule relative">
+                <div className="ghost-num absolute -top-6 right-0 hidden lg:block">{String(courses.length || 28).padStart(2, "0")}</div>
+                <div className="overline mb-4">The Full Catalog</div>
                 <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none">Course Catalog</h1>
                 <p className="mt-5 text-lg text-muted-foreground max-w-2xl">
                     {courses.length} courses across {categories.length}+ categories and {industries.length} industries. Filter by domain, industry, or level.
