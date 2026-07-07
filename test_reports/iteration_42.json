@@ -1,0 +1,31 @@
+{
+  "summary": "Deployment-fix verification (iter 42). Confirmed backend/.env & frontend/.env are tracked in git (not ignored), .gitignore is 91 lines with env patterns removed, pymupdf/pdf2image are gone from requirements.txt. Backend health, superadmin login, /api/courses (28 courses), /api/courses/agentic-ai-banking (rich modules), and /api/certificates/SAMPLE-ITHR-2026-001/pdf all pass. CI=true yarn build compiles successfully. Backend logs show no import errors and clean seed cycle. Deployment blockers are cleared.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_deploy_smoke.py",
+    "/app/test_reports/pytest/iter42_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": ["/app/backend/tests/test_deploy_smoke.py"],
+  "success_rate": {"backend": "100%", "frontend": "skipped-per-request (CI build 100%)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (verified working)",
+  "seed_data_creation": "None - used existing seeded superadmin & sample certificate SAMPLE-ITHR-2026-001",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Deployment fix verified. Git state: `git ls-files --cached | grep -E '\\.env$'` returns backend/.env and frontend/.env. `git check-ignore backend/.env frontend/.env` returns exit 1 (no matches — correctly not ignored). Backend boots without pymupdf/pdf2image. Do NOT stage/unstage .env or modify .gitignore. Feature testing already covered in iterations 40-41.",
+  "verification_evidence": {
+    "git_ls_files_env": ["backend/.env", "frontend/.env"],
+    "git_check_ignore_exit": 1,
+    "gitignore_line_count": 91,
+    "requirements_pymupdf_pdf2image": "absent",
+    "api_health": "200 {status: healthy}",
+    "auth_login_superadmin": "200 with token",
+    "courses_count": ">=28",
+    "agentic_ai_banking_modules": "present with rich lesson content",
+    "certificate_pdf": "200 application/pdf, valid %PDF signature",
+    "frontend_ci_build": "Compiled successfully, exit 0, 365.59 kB main.js"
+  },
+  "pytest_results": "5 passed in 2.43s"
+}
