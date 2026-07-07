@@ -10,7 +10,7 @@ import requests
 
 BASE_URL = os.environ.get(
     "REACT_APP_BACKEND_URL",
-    "https://enterprise-ai-learn-2.preview.emergentagent.com",
+    "https://voice-tutor-labs.preview.emergentagent.com",
 ).rstrip("/")
 API = f"{BASE_URL}/api"
 

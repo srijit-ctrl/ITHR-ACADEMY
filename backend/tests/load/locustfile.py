@@ -5,7 +5,7 @@ Run against the preview environment first:
 
   cd /app/backend/tests/load
   pip install locust
-  locust -f locustfile.py --host https://enterprise-ai-learn-2.preview.emergentagent.com --headless -u 25 -r 5 -t 2m
+  locust -f locustfile.py --host https://voice-tutor-labs.preview.emergentagent.com --headless -u 25 -r 5 -t 2m
 
 Flags:
   -u : concurrent virtual users

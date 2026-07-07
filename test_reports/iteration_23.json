@@ -36,7 +36,7 @@
     "backend": "not re-run (per review-request instructions — untouched since iter-22 100% pass)",
     "frontend": "5/5 targeted flows PASS (100%). PASS: (1) org-owner login → /enterprise/portal loads, (2) Create-user modal opens, (3) submit-create-user → TempCredsModal RENDERS with correct email + non-empty temp password (HIGH regression FIXED), (4) Copy both + Close dismissal work, (5) new user appears in MemberList post silent-reload with no full-screen spinner flash. Sanity: SeatEditorModal preview works for +2 seat increase, cancel dismisses cleanly; Landing/TryALesson streaming returns 857-char response — no refactor side-effects elsewhere."
   },
-  "test_credentials": "Iter23 org-admin (fresh provision this run): email=cto+ed96a2@acmecorped96a2.com, password=Z5LuGOAIYG9HF1, org_id=ddbacb1b-cf7c-4663-b6c0-99269f2461db, invite_code=5V2ERZ4K. Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod. New user created via UI during flow: iter23.newuser302346@acmecorped96a2.com (safe to leave — iter23.* prefix).",
+  "test_credentials": "Iter23 org-admin (fresh provision this run): email=cto+ed96a2@acmecorped96a2.com, password=Z5LuGOAIYG9HF1, org_id=voice-tutor-labs, invite_code=5V2ERZ4K. Super-admin: superadmin@ithr.tech / preview-only-rotate-in-prod. New user created via UI during flow: iter23.newuser302346@acmecorped96a2.com (safe to leave — iter23.* prefix).",
   "seed_data_creation": "1 new org (Iter23 Acme ed96a2) + 1 admin + 1 directly-created member under acmecorped96a2.com. Safe to keep for future regression runs.",
   "retest_needed": false,
   "should_main_agent_self_test": false,
