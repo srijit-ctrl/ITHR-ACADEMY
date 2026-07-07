@@ -980,3 +980,9 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
   - `POST /api/demo/ask` SSE — 280ms (target < 3.5s)
 - Two p99.9 outliers on podcast endpoints (~2s) suggest occasional cold-DB heartbeat — worth watching but not blocking.
 
+
+## 2026-06 — Production build fix (deployment blocker resolved)
+- User reported prod deploy failing at build stage. Root cause: `CI=true yarn build` treats ESLint warnings as errors; a misplaced `eslint-disable-next-line` inside the useEffect body in `frontend/src/components/admin/AuditLogPanel.jsx:38` left the exhaustive-deps warning active, failing the pipeline build.
+- Fix: moved the disable comment to the line above the useEffect. `CI=true yarn build` now compiles (verified). Testing agent iteration_39: audit log panel + all 7 super-admin tabs pass, 0 console errors, 100% frontend success.
+- Deployment agent static scan: PASS (no other blockers). User must Save to GitHub + Redeploy to verify prod.
+- Backlog unchanged: P0 Superadmin Tier 3 (MFA, password policy, API-key rotation, feature flags — user deferred decision), P1 Slack webhook leads, P2 SuperAdminPortal.jsx tab refactor, Redis cache, Sora 2 pipeline.
