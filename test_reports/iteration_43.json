@@ -1,0 +1,32 @@
+{
+  "summary": "Iter 43 — Super-admin email re-sync + clash-guard bug fix verified end-to-end. Backend: 4/4 pytest scenarios pass (baseline canonical login, legacy->canonical email re-sync on boot with log marker, clash-guard skips rename when canonical email is taken by another user AND password re-sync + legacy-email login still work, final-state cleanup). Frontend: UI login at /login with superadmin@ithr.online / Dubai_deram2026 succeeds, lands on /dashboard, and /admin renders the Operator Console showing 'SIGNED IN AS SUPERADMIN@ITHR.ONLINE'. Final DB state is clean: super_admin.email == superadmin@ithr.online, no stray learner remains.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration43_superadmin_email_resync.py",
+    "/app/test_reports/pytest/iter43_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "seed_super_admin.py: fix is minimal and correct — case-normalizes canonical email (DEFAULT_EMAIL.lower()) and guards against clashing accounts before renaming. Confirmed the two log markers ('Super-admin email re-synced' INFO and 'Cannot rename super-admin' ERROR) are emitted as expected.",
+    "Observation (not a blocker for this bug): during test runs an unrelated GET /api/courses/agentic-ai-foundations returned 500 in backend.err.log noise. Not in scope of this iter, but worth flagging for a future check on that course-detail endpoint."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration43_superadmin_email_resync.py"],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (login + /admin render verified)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (canonical, verified). Legacy alias superadmin@ithr.tech exercised transiently and cleaned up.",
+  "seed_data_creation": "Test 02 registered a throwaway learner with email superadmin@ithr.online to exercise the clash-guard, then deleted it in teardown. Test 03 restarts backend once more, super_admin email re-syncs back to superadmin@ithr.online.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix in /app/backend/seed_super_admin.py (email re-sync + clash guard) is fully verified. Final DB state confirmed clean via motor: super_admin doc has email 'superadmin@ithr.online' and no stray learner exists. If retesting, note that /app/backend/pytest.ini enables xdist by default — this specific file must be run either single-worker (pass '-o addopts=') or the sequential-scope will make gw0 run all 4 tests anyway; parallel restarts across workers would race, so keep this file's tests to one worker.",
+  "rca of the issue": "Root cause: preview seeded superadmin@ithr.online, but the production DB still had the legacy superadmin@ithr.tech doc, so canonical-email login failed with 'Invalid credentials'. Fix (seed_super_admin.py lines ~64-98): every boot, if existing super_admin.email != SUPER_ADMIN_EMAIL env, rename to canonical (guarded by a lookup on the target email to avoid unique-index clashes). If a clash exists, an ERROR is logged and rename is skipped; password re-sync continues. Reproduction confirmed: (a) set super_admin.email='superadmin@ithr.tech' in Mongo -> restart -> email re-synced to 'superadmin@ithr.online', login 200. (b) with a clash learner holding the canonical email, restart -> rename skipped, ERROR log emitted, password re-sync intact, login with legacy email 200. Mitigation deployed: production redeploy will now auto-rename the super_admin doc to the canonical address on next boot.",
+  "verification_evidence": {
+    "pytest_iter43": "4 passed in 40.93s",
+    "log_markers_found": [
+      "Super-admin email re-synced: superadmin@ithr.tech -> superadmin@ithr.online",
+      "Cannot rename super-admin superadmin@ithr.tech -> superadmin@ithr.online: another account already uses that email."
+    ],
+    "final_db_state": {"super_admin_email": "superadmin@ithr.online", "stray_learner_exists": false},
+    "canonical_login_final": "HTTP 200 with role=super_admin",
+    "ui_login": "landed on /dashboard; /admin renders Operator Console with SUPERADMIN@ITHR.ONLINE"
+  }
+}

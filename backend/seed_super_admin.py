@@ -67,6 +67,22 @@ async def seed_super_admin() -> None:
     )
 
     if existing:
+        # Sync email to env-var so old deployments converge to the canonical
+        # address (e.g. legacy superadmin@ithr.tech -> superadmin@ithr.online).
+        canonical_email = DEFAULT_EMAIL.lower()
+        if existing["email"] != canonical_email:
+            clash = await db.users.find_one({"email": canonical_email}, {"_id": 1})
+            if clash:
+                logger.error(
+                    f"Cannot rename super-admin {existing['email']} -> {canonical_email}: "
+                    "another account already uses that email."
+                )
+            else:
+                await db.users.update_one(
+                    {"role": "super_admin"},
+                    {"$set": {"email": canonical_email}},
+                )
+                logger.info(f"Super-admin email re-synced: {existing['email']} -> {canonical_email}")
         # Sync password to env-var if it's set (enables rotate-via-restart)
         if env_password:
             if not verify_password(env_password, existing.get("password_hash", "")):
