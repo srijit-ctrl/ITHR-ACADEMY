@@ -9,6 +9,10 @@ import ActivityFeedPanel from "@/components/admin/ActivityFeedPanel";
 import KpiDashboard from "@/components/admin/KpiDashboard";
 import UserControlRow from "@/components/admin/UserControlRow";
 import AuditLogPanel from "@/components/admin/AuditLogPanel";
+import TrafficPanel from "@/components/admin/TrafficPanel";
+import AlertsPanel from "@/components/admin/AlertsPanel";
+import SessionsPanel from "@/components/admin/SessionsPanel";
+import GlobalSearchBar from "@/components/admin/GlobalSearchBar";
 
 /**
  * Super-Admin console.
@@ -109,16 +113,22 @@ export default function SuperAdminPortal() {
                 </div>
 
                 {/* Tabs */}
-                <div className="border-b border-border mb-6 flex gap-1">
-                    <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")} label="Analytics" count={""} testId="tab-analytics" />
+                <div className="border-b border-border mb-6 flex gap-1 items-end flex-wrap">
+                    <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")} label="Overview" count={""} testId="tab-analytics" />
+                    <TabButton active={tab === "traffic"} onClick={() => setTab("traffic")} label="Traffic" count={""} testId="tab-traffic" />
                     <TabButton active={tab === "orgs"} onClick={() => setTab("orgs")} label="Organizations" count={orgs.length} testId="tab-orgs" />
                     <TabButton active={tab === "users"} onClick={() => setTab("users")} label="Users" count={totalUsers} testId="tab-users" />
+                    <TabButton active={tab === "sessions"} onClick={() => setTab("sessions")} label="Sessions" count={""} testId="tab-sessions" />
                     <TabButton active={tab === "emails"} onClick={() => setTab("emails")} label="Send email" count={""} testId="tab-emails" />
                     <TabButton active={tab === "audit"} onClick={() => setTab("audit")} label="Audit log" count={""} testId="tab-audit" />
+                    <div className="ml-auto pb-2">
+                        <GlobalSearchBar onNavigateUser={() => setTab("users")} />
+                    </div>
                 </div>
 
                 {tab === "analytics" && (
                     <div className="space-y-6">
+                        <AlertsPanel />
                         <KpiDashboard />
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2">
@@ -130,6 +140,9 @@ export default function SuperAdminPortal() {
                         </div>
                     </div>
                 )}
+
+                {tab === "traffic" && <TrafficPanel />}
+                {tab === "sessions" && <SessionsPanel />}
 
                 {tab === "orgs" && (
                     <div>

@@ -240,3 +240,173 @@ async def export_audit_log_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="ithr-audit-log-{now_iso()[:10]}.csv"'},
     )
+
+
+# --------- ALERTS ---------
+@router.get("/alerts")
+async def get_alerts(_admin_id: str = Depends(get_current_super_admin)):
+    """Unified alerts feed for the Overview tab. Real signals only —
+    stubbed categories are marked with `stubbed: true`.
+    """
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    last_24h = (now - timedelta(hours=24)).isoformat()
+
+    alerts: list[dict[str, Any]] = []
+
+    # Suspended users
+    sus = await db.users.count_documents({"is_suspended": True})
+    if sus > 0:
+        alerts.append({
+            "id": "suspended-users",
+            "severity": "warn",
+            "title": f"{sus} suspended user{'s' if sus != 1 else ''}",
+            "description": "One or more accounts are currently suspended and cannot log in.",
+            "link": "/admin?tab=users&suspended=true",
+        })
+
+    # Failed logins in last 24h (from login logs — count logs with error field or match by email that doesn't exist)
+    # Simpler: count login_logs where user_id is null (auth attempts we tracked but couldn't attribute)
+    # For now we only log successful logins, so surface impersonation events instead.
+    impersonations = await db.admin_audit_log.count_documents({
+        "action": "user.impersonate",
+        "created_at": {"$gte": last_24h},
+    })
+    if impersonations > 0:
+        alerts.append({
+            "id": "impersonations-24h",
+            "severity": "info",
+            "title": f"{impersonations} impersonation session{'s' if impersonations != 1 else ''} in the last 24h",
+            "description": "Every impersonation is time-boxed (15 min) and fully audit-logged.",
+            "link": "/admin?tab=audit&action=user.impersonate",
+        })
+
+    # Deletions in last 24h
+    deletions = await db.admin_audit_log.count_documents({
+        "action": "user.delete",
+        "created_at": {"$gte": last_24h},
+    })
+    if deletions > 0:
+        alerts.append({
+            "id": "deletions-24h",
+            "severity": "warn",
+            "title": f"{deletions} user deletion{'s' if deletions != 1 else ''} in the last 24h",
+            "description": "Bulk deletions may indicate a data-clean or an operator error — review the audit log.",
+            "link": "/admin?tab=audit&action=user.delete",
+        })
+
+    # Orphan enrollments (courses removed but enrollments linger)
+    course_ids = [c["id"] async for c in db.courses.find({}, {"_id": 0, "id": 1})]
+    orphan_enroll = await db.enrollments.count_documents({"course_id": {"$nin": course_ids}})
+    if orphan_enroll > 0:
+        alerts.append({
+            "id": "orphan-enrollments",
+            "severity": "warn",
+            "title": f"{orphan_enroll} orphan enrollment{'s' if orphan_enroll != 1 else ''}",
+            "description": "Enrollment records point to course_ids that no longer exist.",
+            "link": "",
+        })
+
+    # Traffic drop-off — today vs 7-day avg
+    today = now.strftime("%Y-%m-%d")
+    d7 = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    today_visits = await db.page_visits.count_documents({"day": today})
+    week_visits = await db.page_visits.count_documents({"day": {"$gte": d7}})
+    week_avg = week_visits / 7 if week_visits else 0
+    if week_avg > 20 and today_visits < week_avg * 0.4:
+        alerts.append({
+            "id": "traffic-dropoff",
+            "severity": "warn",
+            "title": "Today's traffic is < 40% of the 7-day average",
+            "description": f"Today: {today_visits} pageviews · 7-day avg: {int(week_avg)}. If unexpected, check the ingress + CDN.",
+            "link": "/admin?tab=traffic",
+        })
+
+    # Stubs — mocked until real backing systems land
+    alerts.append({
+        "id": "license-expiry",
+        "severity": "info",
+        "title": "License expiry monitoring · coming with billing tier",
+        "description": "Requires Stripe subscription sync — queued in Tier 4 backlog.",
+        "link": "",
+        "stubbed": True,
+    })
+    alerts.append({
+        "id": "storage-threshold",
+        "severity": "info",
+        "title": "Storage-usage thresholds · coming with data & backup tier",
+        "description": "Requires Mongo Atlas metrics — queued in Tier 4 backlog.",
+        "link": "",
+        "stubbed": True,
+    })
+
+    return {"alerts": alerts, "count": len(alerts)}
+
+
+# --------- GLOBAL SEARCH ---------
+@router.get("/search")
+async def global_search(q: str, _admin_id: str = Depends(get_current_super_admin)):
+    """Unified search across users, orgs, courses. Top 5 of each type."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return {"query": q, "users": [], "orgs": [], "courses": []}
+
+    users = await db.users.find(
+        {"$or": [{"email": {"$regex": q, "$options": "i"}}, {"full_name": {"$regex": q, "$options": "i"}}]},
+        {"_id": 0, "id": 1, "email": 1, "full_name": 1, "role": 1, "is_suspended": 1},
+    ).limit(5).to_list(5)
+    orgs = await db.organizations.find(
+        {"$or": [{"name": {"$regex": q, "$options": "i"}}, {"domain": {"$regex": q, "$options": "i"}}]},
+        {"_id": 0, "id": 1, "name": 1, "domain": 1, "seats": 1},
+    ).limit(5).to_list(5)
+    courses = await db.courses.find(
+        {"$or": [{"title": {"$regex": q, "$options": "i"}}, {"slug": {"$regex": q, "$options": "i"}}, {"category": {"$regex": q, "$options": "i"}}]},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "category": 1},
+    ).limit(5).to_list(5)
+    return {"query": q, "users": users, "orgs": orgs, "courses": courses}
+
+
+# --------- RECENT SESSIONS ---------
+@router.get("/sessions/recent")
+async def recent_sessions(_admin_id: str = Depends(get_current_super_admin)):
+    """Recently-logged-in users (last 24h) from user_login_logs, joined with
+    user metadata. Provides visibility into who's active; the force-logout
+    button on the row calls the existing suspend endpoint (blocks refresh
+    and login — no separate token store needed).
+    """
+    from datetime import datetime, timezone, timedelta
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    pipeline = [
+        {"$match": {"created_at": {"$gte": since}}},
+        {"$sort": {"created_at": -1}},
+        {"$group": {
+            "_id": "$user_id",
+            "last_login_at": {"$first": "$created_at"},
+            "ip": {"$first": "$ip_address"},
+            "country": {"$first": "$country"},
+            "city": {"$first": "$city"},
+            "user_agent": {"$first": "$user_agent"},
+            "count_24h": {"$sum": 1},
+        }},
+        {"$sort": {"last_login_at": -1}},
+        {"$limit": 50},
+    ]
+    rows = []
+    async for row in db.user_login_logs.aggregate(pipeline):
+        u = await db.users.find_one({"id": row["_id"]}, {"_id": 0, "email": 1, "full_name": 1, "role": 1, "is_suspended": 1})
+        if not u:
+            continue
+        rows.append({
+            "user_id": row["_id"],
+            "email": u["email"],
+            "full_name": u.get("full_name", ""),
+            "role": u.get("role", "learner"),
+            "is_suspended": bool(u.get("is_suspended")),
+            "last_login_at": row["last_login_at"],
+            "ip": row["ip"],
+            "country": row["country"],
+            "city": row["city"],
+            "user_agent": (row.get("user_agent") or "")[:120],
+            "count_24h": row["count_24h"],
+        })
+    return {"sessions": rows, "count": len(rows)}
