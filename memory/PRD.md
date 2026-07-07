@@ -1016,3 +1016,9 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - FIX: removed the patterns (again — this regressed once before, see handoff warning), staged both .env files + frontend/yarn.lock into git, removed dev-only pymupdf/pdf2image from requirements.txt, removed stray root yarn.lock. Deployment agent re-scan: PASS. Iter42: git state verified, backend 100%, CI build clean.
 - ⚠️ RECURRENCE WATCH: if a future deploy fails at readiness again, FIRST check `git ls-files | grep .env` and .gitignore tail — something keeps re-adding the exclusions.
 - USER ACTION: Save to GitHub → Redeploy.
+
+## 2026-07-07 (late) — Prod superadmin login fixed (TESTED ✅ iter43, 100%)
+- Cause: user logged in with LEGACY email superadmin@ithr.tech; canonical account is superadmin@ithr.online.
+- Fix: seed_super_admin.py now re-syncs the super_admin EMAIL to SUPER_ADMIN_EMAIL env on every boot (clash-guarded), alongside the existing password re-sync. Prod converges automatically on next redeploy/boot.
+- KEY LEARNING: Emergent's auto-commit ALWAYS strips .env from git (re-adds ignore patterns). Prod env vars are injected by the platform from preview .env at deploy — do NOT fight this again.
+- All course-detail endpoints re-verified 200.
