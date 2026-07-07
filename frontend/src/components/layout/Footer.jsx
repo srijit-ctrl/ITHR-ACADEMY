@@ -9,7 +9,7 @@ export default function Footer() {
                 <div className="container-page py-8 flex items-center justify-between flex-wrap gap-6">
                     <ITHRLockup size={52} />
                     <div className="flex items-center gap-6 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
-                        <span className="hidden md:inline">An Independent Issuer for the Agentic Enterprise</span>
+                        <span className="hidden md:inline">An Autonomous Certifying Entity For Curated Learning</span>
                         <span className="badge-gold">Est. 2026</span>
                     </div>
                 </div>

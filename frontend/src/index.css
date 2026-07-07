@@ -16,53 +16,57 @@
 
 @layer base {
     :root {
-        /* ITHR Technologies — Official brand palette (source: ITHR_Brand_Guidelines.pdf)
-           Teal #00A78B (leads ~60%) · Navy #16335E · Bright Blue #2E7FC1 · Sky Blue #3FA9E0
-           Background is a soft off-white for eye comfort (not pure white). */
-        --background: 210 33% 98%;            /* #F6F8FB — soft off-white, easy on eyes */
-        --foreground: 217 62% 22%;            /* Navy #16335E — text primary */
-        --surface: 0 0% 100%;                 /* pure white for cards on soft bg */
-        --surface-alt: 210 40% 96%;           /* subtle blue-tinted panel */
+        /* ITHR Academy — Shield-aligned palette (Feb 2026 rebrand).
+           Navy #1E3A5F leads (primary text + primary buttons) · Antique Gold #C9A25B
+           is the accent (CTAs, focus rings, badges) · Sky Blue #8DB8D8 for subtle
+           highlights (matches the circuit lines in the shield). Background stays
+           a soft off-white for readability. */
+        --background: 210 33% 98%;            /* #F6F8FB — soft off-white */
+        --foreground: 216 52% 24%;            /* Navy #1E3A5F — text primary */
+        --surface: 0 0% 100%;
+        --surface-alt: 210 40% 96%;
         --card: 0 0% 100%;
-        --card-foreground: 217 62% 22%;
+        --card-foreground: 216 52% 24%;
         --popover: 0 0% 100%;
-        --popover-foreground: 217 62% 22%;
-        --primary: 217 62% 22%;               /* Navy for primary buttons */
+        --popover-foreground: 216 52% 24%;
+        --primary: 216 52% 24%;               /* Navy primary buttons */
         --primary-foreground: 0 0% 100%;
         --secondary: 210 40% 96%;
-        --secondary-foreground: 217 62% 22%;
+        --secondary-foreground: 216 52% 24%;
         --muted: 210 40% 96%;
-        --muted-foreground: 217 20% 42%;      /* muted navy */
-        --accent: 168 100% 33%;               /* ITHR Teal #00A78B */
-        --accent-foreground: 0 0% 100%;
-        --brand: 168 100% 33%;                /* Teal — the leading brand color */
-        --brand-hover: 168 100% 27%;
-        --brand-ink: 217 62% 22%;             /* Navy for ink text on brand */
-        --brand-navy: 217 62% 22%;            /* #16335E */
-        --brand-navy-deep: 217 62% 15%;
-        --brand-teal: 168 100% 33%;           /* #00A78B */
-        --brand-teal-light: 168 60% 90%;
-        --brand-bright: 210 62% 47%;          /* #2E7FC1 Bright Blue */
-        --brand-sky: 202 74% 56%;             /* #3FA9E0 Sky Blue */
-        --brand-sky-light: 202 74% 92%;
-        /* Legacy aliases kept for now so existing className usage keeps rendering
-           until we do a full search-replace across pages. Mapped to brand. */
-        --brand-blue: 210 62% 47%;
-        --brand-blue-light: 210 62% 92%;
-        --brand-purple: 217 62% 22%;
+        --muted-foreground: 216 20% 44%;
+        --accent: 38 51% 57%;                 /* Gold — subtle accents */
+        --accent-foreground: 216 52% 24%;
+        --brand: 38 51% 57%;                  /* Antique Gold #C9A25B — headline accent */
+        --brand-hover: 38 55% 45%;            /* deeper gold on hover */
+        --brand-ink: 216 52% 24%;             /* navy ink on gold */
+        --brand-navy: 216 52% 24%;            /* #1E3A5F */
+        --brand-navy-deep: 216 55% 16%;
+        --brand-gold: 38 51% 57%;             /* new canonical gold */
+        --brand-gold-deep: 38 55% 42%;
+        --brand-gold-light: 38 60% 92%;
+        --brand-sky: 205 45% 70%;             /* Circuit-line sky blue */
+        --brand-sky-light: 205 55% 92%;
+        /* Legacy teal aliases — kept so existing className usage keeps rendering.
+           Point at gold now so the old teal-branded UI adopts the new palette
+           automatically without a full search-replace. */
+        --brand-teal: 38 51% 57%;
+        --brand-teal-light: 38 60% 92%;
+        --brand-bright: 216 52% 24%;
+        --brand-blue: 205 45% 70%;
+        --brand-blue-light: 205 55% 92%;
+        --brand-purple: 216 52% 24%;
         --brand-purple-light: 210 40% 92%;
-        --brand-orange: 168 100% 33%;
-        --brand-orange-light: 168 60% 92%;
-        --brand-gold: 202 74% 56%;
-        --brand-gold-deep: 210 62% 47%;
+        --brand-orange: 38 51% 57%;
+        --brand-orange-light: 38 60% 92%;
         --destructive: 356 63% 44%;
         --destructive-foreground: 0 0% 100%;
-        --success: 168 100% 33%;              /* teal-tinted success matches brand */
-        --warning: 202 74% 56%;               /* sky blue for warning (subtle) */
+        --success: 152 55% 40%;               /* keep green-teal for semantic success */
+        --warning: 38 60% 55%;                /* gold-tinted warning */
         --border: 210 25% 88%;
         --input: 210 25% 88%;
-        --ring: 168 100% 33%;                 /* teal focus ring */
-        --radius: 1rem;                        /* 16px — soft rounded */
+        --ring: 38 51% 57%;                   /* gold focus ring */
+        --radius: 1rem;
     }
     .dark {
         /* ITHR Technologies — Dark theme (matches logo's black canvas) */

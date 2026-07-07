@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import "@/App.css";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Header from "@/components/layout/Header";
@@ -43,6 +45,20 @@ import ImpersonationBanner from "@/components/ImpersonationBanner";
 function AppShell() {
     const location = useLocation();
     const { user } = useAuth();
+
+    // Anonymous pageview telemetry — fires on every route change. Endpoint is
+    // rate-limited server-side and drops bot user-agents. Never blocks render.
+    useEffect(() => {
+        // Skip admin/verify pages to avoid self-inflating traffic
+        if (location.pathname.startsWith("/admin")) return;
+        const path = location.pathname + location.search;
+        fetch(`${API_BASE}/telemetry/pageview`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path, referrer: document.referrer || "" }),
+            keepalive: true,
+        }).catch(() => { /* silent — telemetry never breaks UX */ });
+    }, [location.pathname, location.search]);
 
     // Detect OAuth callback synchronously
     if (location.hash?.includes("session_id=")) {
