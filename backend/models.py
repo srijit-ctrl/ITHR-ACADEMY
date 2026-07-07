@@ -24,6 +24,7 @@ class UserRegister(BaseModel):
     role: Optional[Literal["learner", "instructor", "admin", "corporate_admin"]] = "learner"
     organization: Optional[str] = None
     title: Optional[str] = None
+    referral_code: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -47,6 +48,10 @@ class UserPublic(BaseModel):
     signup_discount_code: Optional[str] = None
     founding_course_id: Optional[str] = None
     founding_cert_used: bool = False
+    # Referral payment bypass (first 500 redemptions are marked Paid)
+    payment_status: Optional[str] = None
+    paid_via_referral: bool = False
+    referral_seq: Optional[int] = None
 
 
 class AuthResponse(BaseModel):
@@ -62,6 +67,7 @@ class Lesson(BaseModel):
     duration_min: int = 10
     code_sample: Optional[str] = None
     key_takeaways: List[str] = []
+    video_url: Optional[str] = None
 
 
 class Module(BaseModel):

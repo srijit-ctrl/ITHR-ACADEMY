@@ -15,7 +15,7 @@ from routers import (
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, password_reset_router, paths_router,
     recommendation_router, trust_router, tutor_router, voice_router, podcast_router,
-    admin_control_router, traffic_router,
+    admin_control_router, traffic_router, video_quiz_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
 
@@ -76,8 +76,21 @@ async def seed_database():
         quiz_default = doc.pop("quiz", [])
         existing = await db.courses.find_one(
             {"slug": full.slug},
-            {"_id": 0, "has_full_content": 1, "quiz": 1},
+            {"_id": 0, "has_full_content": 1, "quiz": 1, "modules": 1},
         )
+        # Preserve module/lesson ids across restarts (by position) so
+        # video_checkpoints / lesson_videos / enrollments never orphan.
+        if existing and existing.get("modules"):
+            old_modules = existing["modules"]
+            for mi, mod in enumerate(doc.get("modules", [])):
+                if mi >= len(old_modules):
+                    break
+                mod["id"] = old_modules[mi].get("id", mod["id"])
+                old_lessons = old_modules[mi].get("lessons", [])
+                for li, lesson in enumerate(mod.get("lessons", [])):
+                    if li >= len(old_lessons):
+                        break
+                    lesson["id"] = old_lessons[li].get("id", lesson["id"])
         was_stub = existing is not None and (not existing.get("has_full_content") or not existing.get("quiz"))
         if was_stub:
             # Stub → full transition: overwrite quiz with the new bank.
@@ -157,6 +170,25 @@ async def seed_database():
     total = await db.courses.count_documents({})
     logger.info(f"Seed complete. Total courses: {total}.")
 
+    # Re-apply persisted lesson video URLs (course upserts above replace docs,
+    # which would otherwise wipe admin-configured lesson videos on restart).
+    mappings = await db.lesson_videos.find({}, {"_id": 0}).to_list(500)
+    applied = 0
+    for m in mappings:
+        course = await db.courses.find_one({"modules.lessons.id": m["lesson_id"]}, {"_id": 0, "id": 1, "modules": 1})
+        if not course:
+            continue
+        for mi, mod in enumerate(course.get("modules", [])):
+            for li, l in enumerate(mod.get("lessons", [])):
+                if l.get("id") == m["lesson_id"]:
+                    await db.courses.update_one(
+                        {"id": course["id"]},
+                        {"$set": {f"modules.{mi}.lessons.{li}.video_url": m["video_url"]}},
+                    )
+                    applied += 1
+    if applied:
+        logger.info(f"Re-applied {applied} lesson video URLs.")
+
 
 # -------------------- Router mounting --------------------
 for r in (
@@ -182,6 +214,7 @@ for r in (
     digest_router.router,
     demo_router.router,
     trust_router.router,
+    video_quiz_router.router,
 ):
     app.include_router(r)
 

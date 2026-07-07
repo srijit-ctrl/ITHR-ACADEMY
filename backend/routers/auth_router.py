@@ -67,6 +67,13 @@ async def register(payload: UserRegister, response: Response):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Validate any provided referral code BEFORE creating the account so a
+    # typo'd code fails loudly instead of silently registering a free account.
+    if payload.referral_code:
+        from founding_member import is_valid_referral_code
+        if not is_valid_referral_code(payload.referral_code):
+            raise HTTPException(status_code=400, detail="Invalid referral code")
+
     user_id = str(uuid.uuid4())
     doc = {
         "id": user_id,
@@ -98,12 +105,31 @@ async def register(payload: UserRegister, response: Response):
         # regressions of the "seq/code stay null" class don't slip through.
         logger.exception("Founding-member allocation raised during registration")
 
+    # Referral-code payment bypass (first 500 redemptions -> marked Paid).
+    referral_applied = None
+    if payload.referral_code:
+        try:
+            from founding_member import redeem_referral_code
+            referral_applied = await redeem_referral_code(user_id, payload.referral_code)
+            if referral_applied:
+                doc["payment_status"] = "paid"
+                doc["paid_via_referral"] = True
+                doc["referral_seq"] = referral_applied["seq"]
+        except Exception:
+            logger.exception("Referral redemption raised during registration")
+
     # Send the welcome email as a fire-and-forget task so a slow / failing
     # Resend call never blocks the register response.
     try:
         import asyncio as _asyncio
-        from email_service import send_welcome_email
-        _asyncio.create_task(send_welcome_email(doc["email"], doc.get("full_name") or ""))
+        if referral_applied:
+            from email_service import send_founding_welcome_email
+            _asyncio.create_task(send_founding_welcome_email(
+                doc["email"], doc.get("full_name") or "", referral_applied["seq"]
+            ))
+        else:
+            from email_service import send_welcome_email
+            _asyncio.create_task(send_welcome_email(doc["email"], doc.get("full_name") or ""))
     except Exception:
         logger.exception("Welcome-email dispatch failed (non-fatal)")
 

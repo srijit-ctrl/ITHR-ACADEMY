@@ -1,140 +1,97 @@
 {
-  "project_name": "Enterprise Agentic AI Academy",
-  "theme_and_archetype": {
-    "primary_theme": "Light",
-    "archetype": "Archetype 4 (Swiss & High-Contrast) + Archetype 1 (Organic/Scholarly)",
-    "vibe": "Ivy League Cyber / Old Money Tech. The platform must feel like an authoritative, prestigious certification body for Fortune 500 companies, utilizing a serious tech-editorial aesthetic rather than a generic SaaS look.",
-    "forbidden_elements": ["Purple/Teal gradients", "Inter/Space Grotesk fonts", "Rounded soft UI (no large border-radius)", "Centered generic layouts"]
-  },
-  "color_palette": {
-    "light": {
-      "background": "#F7F6F0",
-      "surface": "#FFFFFF",
-      "surface_alt": "#EFECE4",
-      "text_primary": "#0D1321",
-      "text_secondary": "#4A5060",
-      "accent_primary": "#A31621",
-      "accent_hover": "#82111A",
-      "accent_secondary": "#0D1321",
-      "border": "#E2DFD3",
-      "success": "#2D6A4F",
-      "warning": "#D4A373",
-      "error": "#9B2226"
+  "theme": "Light",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) mixed with Light/Earthy surfaces",
+  "design_philosophy": "A modern, professional consulting-firm aesthetic inspired by Deloitte and Baker Tilly. Features confident whitespace, sharp accents, strict geometric grid alignments, bold section numbering, and a 'light and fresh' color palette using the existing Navy and Antique Gold brand colors.",
+  "typography": {
+    "heading_font": "Tahoma",
+    "body_font": "Public Sans",
+    "font_substitution_note": "User requested 'Calibre' for content. Calibre is a commercial font by Klim Type Foundry. We are substituting it with 'Public Sans' (a free Google Font) which perfectly captures the neutral, structural, and corporate geometric feel of Calibre.",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-[#0A1422] font-heading",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#152A47] font-heading",
+      "h3": "text-xl sm:text-2xl font-semibold text-[#152A47] font-heading",
+      "body": "text-base font-sans leading-relaxed text-[#3A4B60]",
+      "small_label": "text-xs font-bold tracking-[0.2em] uppercase text-[#C9A059] font-sans",
+      "large_numbering": "text-8xl font-black text-[#152A47]/5 font-heading -ml-4"
     },
-    "dark": {
-      "background": "#05070D",
-      "surface": "#0C111C",
-      "surface_alt": "#141A29",
-      "text_primary": "#F7F6F0",
-      "text_secondary": "#A0A5B5",
-      "accent_primary": "#D92E3A",
-      "accent_hover": "#F04855",
-      "accent_secondary": "#F7F6F0",
-      "border": "#1F2638",
-      "success": "#40916C",
-      "warning": "#E6B885",
-      "error": "#C1282D"
+    "google_fonts_import": "@import url('https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');"
+  },
+  "colors": {
+    "background": {
+      "primary": "#F9F9F8",
+      "secondary": "#FFFFFF",
+      "accent": "#F0F2F5"
+    },
+    "brand": {
+      "navy_dark": "#0A1422",
+      "navy": "#152A47",
+      "navy_light": "#1F3A5F",
+      "gold": "#C9A059",
+      "gold_light": "#C6A15A"
+    },
+    "text": {
+      "primary": "#0A1422",
+      "secondary": "#3A4B60",
+      "muted": "#64748B",
+      "on_navy": "#FFFFFF"
+    },
+    "borders": {
+      "subtle": "rgba(21, 42, 71, 0.1)",
+      "gold": "rgba(201, 160, 89, 0.4)"
     }
   },
-  "typography": {
-    "font_family": {
-      "heading": "Cormorant Garamond, serif",
-      "body": "IBM Plex Sans, sans-serif",
-      "mono": "IBM Plex Mono, monospace"
-    },
-    "hierarchy": {
-      "h1": "text-5xl sm:text-6xl tracking-tighter leading-none font-medium",
-      "h2": "text-3xl sm:text-4xl tracking-tight leading-tight font-medium",
-      "h3": "text-xl sm:text-2xl tracking-tight font-medium",
-      "h4": "text-lg font-medium",
-      "body": "text-base leading-relaxed",
-      "overline": "text-xs tracking-[0.2em] uppercase font-semibold text-accent-primary"
-    },
-    "rules": [
-      "Never use bold (font-bold) for Cormorant Garamond headings; use font-medium or font-semibold to retain elegance.",
-      "Always use tight letter spacing (tracking-tight) for large headings.",
-      "Use IBM Plex Mono for course tags, code snippets, and certificate IDs."
-    ]
+  "layout_and_spacing": {
+    "general": "Confident whitespace. Use generous padding (p-12, p-16, p-24) to create a premium, uncrowded feel.",
+    "grid": "Strict, clean columns. Left-align text blocks by default to ensure scannability and structural authority.",
+    "borders_and_dividers": "Use 1px solid borders (border-navy/10) for structural separation. Use thin gold lines (border-t border-[#C9A059]/30) to divide major sections.",
+    "border_radius": "Keep corners sharp or minimally rounded (rounded-none or rounded-sm) to match corporate consulting aesthetics (avoid large, bubbly radiuses)."
   },
-  "spacing_and_layout": {
-    "container": "max-w-7xl mx-auto px-6 md:px-12",
-    "section_spacing": "py-24 md:py-32",
-    "bento_grid": "grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8",
-    "card_padding": "p-8 md:p-10",
-    "rules": [
-      "Embrace asymmetrical grids for the marketing landing page (e.g., col-span-8 paired with col-span-4).",
-      "Use strict, dense grids for the learner dashboard and course module lists.",
-      "Containers with borders MUST have generous internal padding (p-8 minimum) to avoid text collision."
-    ]
-  },
-  "surface_strategies": {
-    "header": "Crystal Glassmorphism: backdrop-blur-xl bg-white/80 (light) or bg-[#05070D]/80 (dark) with a 1px delicate bottom border.",
-    "cards": "Flat solid background with 1px sharp border (border-border). No default drop shadows. On hover, apply a slight -translate-y-1 and a subtle diffuse shadow.",
-    "premium_certificates": "The 'Tracing Beam' effect. Outline the certificate cards with a subtle animated gradient border to signal high value and verification.",
-    "ai_tutor_panel": "Neumorphic/Clay hybrid: Soft ambient shadow with a sharp 1px inner border. Differentiates the AI interaction layer from the flat content layer."
-  },
-  "component_patterns": {
+  "components": {
     "buttons": {
-      "primary": "bg-accent-primary text-white hover:bg-accent-hover rounded-sm px-6 py-3 font-medium transition-colors",
-      "secondary": "bg-accent-secondary text-white hover:bg-black rounded-sm px-6 py-3 font-medium transition-colors (Light Mode)",
-      "outline": "border border-border hover:border-accent-primary text-text-primary rounded-sm px-6 py-3 transition-colors"
+      "primary": "bg-[#152A47] text-white hover:bg-[#0A1422] rounded-sm px-6 py-3 transition-colors font-semibold text-sm",
+      "outline": "border border-[#152A47] text-[#152A47] hover:bg-[#152A47]/5 rounded-sm px-6 py-3 transition-colors font-semibold text-sm",
+      "ghost": "text-[#152A47] hover:text-[#0A1422] hover:bg-[#152A47]/5 rounded-sm px-4 py-2 transition-colors font-semibold text-sm"
     },
-    "badges": "px-2.5 py-0.5 rounded-none border border-border text-xs font-mono uppercase tracking-wider bg-surface-alt",
-    "course_modules": "List layout with border-b border-border py-4. Hover state adds a very subtle bg-surface-alt shift.",
-    "progress_bars": "H-1 bg-surface-alt rounded-none overflow-hidden. Fill is accent-primary.",
-    "forms": "Use Shadcn inputs but force rounded-sm or rounded-none. Focus states must ring with accent-primary, not default blue.",
-    "data_testid": "ALL interactive components MUST include a kebab-case data-testid (e.g., data-testid='enroll-button')."
+    "cards": {
+      "default": "bg-white border border-[#152A47]/10 rounded-sm p-8 shadow-sm hover:shadow-md transition-shadow",
+      "interactive": "bg-white border border-[#152A47]/10 rounded-sm p-8 shadow-sm hover:-translate-y-1 hover:border-[#C9A059]/50 transition-all duration-300"
+    },
+    "navigation": {
+      "header": "bg-white/95 backdrop-blur-md border-b border-[#152A47]/10 sticky top-0 z-50",
+      "links": "text-sm font-semibold text-[#152A47] hover:text-[#C9A059] transition-colors"
+    },
+    "graphics_and_accents": {
+      "description": "To add a 'tinge of graphics' while remaining light and fresh, use subtle background SVG patterns (dots, grids, diagonal hatching) in pale gray or 5% gold. Add floating abstract glass/geometric images sparingly as accents.",
+      "patterns": [
+        "bg-[radial-gradient(#152A47_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.03]",
+        "border-l-4 border-[#C9A059] pl-6"
+      ]
+    }
   },
-  "media_urls": {
-    "hero_backgrounds": [
+  "media": {
+    "image_urls": [
       {
-        "url": "https://images.unsplash.com/photo-1526314114033-349ef6f72220?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmFsJTIwbGlicmFyeXxlbnwwfHx8fDE3ODMxNTI1NTV8MA&ixlib=rb-4.1.0&q=85",
-        "description": "High-raise architectural library, use for main academy hero background with a bg-black/40 overlay to ensure text contrast."
+        "url": "https://images.unsplash.com/photo-1658604663578-04634f4cb897?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxjb3Jwb3JhdGUlMjBwcm9mZXNzaW9uYWwlMjBhYnN0cmFjdCUyMGdyYXBoaWNzfGVufDB8fHx8MTc4MzQwOTQ4MXww&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract elegant glass curve. Use as a subtle background graphic overlay for hero or CTA sections.",
+        "category": "abstract_graphic"
       },
       {
-        "url": "https://images.pexels.com/photos/31656148/pexels-photo-31656148.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Modern campus building, use for Enterprise/B2B landing page sections."
-      }
-    ],
-    "course_thumbnails": [
-      {
-        "url": "https://images.unsplash.com/photo-1644088379091-d574269d422f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHw0fHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMGRhdGElMjBhcnR8ZW58MHx8fHwxNzgzMTUyNTU1fDA&ixlib=rb-4.1.0&q=85",
-        "description": "Blue abstract network lines, use for 'Introduction to Agentic AI' course."
+        "url": "https://images.unsplash.com/photo-1462556791646-c201b8241a94?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwyfHxjb3Jwb3JhdGUlMjBwcm9mZXNzaW9uYWwlMjBhYnN0cmFjdCUyMGdyYXBoaWNzfGVufDB8fHx8MTc4MzQwOTQ4MXww&ixlib=rb-4.1.0&q=85",
+        "description": "Architectural low-angle glass building. Excellent for the Enterprise Portal header, about page, or large hero backgrounds with an overlay.",
+        "category": "hero_background"
       },
       {
-        "url": "https://images.unsplash.com/photo-1643228995868-bf698f67d053?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJpYyUyMGRhdGElMjBhcnR8ZW58MHx8fHwxNzgzMTUyNTU1fDA&ixlib=rb-4.1.0&q=85",
-        "description": "Stacked cubes, use for 'Advanced LLM Architecture' course."
-      }
-    ],
-    "corporate_learners": [
-      {
-        "url": "https://images.pexels.com/photos/7698712/pexels-photo-7698712.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Diverse professionals collaborating, use for 'For Teams/Business' sections."
-      },
-      {
-        "url": "https://images.pexels.com/photos/7108207/pexels-photo-7108207.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Professionals discussing documents, use for testimonials or case studies."
-      }
-    ],
-    "company_logos": [
-      {
-        "url": "https://images.pexels.com/photos/15863000/pexels-photo-15863000.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "OpenAI screen, use in a tech partner or 'Powered by' banner."
-      },
-      {
-        "url": "https://images.unsplash.com/photo-1770012977129-19f856a1f935?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjB1bml2ZXJzaXR5JTIwY2FtcHVzfGVufDB8fHx8MTc4MzE1MjU2Nnww&ixlib=rb-4.1.0&q=85",
-        "description": "Palantir logo, use as a placeholder for enterprise customers in trust banner."
+        "url": "https://images.pexels.com/photos/5520284/pexels-photo-5520284.jpeg",
+        "description": "Two businessmen discussing strategies. Perfect for the Learning Paths, Consulting Academy feature section, or Enterprise CTA.",
+        "category": "feature_professional"
       }
     ]
   },
-  "instructions_to_main_agent": [
-    "Load Google Fonts: Cormorant Garamond (400,500,600), IBM Plex Sans (400,500,600), and IBM Plex Mono.",
-    "Configure tailwind.config.js to use these exact color hex codes and font families.",
-    "Do NOT use generic Shadcn Cards without removing their heavy default drop shadows. Replace with the 1px sharp border style.",
-    "Implement the landing page using raw HTML/Tailwind to allow for asymmetrical bento grids. Use Shadcn only for interactive bits (forms, dialogs, accordion).",
-    "Ensure all text over images (like the hero section) has at least bg-black/40 overlay or strong text-shadow for WCAG AA compliance.",
-    "For the AI Tutor chat interface, position it as a fixed bottom-right floating panel with 'Crystal Glassmorphism' to keep the course content visible beneath it.",
-    "All navigation links and buttons must have explicit :hover state color changes.",
-    "Add data-testid attributes to all form inputs, buttons, course cards, and navigation items."
-  ]
+  "instructions_to_main_agent": {
+    "css_variables_setup": "In `/app/frontend/src/index.css`, update the CSS variables. Set primary to Navy (#152A47), secondary to Gold (#C9A059), background to Ivory (#F9F9F8). Implement the Tailwind utility classes mapping to these variables.",
+    "font_setup": "In `/app/frontend/tailwind.config.js`, update the font family. Set 'sans' to `['Public Sans', 'sans-serif']` and 'heading' to `['Tahoma', 'Verdana', 'sans-serif']`.",
+    "testing": "CRITICAL: Ensure all interactive elements retain or add `data-testid` attributes (kebab-case, role-based).",
+    "shadcn_customization": "Modify existing Shadcn components to use `rounded-sm` instead of larger default roundings. Remove heavy drop shadows; prefer `shadow-sm` and 1px borders to mimic Deloitte's sharp, confident corporate layout.",
+    "file_type_note": "Ensure you are editing `.js` and `.jsx` files, not `.tsx`."
+  }
 }

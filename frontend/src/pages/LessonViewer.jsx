@@ -4,6 +4,7 @@ import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
 import { ArrowLeft, ArrowRight, CheckCircle2, Circle, Award, Loader2 } from "lucide-react";
 import InlineTutor from "@/components/InlineTutor";
+import VideoLessonPlayer from "@/components/VideoLessonPlayer";
 
 export default function LessonViewer() {
     const { slug, moduleId, lessonId } = useParams();
@@ -120,6 +121,10 @@ export default function LessonViewer() {
                     <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand mb-3">Module {String(module.number).padStart(2, "0")} · Lesson {lesson.duration_min} min</div>
                     <h1 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">{lesson.title}</h1>
                 </div>
+
+                {lesson.video_url && (
+                    <VideoLessonPlayer lessonId={lesson.id} onProgressReset={loadCourseAndEnrollments} />
+                )}
 
                 <article className="prose-lesson">
                     {lesson.content.split(/\n\n+/).map((para, i) => {

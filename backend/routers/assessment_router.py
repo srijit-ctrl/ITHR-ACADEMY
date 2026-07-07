@@ -450,11 +450,11 @@ async def certificate_qr(certificate_id: str):
 
 @router.get("/certificates/{certificate_id}/pdf")
 async def certificate_pdf(certificate_id: str):
-    """Server-rendered, print-ready PDF of a certificate.
+    """Print-ready PDF rendered onto the uploaded ITHR artwork templates.
 
-    Uses WeasyPrint to render an A4-landscape HTML template with the ITHR seal,
-    gold accents, and embedded QR (base64 SVG). Public — anyone with the ID
-    can download since the credential is already publicly verifiable.
+    The credential is integrity-verified against the live user + course records
+    (recipient name, course title, unique ID) before rendering. The PDF embeds
+    both a QR code and a Code128 barcode of the unique certificate ID.
     """
     cert = await db.certificates.find_one(
         {"certificate_id": certificate_id}, {"_id": 0}
@@ -462,34 +462,31 @@ async def certificate_pdf(certificate_id: str):
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
 
-    import base64
     import os
 
     from weasyprint import HTML
 
-    # Generate QR SVG inline
+    from cert_render import render_certificate_html, verify_certificate_integrity
+
+    # Credential must match the live records before a PDF is issued.
+    if certificate_id != "SAMPLE-ITHR-2026-001":
+        failures = await verify_certificate_integrity(db, cert)
+        if failures:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Certificate integrity check failed: {'; '.join(failures)}",
+            )
+
     base_url = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
     verify_url = f"{base_url}/verify/{certificate_id}" if base_url else f"/verify/{certificate_id}"
-    qr_buf = io.BytesIO()
-    segno.make(verify_url, error="H").save(qr_buf, kind="svg", scale=6, dark="#142544", light="#ffffff", border=1, xmldecl=False)
-    qr_b64 = base64.b64encode(qr_buf.getvalue()).decode("ascii")
 
     issued_raw = cert.get("issued_at", "")
     try:
-        issued = datetime.fromisoformat(issued_raw.replace("Z", "+00:00")).strftime("%B %d, %Y")
+        issued = datetime.fromisoformat(issued_raw.replace("Z", "+00:00")).strftime("%d %B %Y")
     except Exception:
         issued = issued_raw[:10]
 
-    html = _CERT_PDF_TEMPLATE.format(
-        holder=_html_escape(cert["user_name"]),
-        course=_html_escape(cert["course_title"]),
-        score=cert.get("score", 0),
-        cert_id=_html_escape(cert["certificate_id"]),
-        issued=issued,
-        qr_b64=qr_b64,
-        verify_url=_html_escape(verify_url),
-        script_font_b64=_SCRIPT_FONT_B64,
-    )
+    html = render_certificate_html(cert, verify_url, issued)
 
     pdf_buf = io.BytesIO()
     HTML(string=html).write_pdf(pdf_buf)

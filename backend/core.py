@@ -92,6 +92,10 @@ def user_to_public(doc: dict) -> dict:
         "signup_discount_code": doc.get("signup_discount_code"),
         "founding_course_id": doc.get("founding_course_id"),
         "founding_cert_used": doc.get("founding_cert_used", False),
+        # Referral payment bypass (first 500 redemptions are marked Paid).
+        "payment_status": doc.get("payment_status"),
+        "paid_via_referral": doc.get("paid_via_referral", False),
+        "referral_seq": doc.get("referral_seq"),
     }
 
 

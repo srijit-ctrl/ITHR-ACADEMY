@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 40 end-to-end verification of the video-quiz + FOUNDING500 referral + certificate-integrity feature batch. Pytest suite (16 tests) all pass: referral registration (upper/lower/invalid/none), video-quiz learner GET (answers hidden), 3-strike wrong-answer reset flow with progress recalculation, correct-answer flow, admin authz (learner blocked 403), admin CRUD lifecycle (create/list/update/delete/set-video), invalid correct_index 400, sample cert PDF (200 application/pdf, %PDF magic bytes, >5KB), 404 for nonexistent cert. Manual verification: mismatched cert user_name returns 409 with 'recipient name does not match' detail. Frontend E2E via Playwright: /register with FOUNDING500 -> 200 -> lands on /dashboard; invalid code -> shows [data-testid=register-error] 'Invalid referral code'. /learn/agentic-ai-foundations/{m}/{l} renders VideoLessonPlayer with '0/2 checkpoints passed' indicator once model fix applied. Simulated timeupdate at t=9 -> [data-testid=video-quiz-overlay] appears with correct MCQ ('What distinguishes an AI agent from a simple chatbot?'). 3 wrong answers show 'Incorrect — 2 attempts left' -> '1 attempt left' -> '3 attempts used — restarting the lesson' with overlay auto-closing. Admin /admin -> tab-videoquiz -> selects Foundations course -> selects first lesson -> shows 2 seeded checkpoints -> Add checkpoint form works (rows 2->3) -> Delete restores to 2 -> save video URL persists. All feature paths working end-to-end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Video quiz on lesson page",
+        "issue": "BUG FIXED by testing agent: LessonViewer.jsx line 125 gates VideoLessonPlayer on `lesson.video_url`, but /api/courses/{slug} uses response_model=Course whose Lesson model was missing the video_url field, so Pydantic stripped it and the player never rendered. Added `video_url: Optional[str] = None` to Lesson model in /app/backend/models.py.",
+        "affected_selectors": ["video-lesson-player", "lesson.video_url"]
+      }
+    ],
+    "design_issues": [
+      {"screen": "Super Admin console -> Video quizzes tab", "issues": ["React hydration warning: <span> inside <option> (non-fatal, from VideoQuizPanel.jsx lesson-select options). Cosmetic — recommend flattening option label to plain text."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration40_video_quiz_referral.py",
+    "/app/test_reports/pytest/iteration40.xml"
+  ],
+  "action_items": [
+    "STABILITY (P1): backend startup re-seeds courses with fresh UUIDs on each restart which orphans video_checkpoints (they hold the old lesson_ids). The startup routine re-applies lesson_videos by lesson_id but does NOT re-run video_checkpoints seed. Fix options: (a) make course seed idempotent (upsert by slug, preserve module/lesson ids), or (b) also invoke seed_video_quizzes at startup. Currently checkpoints must be manually reseeded after any restart.",
+    "COSMETIC: VideoQuizPanel.jsx has <span> children inside <option> elements causing React hydration warnings — replace with plain string interpolation."
+  ],
+  "critical_code_review_comments": [
+    "models.py Lesson model was missing `video_url` — one-line fix applied. Recommend adding `video_url: Optional[str]` to Lesson explicitly in the seed data types too.",
+    "seed_video_quizzes.py should be idempotent-aware — it deletes then inserts checkpoints for the first-2 courses by slug sort. If course lesson IDs change on next boot, existing seeded checkpoints become orphans (currently 4 orphaned lesson_ids in DB).",
+    "video_quiz_router.answer_checkpoint: on 3rd-strike reset, correctly deletes checkpoint_attempts and calls _reset_lesson_progress which recomputes progress_pct. Solid implementation.",
+    "auth_router.register: referral validation happens BEFORE user insert (correct — no orphan user on invalid code). Verified.",
+    "cert_render.verify_certificate_integrity: cross-checks user.full_name + course.title (case-insensitive strip) — behaves correctly, returns 409 with descriptive detail. SAMPLE-ITHR-2026-001 bypass is intact."
+  ],
+  "updated_files": [
+    "/app/backend/models.py (added Lesson.video_url field so /api/courses/{slug} exposes it)",
+    "/app/backend/tests/test_iteration40_video_quiz_referral.py (new pytest file)"
+  ],
+  "success_rate": {
+    "backend": "100% — 16/16 pytest cases pass (referral, video-quiz learner, 3-strike reset, correct-answer, admin authz, admin CRUD, cert PDF, cert 404). Plus manual: cert integrity mismatch returns 409.",
+    "frontend": "100% — /register referral flow OK, /learn video quiz overlay + 3-strike reset OK, /admin videoquiz panel course/lesson select + add/delete/save-video CRUD OK."
+  },
+  "test_credentials": "Super admin: superadmin@ithr.online / Dubai_deram2026. Referral: FOUNDING500 (case-insensitive). Learners auto-registered per test with unique timestamped emails and TestPass123!.",
+  "seed_data_creation": "Executed `python /app/backend/seed_video_quizzes.py` twice to re-associate video checkpoints with current lesson IDs after backend restart (see STABILITY action item above). Also created several transient test users via /api/auth/register and one transient certificate row for the mismatch-integrity check (cleaned up after test).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter 40 shipped 3 features: (1) FOUNDING500 referral bypass, (2) interactive video-quiz checkpoints with 3-strike reset, (3) certificate PDF on ITHR artwork with QR+Code128+integrity check. All backend endpoints under /api/video-quiz/*, /api/admin/video-checkpoints, /api/admin/lessons/{id}/video, /api/lessons/{id}/video-quiz, /api/certificates/{id}/pdf verified. Testing agent added `video_url: Optional[str] = None` to Lesson pydantic model — required so /api/courses/{slug} exposes video_url and LessonViewer conditionally mounts VideoLessonPlayer. BEWARE: on every backend restart the course seed regenerates lesson UUIDs, which orphans previously-seeded video_checkpoints. To retest, run `python /app/backend/seed_video_quizzes.py` after restart. Playwright cannot autoplay external MP4 sources in headless mode — use `Object.defineProperty(v, 'currentTime', {get: ()=>N})` + dispatchEvent('timeupdate') to simulate reaching a checkpoint. Frontend testids: register-referral, register-error, video-lesson-player, video-quiz-overlay, video-quiz-question, video-quiz-option-0..3, video-quiz-submit, video-quiz-feedback, tab-videoquiz, vq-course-select, vq-lesson-select, vq-video-url, vq-save-video, vq-form-timestamp, vq-form-question, vq-form-option-0..3, vq-form-correct-0..3, vq-form-submit, vq-row-{id}, vq-delete-{id}.",
+  "rca of the issue": "ROOT CAUSE (video player invisible): The Course pydantic model in models.py enforces its schema on /api/courses/{slug} responses. The nested Lesson submodel was missing `video_url: Optional[str] = None`, so even though the underlying MongoDB document had video_url set (correctly persisted via lesson_videos re-application), Pydantic's response_model filtering stripped it. Downstream, LessonViewer.jsx guards `<VideoLessonPlayer>` with `{lesson.video_url && …}` — evaluating to `undefined && …` -> never rendered. FIX APPLIED: added `video_url: Optional[str] = None` to Lesson class in /app/backend/models.py. Verified post-fix: /api/courses/agentic-ai-foundations returns video_url on the seeded first lesson and player renders. SECONDARY ISSUE (test flakiness): seed_video_quizzes.py binds to current lesson UUIDs; course seed on restart mints fresh UUIDs => checkpoints orphaned. Recommend making the course seed idempotent (upsert by slug preserving nested ids) OR calling seed_video_quizzes at startup after course-seed to re-link."
+}

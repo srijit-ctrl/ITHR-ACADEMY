@@ -16,12 +16,49 @@ Public helpers:
 - has_full_module_access(user, course_id)
 - can_claim_free_cert(user, course_id)
 """
+import os
 import secrets
 import string
 
 from core import db, logger
 
 FOUNDER_CAP = 500
+
+
+def _referral_code() -> str:
+    return (os.environ.get("FOUNDING_REFERRAL_CODE") or "").strip().upper()
+
+
+def is_valid_referral_code(code: str) -> bool:
+    configured = _referral_code()
+    return bool(configured) and (code or "").strip().upper() == configured
+
+
+async def redeem_referral_code(user_id: str, code: str) -> dict | None:
+    """First 500 signups using the referral code bypass payment entirely.
+
+    Marks the user payment_status='paid' + paid_via_referral, allocating a
+    1-based referral_seq. Returns {seq} on success, None when the code is
+    invalid or the 500-user cap is exhausted.
+    """
+    if not is_valid_referral_code(code):
+        return None
+    seq = await db.users.count_documents({"paid_via_referral": True}) + 1
+    if seq > FOUNDER_CAP:
+        logger.info(f"Referral cap reached — user {user_id[:8]}… registered without bypass")
+        return None
+    result = await db.users.update_one(
+        {"id": user_id, "paid_via_referral": {"$exists": False}},
+        {"$set": {
+            "payment_status": "paid",
+            "paid_via_referral": True,
+            "referral_seq": seq,
+        }},
+    )
+    if result.modified_count == 0:
+        return None
+    logger.info(f"Referral bypass #{seq}/{FOUNDER_CAP} applied to user {user_id[:8]}…")
+    return {"seq": seq}
 CODE_ALPHABET = string.ascii_uppercase + string.digits
 
 

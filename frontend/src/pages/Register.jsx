@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Ticket } from "lucide-react";
+import { toast } from "sonner";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 function googleSignIn() {
@@ -18,6 +19,7 @@ export default function Register() {
         password: "",
         organization: "",
         title: "",
+        referral_code: "",
     });
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
@@ -29,7 +31,16 @@ export default function Register() {
         setErr("");
         setLoading(true);
         try {
-            await register(form);
+            const payload = { ...form };
+            if (!payload.referral_code.trim()) delete payload.referral_code;
+            const u = await register(payload);
+            if (form.referral_code.trim()) {
+                if (u?.paid_via_referral) {
+                    toast.success(`Founding Member #${u.referral_seq} of 500 — payment waived, full access unlocked. Check your inbox for access details.`);
+                } else {
+                    toast.info("Referral code valid, but the first-500 cap has been reached — a standard account was created.");
+                }
+            }
             navigate("/dashboard");
         } catch (e) {
             setErr(e.response?.data?.detail || "Registration failed.");
@@ -83,6 +94,12 @@ export default function Register() {
                             <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground block mb-2">Title</label>
                             <input value={form.title} onChange={handle("title")} data-testid="register-title" className="w-full bg-surface border border-border rounded-sm px-4 py-3 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand" placeholder="Director" />
                         </div>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground block mb-2 flex items-center gap-1.5">
+                            <Ticket className="w-3 h-3 text-brand" /> Referral code <span className="normal-case tracking-normal">(optional — first 500 get full paid access)</span>
+                        </label>
+                        <input value={form.referral_code} onChange={handle("referral_code")} data-testid="register-referral" className="w-full bg-surface border border-border rounded-sm px-4 py-3 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand font-mono uppercase" placeholder="FOUNDING500" />
                     </div>
 
                     {err && (

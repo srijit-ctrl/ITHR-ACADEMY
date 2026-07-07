@@ -13,6 +13,7 @@ import TrafficPanel from "@/components/admin/TrafficPanel";
 import AlertsPanel from "@/components/admin/AlertsPanel";
 import SessionsPanel from "@/components/admin/SessionsPanel";
 import GlobalSearchBar from "@/components/admin/GlobalSearchBar";
+import VideoQuizPanel from "@/components/admin/VideoQuizPanel";
 
 /**
  * Super-Admin console.
@@ -121,6 +122,7 @@ export default function SuperAdminPortal() {
                     <TabButton active={tab === "sessions"} onClick={() => setTab("sessions")} label="Sessions" count={""} testId="tab-sessions" />
                     <TabButton active={tab === "emails"} onClick={() => setTab("emails")} label="Send email" count={""} testId="tab-emails" />
                     <TabButton active={tab === "audit"} onClick={() => setTab("audit")} label="Audit log" count={""} testId="tab-audit" />
+                    <TabButton active={tab === "videoquiz"} onClick={() => setTab("videoquiz")} label="Video quizzes" count={""} testId="tab-videoquiz" />
                     <div className="ml-auto pb-2">
                         <GlobalSearchBar onNavigateUser={() => setTab("users")} />
                     </div>
@@ -143,6 +145,7 @@ export default function SuperAdminPortal() {
 
                 {tab === "traffic" && <TrafficPanel />}
                 {tab === "sessions" && <SessionsPanel />}
+                {tab === "videoquiz" && <VideoQuizPanel />}
 
                 {tab === "orgs" && (
                     <div>

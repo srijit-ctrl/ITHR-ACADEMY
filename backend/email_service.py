@@ -126,6 +126,45 @@ async def send_welcome_email(email: str, full_name: str) -> bool:
     return await _fire(email, "Welcome to ITHR Academy", html, text, tag="welcome")
 
 
+async def send_founding_welcome_email(email: str, full_name: str, seq: int) -> bool:
+    """Welcome email for referral-code signups (first 500 = payment bypassed)."""
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    login_url = f"{FRONTEND_URL}/login"
+    name = _safe(full_name or "there")
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Welcome, {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Your referral code has been accepted. You are <b style="color:#16335E;">Founding Member #{seq} of 500</b>
+  at ITHR Academy — your account is marked <b style="color:#0f766e;">Paid</b> with no payment required.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;"><b>Your access details</b></p>
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 12px 0;padding-left:18px;">
+  <li>Account email: <b>{_safe(email)}</b></li>
+  <li>Status: Founding Member · Paid (referral)</li>
+  <li>Sign in any time: <a href="{login_url}" style="color:#00A78B;">{login_url}</a></li>
+</ul>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
+  Every course, video lesson and certification exam is unlocked. Aletheia, your AI tutor, is standing by inside each lesson.
+</p>
+"""
+    html = _wrap(
+        kicker=f"ITHR Academy · Founding Member #{seq}",
+        heading=f"You're in, {name} — payment waived.",
+        body_html=body,
+        cta_label="Open my dashboard",
+        cta_url=dash_url,
+        footer_note="Keep this email — it confirms your Founding Member status.",
+    )
+    text = (
+        f"Welcome, {name}!\n\n"
+        f"Your referral code was accepted — Founding Member #{seq} of 500.\n"
+        f"Your account ({email}) is marked Paid. No payment required.\n"
+        f"Sign in: {login_url}\nDashboard: {dash_url}\n\n"
+        "— ITHR Academy"
+    )
+    return await _fire(email, f"Founding Member #{seq} — your ITHR Academy access", html, text, tag="founding-welcome")
+
+
 # ---- Certificate earned ---------------------------------------------------
 
 
