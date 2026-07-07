@@ -18,7 +18,7 @@ export default function Footer() {
             <div className="container-page py-14 grid grid-cols-2 md:grid-cols-6 gap-10">
                 <div className="col-span-2">
                     <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
-                        The Enterprise Agentic AI Academy is designed, curated, and operated by <span className="text-foreground font-medium">ITHR Technologies Consulting LLC</span> — a UAE consulting firm publishing structured learning and verifiable credentials for agentic-AI competence.
+                        The ITHR Academy is designed, curated, and operated by <span className="text-foreground font-medium">ITHR Technologies Consulting LLC</span> — a UAE consulting firm publishing structured learning and verifiable credentials for agentic-AI competence.
                     </p>
                 </div>
 

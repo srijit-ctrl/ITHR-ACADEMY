@@ -56,7 +56,7 @@ export default function Landing() {
                             Where the world&apos;s workforce learns to <span className="italic text-brand">command</span> AI.
                         </h1>
                         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10">
-                            The <span className="text-foreground font-semibold">ITHR Enterprise Agentic AI Academy</span> is a credentialing platform for enterprise workforces &mdash; six tiers, twenty industries, one standard, refreshed continuously.
+                            The <span className="text-foreground font-semibold">ITHR Academy</span> is a credentialing platform for enterprise workforces &mdash; six tiers, twenty industries, one standard, refreshed continuously.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
                             <Link to="/courses" data-testid="hero-browse-catalog" className="btn-primary text-base">

@@ -245,7 +245,7 @@ def build_rag_course() -> Course:
         industries=["Banking", "Healthcare", "Insurance", "Government", "Professional Services"],
         difficulty="Intermediate",
         duration_hours=24,
-        thumbnail_url="https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=800&q=80",
+        thumbnail_url="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80",
         instructor="Dr. Priya Nair",
         prerequisites=["Python proficiency", "Familiarity with any LLM API", "Basic understanding of embeddings"],
         learning_objectives=[

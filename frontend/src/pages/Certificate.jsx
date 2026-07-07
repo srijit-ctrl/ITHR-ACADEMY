@@ -49,7 +49,7 @@ export default function Certificate() {
                                 <ITHRSeal size={72} label="Independent Issuer" />
                                 <div>
                                     <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal">ITHR Technologies</div>
-                                    <div className="font-serif text-2xl leading-none mt-1">Enterprise Agentic AI Academy</div>
+                                    <div className="font-serif text-2xl leading-none mt-1">ITHR Academy</div>
                                     <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-1">Est. 2026 · An Independent Issuer</div>
                                 </div>
                             </div>

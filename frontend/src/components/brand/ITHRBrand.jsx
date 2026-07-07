@@ -7,6 +7,9 @@
  */
 import { ITHR_LOGO_URL, ITHR_MARK_URL, ITHR_LOGO_WHITE_URL } from "@/components/layout/Header";
 
+// New primary lockup — shield mark + "ITHR ACADEMY" wordmark (used site-wide).
+export const ITHR_ACADEMY_SHIELD_URL = "/brand/ITHR_Academy_Shield.png";
+
 /**
  * ITHR Mark — the triangle mark only. Use for tight spaces (avatars, favicons).
  */
@@ -23,46 +26,46 @@ export function ITHRMark({ size = 40, className = "", variant = "color" }) {
 }
 
 /**
- * ITHR Lockup — the official ITHR wordmark SVG (mark + "ITHR" letters together).
- * Comes with an "· ACADEMY" sub-mark to identify the Academy sub-brand.
+ * ITHR Lockup — Academy shield + "ITHR ACADEMY" wordmark.
+ * Used in the site Header and anywhere the Academy brand needs identification.
  *
  * variants:
- *   - `stacked` (default) — logo above ACADEMY tag line
- *   - `compact` — inline, for very tight headers
- *   - `white` — for use on navy/dark backgrounds
+ *   - `stacked` (default) — shield + wordmark side-by-side, wordmark right
+ *   - `compact` — inline for tight headers (shows shield + short wordmark)
  */
 export function ITHRLockup({ variant = "stacked", size = 44, className = "", onDark = false }) {
-    const logoSrc = onDark ? ITHR_LOGO_WHITE_URL : ITHR_LOGO_URL;
-    // The master logo aspect ratio is ≈ 2.7:1 (1378x510 viewBox), so width ≈ 2.7 × height.
-    const logoH = typeof size === "number" ? size : parseInt(size, 10);
-    const logoW = Math.round(logoH * 2.7);
+    const shieldH = typeof size === "number" ? size : parseInt(size, 10);
+    const wordColour = onDark ? "text-white" : "text-foreground";
 
     if (variant === "compact") {
         return (
-            <div className={`inline-flex items-center gap-2 ${className}`}>
+            <div className={`inline-flex items-center gap-2 ${className}`} data-testid="ithr-lockup-compact">
                 <img
-                    src={logoSrc}
-                    alt="ITHR Technologies"
-                    style={{ height: `${logoH}px`, width: `${logoW}px` }}
-                    className="object-contain"
+                    src={ITHR_ACADEMY_SHIELD_URL}
+                    alt="ITHR Academy"
+                    style={{ height: `${shieldH}px`, width: `${shieldH}px` }}
+                    className="object-contain shrink-0"
                 />
+                <span className={`font-sans font-semibold text-sm tracking-wide ${wordColour}`}>
+                    ITHR <span className="text-brand">ACADEMY</span>
+                </span>
             </div>
         );
     }
     return (
-        <div className={`inline-flex items-center gap-3 ${className}`}>
+        <div className={`inline-flex items-center gap-3 ${className}`} data-testid="ithr-lockup">
             <img
-                src={logoSrc}
-                alt="ITHR Technologies"
-                style={{ height: `${logoH}px`, width: `${logoW}px` }}
-                className="object-contain"
+                src={ITHR_ACADEMY_SHIELD_URL}
+                alt="ITHR Academy"
+                style={{ height: `${shieldH}px`, width: `${shieldH}px` }}
+                className="object-contain shrink-0"
             />
-            <div
-                className={`pl-3 border-l leading-tight ${onDark ? "border-white/25 text-white" : "border-border text-foreground"}`}
-                style={{ minHeight: `${Math.round(logoH * 0.7)}px` }}
-            >
-                <div className="font-sans font-semibold text-xs md:text-sm tracking-tight leading-snug max-w-[9.5rem]">
-                    Enterprise Agentic AI Academy
+            <div className={`leading-none ${wordColour}`} style={{ minHeight: `${Math.round(shieldH * 0.7)}px` }}>
+                <div className="font-sans font-bold text-lg md:text-xl tracking-wide leading-none">
+                    ITHR <span className="text-brand">ACADEMY</span>
+                </div>
+                <div className={`mt-1 text-[9px] md:text-[10px] font-mono uppercase tracking-[0.22em] ${onDark ? "text-white/70" : "text-muted-foreground"}`}>
+                    Technology · Innovation · Future
                 </div>
             </div>
         </div>
