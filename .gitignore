@@ -96,9 +96,11 @@ frontend/node_modules/.cache/default-development/19.pack
 frontend/node_modules/.cache/default-development/20.pack
 frontend/node_modules/.cache/default-development/24.pack
 frontend/node_modules/.cache/default-development/25.pack
-.env
-.env.*
-*.env
+# NOTE: .env files (backend/.env, frontend/.env) MUST be tracked so Emergent
+# deployment can substitute production values at deploy time. Do NOT re-add
+# `.env`, `.env.*`, `*.env` patterns here — the pod crashes on startup
+# without MONGO_URL / EMERGENT_LLM_KEY / REACT_APP_BACKEND_URL. Personal
+# secrets go in Emergent Secrets UI (never committed).
 credentials.json
 *.key
 .credentials
