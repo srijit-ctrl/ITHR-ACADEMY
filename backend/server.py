@@ -251,8 +251,12 @@ async def on_startup():
         except Exception:
             logger.exception("Super-admin seed failed (non-fatal)")
         try:
-            from seed_sample_cert import seed_sample_certificate
-            await seed_sample_certificate()
+            # Gate sample-cert seed behind env flag so prod (where user has
+            # purged demo data) doesn't re-create it on every backend restart.
+            # Preview keeps SEED_SAMPLE_CERT=true so /verify demo still works.
+            if os.environ.get("SEED_SAMPLE_CERT", "true").lower() in {"1", "true", "yes"}:
+                from seed_sample_cert import seed_sample_certificate
+                await seed_sample_certificate()
         except Exception:
             logger.exception("Sample certificate seed failed (non-fatal)")
         logger.info("Background seeding complete.")

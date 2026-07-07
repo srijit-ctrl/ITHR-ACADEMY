@@ -245,7 +245,7 @@ def build_rag_course() -> Course:
         industries=["Banking", "Healthcare", "Insurance", "Government", "Professional Services"],
         difficulty="Intermediate",
         duration_hours=24,
-        thumbnail_url="https://images.unsplash.com/photo-1592305863326-6c2e6d5c4b8b?w=800&q=80",
+        thumbnail_url="https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=800&q=80",
         instructor="Dr. Priya Nair",
         prerequisites=["Python proficiency", "Familiarity with any LLM API", "Basic understanding of embeddings"],
         learning_objectives=[
@@ -373,7 +373,7 @@ def build_multi_agent_course() -> Course:
         industries=["Banking", "Insurance", "Retail", "Healthcare", "Logistics", "Professional Services"],
         difficulty="Advanced",
         duration_hours=26,
-        thumbnail_url="https://images.unsplash.com/photo-1673526759327-2f7b9a9b0e14?w=800&q=80",
+        thumbnail_url="https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80",
         instructor="Rahul Bansal",
         prerequisites=["Prior single-agent development experience", "Python + async/await proficiency"],
         learning_objectives=[
