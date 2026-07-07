@@ -14,6 +14,7 @@ import os
 import sys
 import uuid
 
+import json_repair
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -41,7 +42,7 @@ def _clean_code_sample(value):
     return value if isinstance(value, str) and value.strip() else None
 
 
-async def _ask(prompt: str, retries: int = 2) -> dict:
+async def _ask(prompt: str, retries: int = 4) -> dict:
     async with _sem:
         for attempt in range(retries + 1):
             try:
@@ -49,14 +50,23 @@ async def _ask(prompt: str, retries: int = 2) -> dict:
                     api_key=os.environ["EMERGENT_LLM_KEY"],
                     session_id=f"contentgen-{uuid.uuid4()}",
                     system_message=SYSTEM,
-                ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+                ).with_model("anthropic", "claude-sonnet-4-5-20250929").with_params(max_tokens=8192)
                 raw = await chat.send_message(UserMessage(text=prompt))
                 cleaned = raw.strip()
                 if cleaned.startswith("```"):
                     cleaned = cleaned.split("```")[1]
                     if cleaned.startswith("json"):
                         cleaned = cleaned[4:]
-                return json.loads(cleaned.strip())
+                cleaned = cleaned.strip()
+                try:
+                    data = json.loads(cleaned, strict=False)
+                except json.JSONDecodeError:
+                    data = json_repair.loads(cleaned)  # tolerates truncation/bad escapes
+                # Reject salvaged-but-gutted lessons so truncated calls retry.
+                for l in data.get("lessons", []):
+                    if len(l.get("content", "")) < 900:
+                        raise ValueError(f"lesson content too short after parse ({len(l.get('content', ''))} chars)")
+                return data
             except Exception as e:
                 logger.warning(f"contentgen call failed (attempt {attempt + 1}): {e}")
                 if attempt == retries:
@@ -144,19 +154,22 @@ async def build_stub_course(course: dict) -> None:
 
 # ---------------- Thin builder courses: enrichment ----------------
 
-ENRICH_PROMPT = """Expand the lessons of this module of the course "{course_title}" into full learning material.
+ENRICH_PROMPT = """Expand the lessons of this module of the course "{course_title}" into deep, competitive-grade learning material.
 
 Module: {module_title}
 Existing lessons (title + current brief text to expand while preserving intent):
 {lessons_json}
 
 Return JSON exactly:
-{{"lessons":[{{"title":"<same title>","content":"<250-350 words of markdown>","key_takeaways":["…","…","…"],"code_sample":null}}]}}
-Content rules: markdown with "### " subheadings, **bold** terms, blank-line paragraphs, concrete
-enterprise examples. code_sample only where genuinely useful (else null). Keep the SAME lesson
-order and titles."""
+{{"lessons":[{{"title":"<same title>","content":"<400-550 words of markdown>","key_takeaways":["…","…","…","…"],"code_sample":null}}]}}
+Content rules: markdown with 3+ "### " subheadings, **bold** terms, blank-line paragraphs.
+Each lesson MUST include: (1) a named framework, standard, regulation or tool treated in depth;
+(2) a concrete enterprise case example with realistic numbers/metrics; (3) a "common pitfalls"
+or "what practitioners get wrong" angle. Write at the depth of a paid executive-education
+program — denser and more actionable than typical online courses. code_sample only where
+genuinely useful (else null). Keep the SAME lesson order and titles. 4-5 key_takeaways."""
 
-MIN_RICH_CHARS = 800
+MIN_RICH_CHARS = 1500
 
 
 async def enrich_course(course: dict) -> None:
@@ -168,9 +181,9 @@ async def enrich_course(course: dict) -> None:
         if not todo:
             return 0
         count = 0
-        # Chunk to 3 lessons per call so responses never truncate mid-JSON.
-        for start in range(0, len(todo), 3):
-            chunk = todo[start:start + 3]
+        # Chunk to 2 lessons per call so responses never truncate mid-JSON.
+        for start in range(0, len(todo), 2):
+            chunk = todo[start:start + 2]
             data = await _ask(ENRICH_PROMPT.format(
                 course_title=course["title"], module_title=mod["title"],
                 lessons_json=json.dumps([
@@ -223,7 +236,7 @@ async def main():
         thin = []
         async for c in db.courses.find({"has_full_content": True}, {"_id": 0}):
             lessons = [l for m in c.get("modules", []) for l in m.get("lessons", [])]
-            if lessons and sum(len(l.get("content", "")) for l in lessons) / len(lessons) < 400:
+            if lessons and any(len(l.get("content", "")) < MIN_RICH_CHARS for l in lessons):
                 thin.append(c)
         logger.info(f"[contentgen] {len(thin)} thin courses to enrich")
         for c in thin:
@@ -233,6 +246,11 @@ async def main():
                 logger.exception(f"[contentgen] enrich failed: {c['slug']} — continuing")
 
     logger.info("[contentgen] ALL DONE")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+gger.info("[contentgen] ALL DONE")
 
 
 if __name__ == "__main__":

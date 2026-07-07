@@ -8,6 +8,7 @@ import base64
 import hashlib
 import io
 import os
+import re
 
 import segno
 
@@ -21,6 +22,8 @@ _PLACEHOLDER_ID = "ITHR-AI-2026-000123"
 _VERIFY_CSS = """
   /* ---- WeasyPrint print-layout overrides (single-page fit) ---- */
   .content{ display:block; height:100%; padding:12mm 30mm 0; }
+  /* Official ITHR Academy shield logo, prominent at the top centre. */
+  .crest{ width:30mm; height:auto; margin-bottom:2.5mm; }
   .rule-orn{ margin:4.5mm auto 4mm; }
   .recipient{ min-width:0; }
   .course-title{ margin-left:auto; margin-right:auto; }
@@ -81,6 +84,16 @@ def _load_templates() -> dict:
 _TEMPLATES = _load_templates()
 
 
+def _official_logo_b64() -> str:
+    path = os.path.join(os.path.dirname(__file__), "assets", "brand", "ITHR_Academy_Shield.png")
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode("ascii")
+
+
+_LOGO_B64 = _official_logo_b64()
+_CREST_RE = re.compile(r'(<img class="crest" src=")data:image/png;base64,[^"]*(")')
+
+
 def _escape(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -101,6 +114,8 @@ def pick_design(certificate_id: str) -> str:
 
 def render_certificate_html(cert: dict, verify_url: str, issued_display: str) -> str:
     html = _TEMPLATES[pick_design(cert["certificate_id"])]
+    # Swap the template crest for the official ITHR Academy shield logo (top centre).
+    html = _CREST_RE.sub(rf'\g<1>data:image/png;base64,{_LOGO_B64}\g<2>', html, count=1)
     html = html.replace(_PLACEHOLDER_NAME, _escape(cert["user_name"]))
     html = html.replace(_PLACEHOLDER_COURSE, _escape(cert["course_title"]))
     html = html.replace(_PLACEHOLDER_DATE, _escape(issued_display))

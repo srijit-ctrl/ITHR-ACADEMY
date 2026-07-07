@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, API_BASE } from "@/lib/api";
-import { Award, ShieldCheck, Share2, Download, Loader2, Linkedin, Copy, Check } from "lucide-react";
-import { ITHRSeal } from "@/components/brand/ITHRBrand";
+import { ShieldCheck, Share2, Download, Loader2, Linkedin, Copy, Check } from "lucide-react";
 import CertificateTutor from "@/components/CertificateTutor";
 
 export default function Certificate() {
@@ -44,16 +43,13 @@ export default function Certificate() {
                         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-brand-gold to-transparent" />
                         <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-brand-gold to-transparent" />
 
-                        <div className="flex items-start justify-between mb-10 gap-4">
-                            <div className="flex items-center gap-4">
-                                <ITHRSeal size={72} label="Independent Issuer" />
-                                <div>
-                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal">ITHR Technologies</div>
-                                    <div className="font-serif text-2xl leading-none mt-1">ITHR Academy</div>
-                                    <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-1">Est. 2026 · An Independent Issuer</div>
-                                </div>
+                        <div className="flex flex-col items-center text-center mb-10 gap-3">
+                            <img src="/brand/ITHR_Academy_Shield.png" alt="ITHR Academy" className="w-20 h-20 object-contain" data-testid="cert-logo" />
+                            <div>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal">ITHR Technologies</div>
+                                <div className="font-serif text-2xl leading-none mt-1">ITHR Academy</div>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground mt-1">Est. 2026 · An Independent Issuer</div>
                             </div>
-                            <Award className="w-12 h-12 text-brand hidden md:block" />
                         </div>
 
                         <div className="divider-gold"><span className="text-[10px] font-mono uppercase tracking-[0.25em] text-brand-teal">Certificate</span></div>
