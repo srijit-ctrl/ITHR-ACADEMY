@@ -130,7 +130,7 @@
         @apply text-xs tracking-[0.2em] uppercase font-semibold text-brand font-sans;
     }
     .btn-primary {
-        @apply inline-flex items-center justify-center gap-2 bg-brand text-white hover:bg-brand-hover rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-transparent shadow-sm hover:shadow-md;
+        @apply inline-flex items-center justify-center gap-2 bg-brand text-white rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-transparent shadow-sm;
     }
     .btn-ink {
         @apply inline-flex items-center justify-center gap-2 bg-foreground text-background hover:opacity-90 rounded-full px-7 py-3 font-semibold transition-all duration-200 border border-foreground shadow-sm;
@@ -191,6 +191,26 @@
     /* ITHR brand marks & lockups */
     .brand-lockup {
         @apply inline-flex items-center gap-3;
+    }
+
+    /* Tactile hover state for primary CTA — subtle lift + gold-tinted shadow ring.
+       Placed outside the .btn-primary @apply block because CSS nesting inside
+       `@apply` doesn't compile with our Tailwind/PostCSS setup. */
+    .btn-primary:hover {
+        background-color: hsl(var(--brand-hover));
+        transform: translateY(-1px);
+        box-shadow: 0 8px 24px -6px hsl(var(--brand) / 0.45),
+                    0 2px 4px -1px hsl(var(--brand-navy) / 0.15);
+    }
+    .btn-primary:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 6px -2px hsl(var(--brand) / 0.4);
+    }
+    .btn-primary:disabled {
+        opacity: 0.55;
+        transform: none;
+        box-shadow: none;
+        cursor: not-allowed;
     }
     .brand-mark {
         @apply relative overflow-hidden;
