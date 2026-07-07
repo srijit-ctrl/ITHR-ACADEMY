@@ -38,6 +38,7 @@ import Podcast from "@/pages/Podcast";
 import HrSuite from "@/pages/HrSuite";
 import SuperAdminPortal from "@/pages/SuperAdminPortal";
 import LegalDoc from "@/pages/LegalDoc";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 
 function AppShell() {
     const location = useLocation();
@@ -53,6 +54,7 @@ function AppShell() {
 
     return (
         <div className="min-h-screen flex flex-col">
+            <ImpersonationBanner />
             <Header />
             <main className="flex-1">
                 <Routes>

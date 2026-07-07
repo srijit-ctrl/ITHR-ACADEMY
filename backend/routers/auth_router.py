@@ -129,6 +129,8 @@ async def login(payload: UserLogin, request: Request, response: Response):
     doc = await db.users.find_one({"email": payload.email.lower()})
     if not doc or not verify_password(payload.password, doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if doc.get("is_suspended"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Contact your administrator.")
     access = create_access_token(doc["id"], doc["email"], doc["role"])
     _set_refresh_cookie(response, doc["id"])
     # Fire-and-forget login tracking (updates last_login_at, login_count,
@@ -157,6 +159,9 @@ async def refresh(response: Response, ithr_refresh: str = Cookie(default=None)):
     if not doc:
         _clear_refresh_cookie(response)
         raise HTTPException(status_code=401, detail="User no longer exists")
+    if doc.get("is_suspended"):
+        _clear_refresh_cookie(response)
+        raise HTTPException(status_code=403, detail="Account suspended")
     access = create_access_token(doc["id"], doc["email"], doc["role"])
     _set_refresh_cookie(response, doc["id"])
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))

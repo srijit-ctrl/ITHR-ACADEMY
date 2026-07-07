@@ -208,13 +208,28 @@ async def list_all_users(
     _super_admin_id: str = Depends(get_current_super_admin),
     limit: int = 100,
     skip: int = 0,
+    q: str | None = None,
+    role: str | None = None,
+    suspended: str | None = None,
 ):
     limit = max(1, min(500, limit))
+    query: dict = {}
+    if q:
+        query["$or"] = [
+            {"email": {"$regex": q, "$options": "i"}},
+            {"full_name": {"$regex": q, "$options": "i"}},
+        ]
+    if role:
+        query["role"] = role
+    if suspended == "true":
+        query["is_suspended"] = True
+    elif suspended == "false":
+        query["is_suspended"] = {"$ne": True}
     users = await db.users.find(
-        {},
+        query,
         {"_id": 0, "password_hash": 0},
     ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.users.count_documents({})
+    total = await db.users.count_documents(query)
     return {"users": users, "total": total, "limit": limit, "skip": skip}
 
 

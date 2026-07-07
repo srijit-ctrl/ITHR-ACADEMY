@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback } 
 import { api, setAccessToken } from "@/lib/api";
 
 const AuthContext = createContext(null);
+const IMPERSONATION_STASH_KEY = "ithr_imp_stash_v1";
 
 /**
  * Auth state is held in memory only.
@@ -9,10 +10,20 @@ const AuthContext = createContext(null);
  * - Refresh token: lives in an httpOnly Secure cookie set by the backend.
  * On mount we call /auth/refresh to see if a valid session already exists (cookie
  * survives page reloads, JWT survives navigations because of React context).
+ *
+ * Impersonation flow (super-admin only):
+ *   - beginImpersonation({token, user}): stash the CURRENT admin session in
+ *     sessionStorage (survives tab refresh, cleared on close), swap the
+ *     in-memory token+user to the impersonation target, and remember the
+ *     "acting as" state so the ImpersonationBanner can render.
+ *   - endImpersonation(): pop the stash, restore the admin session, and
+ *     hydrate a fresh access token via /auth/refresh (cookie is still the
+ *     admin's).
  */
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [impersonation, setImpersonation] = useState(null); // { actorEmail, target: {email, id} }
 
     const hydrate = useCallback(async () => {
         try {
@@ -29,6 +40,15 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         hydrate();
+        // Restore an in-progress impersonation banner state (only banner, not
+        // the token — impersonation tokens are one-shot and expire in 15 min).
+        try {
+            const stash = sessionStorage.getItem(IMPERSONATION_STASH_KEY);
+            if (stash) {
+                const parsed = JSON.parse(stash);
+                if (parsed?.actorEmail) setImpersonation(parsed);
+            }
+        } catch { /* noop */ }
     }, [hydrate]);
 
     const login = useCallback(async (email, password) => {
@@ -54,6 +74,8 @@ export function AuthProvider({ children }) {
         }
         setAccessToken(null);
         setUser(null);
+        setImpersonation(null);
+        try { sessionStorage.removeItem(IMPERSONATION_STASH_KEY); } catch { /* noop */ }
     }, []);
 
     const refreshUser = useCallback(async () => {
@@ -66,9 +88,35 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
+    const beginImpersonation = useCallback(({ token, user: targetUser, actorEmail }) => {
+        // Stash the admin's identity so the banner can render "return".
+        // We DO NOT stash the admin's access token — it's short-lived in memory
+        // and would be exposed to XSS if persisted. Instead, we rely on the
+        // admin's refresh cookie (still valid) via /auth/refresh on return.
+        const stash = { actorEmail, target: { id: targetUser.id, email: targetUser.email, full_name: targetUser.full_name } };
+        try { sessionStorage.setItem(IMPERSONATION_STASH_KEY, JSON.stringify(stash)); } catch { /* noop */ }
+        setImpersonation(stash);
+        setAccessToken(token);
+        setUser(targetUser);
+    }, []);
+
+    const endImpersonation = useCallback(async () => {
+        try { sessionStorage.removeItem(IMPERSONATION_STASH_KEY); } catch { /* noop */ }
+        setImpersonation(null);
+        // Fresh access token via the admin's still-valid refresh cookie.
+        try {
+            const res = await api.post("/auth/refresh");
+            setAccessToken(res.data.token);
+            setUser(res.data.user);
+        } catch {
+            setAccessToken(null);
+            setUser(null);
+        }
+    }, []);
+
     const value = useMemo(
-        () => ({ user, loading, login, register, logout, refreshUser }),
-        [user, loading, login, register, logout, refreshUser]
+        () => ({ user, loading, login, register, logout, refreshUser, impersonation, beginImpersonation, endImpersonation }),
+        [user, loading, login, register, logout, refreshUser, impersonation, beginImpersonation, endImpersonation]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
