@@ -119,9 +119,12 @@ function ListCard({ icon, title, rows, render, testid }) {
                 <div className="text-xs text-muted-foreground py-4">No data yet.</div>
             ) : (
                 <div className="divide-y divide-border">
-                    {rows.map((row, i) => (
-                        <div key={i} className="flex items-center py-2">{render(row)}</div>
-                    ))}
+                    {rows.map((row) => {
+                        const key = row.path || row.city || row.country || row.hour || row.day || JSON.stringify(row);
+                        return (
+                            <div key={key} className="flex items-center py-2">{render(row)}</div>
+                        );
+                    })}
                 </div>
             )}
         </div>

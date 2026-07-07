@@ -141,3 +141,59 @@ have been added at each confirmed-false-positive site:
 - `components/admin/ActivityFeedPanel.jsx` — silent catch now emits
   `console.debug` for devtools observability while preserving polling
   recovery behavior.
+
+
+---
+
+## Feb 2026 update — Iter 38 review-cycle additions
+
+### 8. Hardcoded credentials in `backend/tests/test_iteration36_*.py` / `test_iteration38_*.py`
+- **Report says:** hardcoded secret at line 19/31/44 leaks credentials.
+- **Reality:** These are the documented **test fixtures** for the super-admin
+  account (`superadmin@ithr.online` / `Dubai_deram2026`) that already appears
+  in `/app/memory/test_credentials.md`. Every test-agent run reads the same
+  credentials from that memory file. There is no separate production secret
+  to leak — prod uses `SUPER_ADMIN_PASSWORD` from Emergent Secrets, not this
+  string. Test files are excluded from the production build; the pattern is
+  standard for pytest fixtures.
+- **What we did do:** the real fix (already shipped iter-30) is that the
+  seed script gates on `os.environ["SUPER_ADMIN_PASSWORD"]` and only falls
+  back to a sentinel in dev.
+
+### 9. `admin_control_router.get_alerts()` complexity 13 / 96 lines
+- **Report says:** cyclomatic complexity too high.
+- **Reality:** the function is a **linear, single-purpose read** — a series of
+  independent alert-source counts appended to one list. There are no nested
+  branches, no shared mutable state, no callable arguments. Extracting each
+  alert-source into its own helper would add indirection (7+ mini-functions
+  that call each other in a hard-coded sequence) with no testability win.
+- **What we did fix:** if a real bug surfaces, the fix is in whichever
+  alert-source branch fired, not in a broken abstraction.
+
+### 10. `purge_test_data.py:107 purge()` — 106 lines
+- **Report says:** too long / 28 locals.
+- **Reality:** the function is one atomic DB transaction with cascade deletes.
+  Breaking it into per-collection helpers means threading `db`, victim ids,
+  and drop-flag flags through 12+ signatures for no runtime benefit — and it
+  would fragment the safety invariant that all writes happen after the
+  dry-run report is printed. Leaving as-is.
+
+### 11. Empty `catch { /* noop */ }` blocks in `AuthContext.jsx`
+- **Iter 38 fix (2026-02-06):** all four call sites now log via
+  `console.debug("[Auth] ...", e?.message)`. The behaviour is still "swallow
+  and continue" because `sessionStorage` is genuinely optional (Safari ITP,
+  privacy mode) — but the linter no longer flags empty catch bodies.
+
+### 12. `TrafficPanel.jsx:123` — array index as key
+- **Iter 38 fix (2026-02-06):** switched to a stable composite key
+  (`row.path || row.city || row.country || row.hour || row.day`) so
+  reordering the country/city/page tables no longer forces DOM churn.
+
+### 13. `random.choice()` in `assessment_router.py`
+- **Report says:** insecure PRNG for security-sensitive operations.
+- **Reality:** `random.choice()` here selects **quiz-question shuffle order**
+  and **presentation-only** demo assertions. Zero cryptographic use. All
+  actual security tokens (JWTs, refresh cookies, password-reset tokens) go
+  through `secrets.token_urlsafe(...)` — grep `secrets\.` in the repo to
+  confirm. `random` is the correct standard-library choice for pedagogical
+  content ordering.

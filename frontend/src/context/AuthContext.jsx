@@ -48,7 +48,11 @@ export function AuthProvider({ children }) {
                 const parsed = JSON.parse(stash);
                 if (parsed?.actorEmail) setImpersonation(parsed);
             }
-        } catch { /* noop */ }
+        } catch (e) {
+            // sessionStorage may be blocked (privacy mode / Safari ITP); banner
+            // just won't reappear across reloads. Non-fatal — do not throw.
+            console.debug("[Auth] impersonation stash read failed:", e?.message);
+        }
     }, [hydrate]);
 
     const login = useCallback(async (email, password) => {
@@ -75,7 +79,12 @@ export function AuthProvider({ children }) {
         setAccessToken(null);
         setUser(null);
         setImpersonation(null);
-        try { sessionStorage.removeItem(IMPERSONATION_STASH_KEY); } catch { /* noop */ }
+        try {
+            sessionStorage.removeItem(IMPERSONATION_STASH_KEY);
+        } catch (e) {
+            // sessionStorage may be blocked; ignore — key just won't clear.
+            console.debug("[Auth] impersonation stash clear failed:", e?.message);
+        }
     }, []);
 
     const refreshUser = useCallback(async () => {
@@ -94,14 +103,22 @@ export function AuthProvider({ children }) {
         // and would be exposed to XSS if persisted. Instead, we rely on the
         // admin's refresh cookie (still valid) via /auth/refresh on return.
         const stash = { actorEmail, target: { id: targetUser.id, email: targetUser.email, full_name: targetUser.full_name } };
-        try { sessionStorage.setItem(IMPERSONATION_STASH_KEY, JSON.stringify(stash)); } catch { /* noop */ }
+        try {
+            sessionStorage.setItem(IMPERSONATION_STASH_KEY, JSON.stringify(stash));
+        } catch (e) {
+            console.debug("[Auth] impersonation stash write failed:", e?.message);
+        }
         setImpersonation(stash);
         setAccessToken(token);
         setUser(targetUser);
     }, []);
 
     const endImpersonation = useCallback(async () => {
-        try { sessionStorage.removeItem(IMPERSONATION_STASH_KEY); } catch { /* noop */ }
+        try {
+            sessionStorage.removeItem(IMPERSONATION_STASH_KEY);
+        } catch (e) {
+            console.debug("[Auth] impersonation stash clear failed:", e?.message);
+        }
         setImpersonation(null);
         // Fresh access token via the admin's still-valid refresh cookie.
         try {
