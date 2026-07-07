@@ -35,7 +35,8 @@ export default function AuditLogPanel() {
         }
     };
 
-    useEffect(() => { load(); /* eslint-disable-next-line */ }, [action]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => { load(); }, [action]);
 
     return (
         <div data-testid="audit-log-panel">
