@@ -1022,3 +1022,8 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - Fix: seed_super_admin.py now re-syncs the super_admin EMAIL to SUPER_ADMIN_EMAIL env on every boot (clash-guarded), alongside the existing password re-sync. Prod converges automatically on next redeploy/boot.
 - KEY LEARNING: Emergent's auto-commit ALWAYS strips .env from git (re-adds ignore patterns). Prod env vars are injected by the platform from preview .env at deploy — do NOT fight this again.
 - All course-detail endpoints re-verified 200.
+
+## 2026-07-14 — Content completeness + admin dashboard real-data pass (TESTED ✅ iter44, 100%)
+- Content: verified + topped up remaining 8 short lessons — ALL 28 courses now fully rich (every lesson ≥1200 chars, most 2-5K).
+- Admin dashboard: stub alerts removed (real signals only), 'Mock revenue' → 'Revenue (paid)' (API kpis.revenue_total from real paid payment_transactions), KPI cards clickable (users/sessions tabs, time-series metric switch), top-course bars open course pages, /admin?tab= deep links work, keyboard a11y on KPI cards, orphan enrollment cleaned.
+- All numbers on the dashboard are live DB aggregations — no dummy values remain. NOTE (not done, by scope): public catalog cards still show seeded marketing enrolled_count/rating values.

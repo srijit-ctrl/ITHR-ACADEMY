@@ -245,9 +245,7 @@ async def export_audit_log_csv(
 # --------- ALERTS ---------
 @router.get("/alerts")
 async def get_alerts(_admin_id: str = Depends(get_current_super_admin)):
-    """Unified alerts feed for the Overview tab. Real signals only —
-    stubbed categories are marked with `stubbed: true`.
-    """
+    """Unified alerts feed for the Overview tab. Real signals only."""
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
     last_24h = (now - timedelta(hours=24)).isoformat()

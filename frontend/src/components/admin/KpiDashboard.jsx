@@ -24,6 +24,8 @@ function Kpi({ icon: Icon, label, value, tone = "default", testId, onClick, link
             data-testid={testId}
             onClick={onClick}
             role={clickable ? "button" : undefined}
+            tabIndex={clickable ? 0 : undefined}
+            onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
         >
             <div className="flex items-center justify-between mb-3">
                 <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{label}</div>
