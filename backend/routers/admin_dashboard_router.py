@@ -65,13 +65,13 @@ async def _compute_kpis() -> dict:
     certs_total = await db.certificates.count_documents({})
     pass_rate = round(100 * certs_total / attempts_total, 1) if attempts_total > 0 else 0.0
 
-    # Mock revenue — sum of paid payment_transactions
+    # Revenue — sum of paid payment_transactions (real Stripe-confirmed orders)
     rev_pipeline = [
         {"$match": {"payment_status": "paid"}},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
     ]
     rev_rows = await db.payment_transactions.aggregate(rev_pipeline).to_list(1)
-    mock_revenue_total = float(rev_rows[0]["total"]) if rev_rows else 0.0
+    revenue_total = float(rev_rows[0]["total"]) if rev_rows else 0.0
 
     llm_key_health = "green" if os.environ.get("EMERGENT_LLM_KEY") else "red"
 
@@ -81,7 +81,7 @@ async def _compute_kpis() -> dict:
         "active_30d": active_30d,
         "enrollments_total": enrollments_total,
         "exam_pass_rate": pass_rate,
-        "mock_revenue_total": mock_revenue_total,
+        "revenue_total": revenue_total,
         "llm_key_health": llm_key_health,
     }
 

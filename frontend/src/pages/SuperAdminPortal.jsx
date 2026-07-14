@@ -31,7 +31,10 @@ export default function SuperAdminPortal() {
     const [busy, setBusy] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [tempCreds, setTempCreds] = useState(null); // {email, temp_password, org_name}
-    const [tab, setTab] = useState("analytics");
+    const [tab, setTab] = useState(() => {
+        const t = new URLSearchParams(window.location.search).get("tab");
+        return ["analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz"].includes(t) ? t : "analytics";
+    });
 
     const loadAll = useCallback(async () => {
         setBusy(true);
@@ -131,7 +134,7 @@ export default function SuperAdminPortal() {
                 {tab === "analytics" && (
                     <div className="space-y-6">
                         <AlertsPanel />
-                        <KpiDashboard />
+                        <KpiDashboard onNavigate={setTab} />
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2">
                                 <PlatformAnalyticsPanel />

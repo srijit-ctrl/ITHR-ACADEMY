@@ -15,15 +15,24 @@ function formatCurrency(n) {
     return `$${(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
-function Kpi({ icon: Icon, label, value, tone = "default", testId }) {
+function Kpi({ icon: Icon, label, value, tone = "default", testId, onClick, linkLabel }) {
     const toneCls = tone === "green" ? "text-brand" : tone === "red" ? "text-destructive" : "text-foreground";
+    const clickable = typeof onClick === "function";
     return (
-        <div className="card-flat p-5" data-testid={testId}>
+        <div
+            className={`card-flat p-5 ${clickable ? "cursor-pointer transition-colors hover:border-brand/60" : ""}`}
+            data-testid={testId}
+            onClick={onClick}
+            role={clickable ? "button" : undefined}
+        >
             <div className="flex items-center justify-between mb-3">
                 <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{label}</div>
                 <Icon className={`w-3.5 h-3.5 ${toneCls}`} />
             </div>
             <div className={`font-serif text-3xl leading-none ${toneCls}`}>{value}</div>
+            {clickable && (
+                <div className="text-[9px] font-mono uppercase tracking-[0.15em] text-brand mt-2">{linkLabel || "view"} →</div>
+            )}
         </div>
     );
 }
@@ -53,7 +62,7 @@ function Card({ title, children, testId, className = "" }) {
     );
 }
 
-export default function KpiDashboard() {
+export default function KpiDashboard({ onNavigate }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [tsMetric, setTsMetric] = useState("signups");
@@ -111,12 +120,12 @@ export default function KpiDashboard() {
         <div className="space-y-6" data-testid="kpi-dashboard">
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4" data-testid="kpi-row">
-                <Kpi icon={Users} label="Total users" value={k.total_users.toLocaleString()} testId="kpi-total-users" />
-                <Kpi icon={TrendingUp} label="Active 7d" value={k.active_7d.toLocaleString()} testId="kpi-active-7d" />
-                <Kpi icon={TrendingUp} label="Active 30d" value={k.active_30d.toLocaleString()} testId="kpi-active-30d" />
-                <Kpi icon={GraduationCap} label="Enrollments" value={k.enrollments_total.toLocaleString()} testId="kpi-enrollments" />
-                <Kpi icon={Award} label="Exam pass rate" value={`${k.exam_pass_rate}%`} testId="kpi-pass-rate" />
-                <Kpi icon={DollarSign} label="Mock revenue" value={formatCurrency(k.mock_revenue_total)} testId="kpi-revenue" />
+                <Kpi icon={Users} label="Total users" value={k.total_users.toLocaleString()} testId="kpi-total-users" onClick={() => onNavigate?.("users")} linkLabel="users" />
+                <Kpi icon={TrendingUp} label="Active 7d" value={k.active_7d.toLocaleString()} testId="kpi-active-7d" onClick={() => onNavigate?.("sessions")} linkLabel="sessions" />
+                <Kpi icon={TrendingUp} label="Active 30d" value={k.active_30d.toLocaleString()} testId="kpi-active-30d" onClick={() => onNavigate?.("sessions")} linkLabel="sessions" />
+                <Kpi icon={GraduationCap} label="Enrollments" value={k.enrollments_total.toLocaleString()} testId="kpi-enrollments" onClick={() => setTsMetric("enrollments")} linkLabel="time series" />
+                <Kpi icon={Award} label="Exam pass rate" value={`${k.exam_pass_rate}%`} testId="kpi-pass-rate" onClick={() => setTsMetric("exam_attempts")} linkLabel="attempts" />
+                <Kpi icon={DollarSign} label="Revenue (paid)" value={formatCurrency(k.revenue_total)} testId="kpi-revenue" onClick={() => setTsMetric("orders")} linkLabel="orders" />
                 <LlmHealthPill status={k.llm_key_health} />
             </div>
 
@@ -153,10 +162,16 @@ export default function KpiDashboard() {
                                     tickFormatter={(t) => (t?.length > 22 ? t.slice(0, 22) + "…" : t)}
                                 />
                                 <Tooltip />
-                                <Bar dataKey="enrollments" fill={BRAND_TEAL} />
+                                <Bar
+                                    dataKey="enrollments"
+                                    fill={BRAND_TEAL}
+                                    cursor="pointer"
+                                    onClick={(d) => d?.slug && window.open(`/courses/${d.slug}`, "_blank")}
+                                />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
+                    <div className="text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-2">Click a bar to open the course page</div>
                 </Card>
 
                 <Card title="Global reach · last 30d" testId="geo-card">

@@ -5,8 +5,7 @@ import { AlertTriangle, Info, Loader2 } from "lucide-react";
 /**
  * Unified alerts feed for the Overview tab. Renders real signals from
  * /api/admin/alerts (suspended users, impersonations, deletions, traffic
- * drops, orphan enrollments) + stubbed placeholders for billing/storage
- * pending Tier-4 backing systems.
+ * drops, orphan enrollments). Real data only — no placeholders.
  */
 export default function AlertsPanel() {
     const [alerts, setAlerts] = useState([]);
@@ -36,14 +35,13 @@ export default function AlertsPanel() {
             </div>
             <div className="divide-y divide-border">
                 {alerts.map((a) => (
-                    <div key={a.id} className={`py-3 flex items-start gap-3 ${a.stubbed ? "opacity-60" : ""}`} data-testid={`alert-${a.id}`}>
+                    <div key={a.id} className="py-3 flex items-start gap-3" data-testid={`alert-${a.id}`}>
                         {a.severity === "warn"
                             ? <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                             : <Info className="w-4 h-4 text-brand-sky shrink-0 mt-0.5" />}
                         <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium flex items-center gap-2">
                                 {a.title}
-                                {a.stubbed && <span className="badge-mono text-[9px] py-0">Stub</span>}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">{a.description}</div>
                         </div>

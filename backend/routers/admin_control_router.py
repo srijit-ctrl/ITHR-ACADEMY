@@ -322,24 +322,6 @@ async def get_alerts(_admin_id: str = Depends(get_current_super_admin)):
             "link": "/admin?tab=traffic",
         })
 
-    # Stubs — mocked until real backing systems land
-    alerts.append({
-        "id": "license-expiry",
-        "severity": "info",
-        "title": "License expiry monitoring · coming with billing tier",
-        "description": "Requires Stripe subscription sync — queued in Tier 4 backlog.",
-        "link": "",
-        "stubbed": True,
-    })
-    alerts.append({
-        "id": "storage-threshold",
-        "severity": "info",
-        "title": "Storage-usage thresholds · coming with data & backup tier",
-        "description": "Requires Mongo Atlas metrics — queued in Tier 4 backlog.",
-        "link": "",
-        "stubbed": True,
-    })
-
     return {"alerts": alerts, "count": len(alerts)}
 
 

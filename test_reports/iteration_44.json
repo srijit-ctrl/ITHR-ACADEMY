@@ -1,0 +1,23 @@
+{
+  "summary": "Iter 44 — Super-Admin dashboard cleanup + course-content completeness verified end-to-end. Backend: 6/6 pytest scenarios pass — (a) /api/admin/alerts returns real signals only (no 'stub-' ids, no license-expiry/storage-threshold, no stubbed:true flag); currently returns 1 real alert ('orphan-enrollments'); (b) /api/admin/dashboard kpis.revenue_total present, mock_revenue_total absent; (c) /api/courses returns exactly 28 courses; (d) agentic-ai-healthcare, agentic-ai-retail, multi-agent-systems — every lesson.content >= 1200 chars. Frontend: superadmin login OK, /admin loads Overview with no 'Stub' or 'Mock revenue' text, kpi-revenue label is 'Revenue (paid)' with numeric value ($0 — correct given clean preview DB), kpi-total-users -> Users tab, kpi-active-7d -> Sessions tab, kpi-enrollments -> ts-metric='enrollments', kpi-revenue -> ts-metric='orders', deep links /admin?tab=audit and /admin?tab=videoquiz correctly select their tabs on load, all 5 Overview charts (signups-enrollments line, top-courses bar, band pie, language pie, geo card) render without console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration44_dashboard_cleanup.py",
+    "/app/test_reports/pytest/iter44_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_control_router.py get_alerts docstring still says 'stubbed categories are marked with `stubbed: true`' (line 249) which is now stale — the stub categories were fully removed, no code path emits stubbed:true anymore. Minor cosmetic doc-string fix.",
+    "AlertsPanel.jsx uses `a.id` as the React key for each alert. All current alert ids are unique strings, but if a future alert type (e.g., traffic-dropoff repeated per day) is added to the /alerts feed with a duplicate id, React will warn. Consider `${a.id}-${idx}` defensively.",
+    "KpiDashboard.jsx: `Kpi` component sets role='button' on click but does not add tabIndex or a keyboard onKeyDown handler — the whole KPI card is not keyboard-accessible (Enter/Space won't trigger the navigate). Non-blocking for now, but worth adding for a11y."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration44_dashboard_cleanup.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (8/8 flows)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 — verified working",
+  "seed_data_creation": "None — read-only tests against existing preview data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter 44 verified: dashboard-cleanup (stub alerts removed, revenue rename, kpi navigation, deep links, chart regression) and course-content completeness (28 courses, lesson content >= 1200 chars for the 3 spot-checked slugs). Only pre-existing console noise seen was two 401s on / (public pages before login) — unrelated to this iter. If Overview KPIs seem stale after data mutation, remember @cached ttl is 45-180s. Full test file: /app/backend/tests/test_iteration44_dashboard_cleanup.py; pytest xml at /app/test_reports/pytest/iter44_results.xml.",
+  "rca of the issue": "N/A — this iteration is a feature-verification pass, not a bug hunt. All 6 backend + 8 frontend expectations from the review request passed on the first (or second, after fixing a case-sensitive UI assertion in the test script) run."
+}
