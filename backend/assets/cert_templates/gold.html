@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ITHR Academy — Certificate of Completion</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Jost:wght@400;500;600&display=swap');
+
+  @font-face{
+    font-family:'Great Vibes';
+    src:url(data:font/ttf;base64,__FONT_GV__) format('truetype');
+    font-weight:400; font-style:normal;
+  }
+
+  @page{ size:297mm 171.73mm; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ width:297mm; height:171.73mm; }
+
+  .page{
+    position:relative; width:297mm; height:171.73mm; overflow:hidden;
+    background:url(data:image/jpeg;base64,__BG__) no-repeat;
+    background-size:100% 100%;
+  }
+  .overlay{ position:absolute; }
+
+  .recipient{
+    left:0; right:0; top:86.6mm; height:18mm;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Great Vibes', cursive;
+    font-size:__NAME_FS__; color:#22365C; line-height:1;
+    text-align:center; white-space:nowrap;
+  }
+  .program{
+    left:40mm; right:40mm; top:113.2mm; height:9.5mm;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'EB Garamond', serif; font-weight:600;
+    font-size:__COURSE_FS__; color:#8B611E; line-height:1.05;
+    text-align:center; white-space:nowrap; letter-spacing:0.2px;
+  }
+  .meta-value{
+    top:138.5mm; height:7.4mm;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'EB Garamond', serif; font-weight:500;
+    font-size:10.5pt; color:#2B2B2B; letter-spacing:0.4px;
+    text-align:center; white-space:nowrap;
+  }
+  .meta-date{ left:84mm; width:36mm; }
+  .meta-id{ left:136mm; width:44mm; }
+
+  .qr{
+    left:96.2mm; top:151.4mm; width:15.4mm; height:15.4mm;
+  }
+  .qr img{ width:100%; height:100%; display:block; }
+
+  .verify-text{
+    left:130.3mm; top:157.4mm; width:70mm;
+    font-family:'Jost', sans-serif; font-size:7.4pt; line-height:1.6;
+    color:#4A4235; letter-spacing:0.2px;
+  }
+  .verify-text .visit{ color:#5B5344; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="overlay recipient">__NAME__</div>
+    <div class="overlay program">__COURSE__</div>
+    <div class="overlay meta-value meta-date">__DATE__</div>
+    <div class="overlay meta-value meta-id">__CERT_ID__</div>
+    <div class="overlay qr"><img src="data:image/svg+xml;base64,__QR__" alt="Verification QR"></div>
+    <div class="overlay verify-text">
+      Scan to verify authenticity<br>
+      <span class="visit">or visit: __VERIFY_URL__</span>
+    </div>
+  </div>
+</body>
+</html>

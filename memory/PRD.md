@@ -1105,3 +1105,9 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - Frontend: Phase2Panels.jsx (LearningFunnelPanel, AssessmentAnalyticsPanel, CredentialManagerPanel, AiOpsPanel), sidebar Learning & AI group now 6 links. All 4 verified rendering via screenshot.
 - BUGS FIXED during dev: orphaned JSX fragment in SuperAdminPortal.jsx broke compile (from earlier edit); Request import missing in command_center_router; NAV/VALID_TABS edit silently not applied — reapplied and verified via grep.
 - NOT covered by testing agent this iteration (self-tested only): Phase 2 UI interactions (credential revoke prompt UI, search, aiops range switch).
+
+## 2026-07-15 — New brand logo + gold certificate template
+- Replaced brand shield with the new navy/gold ITHR Academy shield (extracted from user's `01_primary_logo_lockup.png`, transparent bg): `/app/frontend/public/brand/ITHR_Academy_Shield.png`, `/app/backend/assets/brand/ITHR_Academy_Shield.png`, and regenerated ALL favicons (16–512px, apple-touch-icon, favicon.ico).
+- Header logo size increased 30% (`ITHRLockup` size 36→47 desktop, 30→39 mobile) in `Header.jsx`.
+- Certificate PDF template fully replaced with the user's gold artwork design: `assets/cert_templates/gold.html` + `gold_bg.jpg` (artwork with demo text zones blanked out via PIL). Dynamic fields (recipient in Great Vibes script, program, date, cert ID, navy QR, verify URL) overlaid as crisp vector text. `cert_render.py` simplified — old A/B designs (design_a/b.html) deleted, pick_design removed. Page size 297×171.73mm (artwork aspect). Verified: sample PDF renders pixel-faithful, live endpoint /api/certificates/SAMPLE-ITHR-2026-001/pdf returns 200.
+- Note: external preview URL was serving a stale "asleep" CDN snapshot during testing; localhost render confirmed new logo live.

@@ -1,97 +1,27 @@
-"""Certificate rendering using the uploaded ITHR artwork templates.
+"""Certificate rendering onto the official ITHR Academy gold artwork template.
 
-Two designs (design_a = "ab sign", design_b = plain) alternate deterministically
-per certificate id. Dynamic fields are overlaid onto the artwork placeholders,
-plus an injected QR code + Code128 barcode verification strip.
+The uploaded artwork (shield crest, laurels, gold frame, seal-of-excellence
+ribbon) is embedded as a full-bleed background; dynamic fields (recipient,
+program, date, certificate ID, verification QR) are overlaid as crisp
+vector text so the PDF stays print-sharp.
 """
 import base64
-import hashlib
 import io
 import os
-import re
 
 import segno
 
-_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "assets", "cert_templates")
-
-_PLACEHOLDER_NAME = "Recipient Full Name"
-_PLACEHOLDER_COURSE = "Advanced Certificate in Artificial Intelligence &amp; Machine Learning"
-_PLACEHOLDER_DATE = "07 July 2026"
-_PLACEHOLDER_ID = "ITHR-AI-2026-000123"
-
-_VERIFY_CSS = """
-  /* ---- WeasyPrint print-layout overrides (single-page fit) ---- */
-  .content{ display:block; height:100%; padding:12mm 30mm 0; }
-  /* Official ITHR Academy shield logo, prominent at the top centre. */
-  .crest{ width:30mm; height:auto; margin-bottom:2.5mm; }
-  .rule-orn{ margin:4.5mm auto 4mm; }
-  .recipient{ min-width:0; }
-  .course-title{ margin-left:auto; margin-right:auto; }
-  .description{ margin-left:auto; margin-right:auto; }
-  .spacer{ display:none; }
-  .meta-row{ position:absolute; left:30mm; right:30mm; width:auto; bottom:50mm; margin:0; }
-  /* Signatures removed — the credential is system-issued and QR-verifiable. */
-  .sig-col{ display:none !important; }
-  .bottom-block{
-    position:absolute; left:28mm; right:28mm; bottom:27mm;
-    width:auto; margin:0;
-    display:flex; align-items:flex-end; justify-content:center;
-  }
-  .seal{ width:22mm; height:22mm; }
-  .verify-strip{
-    position:absolute; z-index:6;
-    bottom:14mm; left:0; right:0;
-    display:flex; align-items:center; justify-content:center; gap:6mm;
-  }
-  .verify-cell{ text-align:center; }
-  .qr-img{ width:11mm; height:11mm; display:block; margin:0 auto; }
-  .verify-label{
-    font-family:'Jost', sans-serif; font-size:5pt; letter-spacing:1.2px;
-    color:#2C4A6B; text-transform:uppercase; margin-top:0.8mm;
-  }
-  .verify-disclaimer{
-    max-width:118mm; text-align:left;
-    font-family:'Jost', sans-serif; font-size:5.4pt; line-height:1.5;
-    color:#5B6B7E; letter-spacing:0.3px;
-  }
-  .verify-disclaimer b{ color:#2C4A6B; }
-"""
-
-_VERIFY_HTML = """
-  <div class="verify-strip">
-    <div class="verify-cell">
-      <img class="qr-img" src="data:image/svg+xml;base64,{qr_b64}" alt="Verification QR">
-      <div class="verify-label">Scan to verify</div>
-    </div>
-    <div class="verify-disclaimer">
-      <b>This is a system-generated document and does not require a manual signature.</b><br>
-      The authenticity of this certificate can be validated at any time by scanning the QR code
-      or visiting {verify_url} &middot; Certificate ID: {cert_id}.
-    </div>
-  </div>
-"""
+_ASSET_DIR = os.path.join(os.path.dirname(__file__), "assets")
 
 
-def _load_templates() -> dict:
-    templates = {}
-    for key, fname in (("a", "design_a.html"), ("b", "design_b.html")):
-        path = os.path.join(_TEMPLATE_DIR, fname)
-        with open(path, encoding="utf-8") as f:
-            templates[key] = f.read()
-    return templates
-
-
-_TEMPLATES = _load_templates()
-
-
-def _official_logo_b64() -> str:
-    path = os.path.join(os.path.dirname(__file__), "assets", "brand", "ITHR_Academy_Shield.png")
-    with open(path, "rb") as f:
+def _b64_file(*parts: str) -> str:
+    with open(os.path.join(_ASSET_DIR, *parts), "rb") as f:
         return base64.b64encode(f.read()).decode("ascii")
 
 
-_LOGO_B64 = _official_logo_b64()
-_CREST_RE = re.compile(r'(<img class="crest" src=")data:image/png;base64,[^"]*(")')
+_TEMPLATE = open(os.path.join(_ASSET_DIR, "cert_templates", "gold.html"), encoding="utf-8").read()
+_BG_B64 = _b64_file("cert_templates", "gold_bg.jpg")
+_FONT_GV_B64 = _b64_file("fonts", "GreatVibes-Regular.ttf")
 
 
 def _escape(s: str) -> str:
@@ -101,34 +31,52 @@ def _escape(s: str) -> str:
 def _qr_b64(verify_url: str) -> str:
     buf = io.BytesIO()
     segno.make(verify_url, error="H").save(
-        buf, kind="svg", scale=6, dark="#152A47", light="#FBF8F1", border=1, xmldecl=False
+        buf, kind="svg", scale=6, dark="#1F2C47", light=None, border=0, xmldecl=False
     )
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def pick_design(certificate_id: str) -> str:
-    """Alternate between the two uploaded designs, deterministic per cert id."""
-    # nosec B324 — md5 used only as a stable bucketing hash (design A/B pick), not for security.
-    # Kept as md5 so previously issued certificates keep their original design.
-    digest = hashlib.md5(certificate_id.encode(), usedforsecurity=False).hexdigest()
-    return "a" if int(digest, 16) % 2 == 0 else "b"
+def _name_font_size(name: str) -> str:
+    n = len(name)
+    if n <= 22:
+        return "34pt"
+    if n <= 30:
+        return "28pt"
+    if n <= 40:
+        return "23pt"
+    return "19pt"
+
+
+def _course_font_size(title: str) -> str:
+    n = len(title)
+    if n <= 48:
+        return "16.5pt"
+    if n <= 62:
+        return "14pt"
+    if n <= 80:
+        return "12pt"
+    return "10.5pt"
 
 
 def render_certificate_html(cert: dict, verify_url: str, issued_display: str) -> str:
-    html = _TEMPLATES[pick_design(cert["certificate_id"])]
-    # Swap the template crest for the official ITHR Academy shield logo (top centre).
-    html = _CREST_RE.sub(rf'\g<1>data:image/png;base64,{_LOGO_B64}\g<2>', html, count=1)
-    html = html.replace(_PLACEHOLDER_NAME, _escape(cert["user_name"]))
-    html = html.replace(_PLACEHOLDER_COURSE, _escape(cert["course_title"]))
-    html = html.replace(_PLACEHOLDER_DATE, _escape(issued_display))
-    html = html.replace(_PLACEHOLDER_ID, _escape(cert["certificate_id"]))
-    html = html.replace("</style>", _VERIFY_CSS + "\n</style>", 1)
-    verify_block = _VERIFY_HTML.format(
-        qr_b64=_qr_b64(verify_url),
-        cert_id=_escape(cert["certificate_id"]),
-        verify_url=_escape(verify_url.replace("https://", "").replace("http://", "")),
-    )
-    return html.replace("</body>", verify_block + "\n</body>", 1)
+    name = (cert.get("user_name") or "").strip()
+    course = (cert.get("course_title") or "").strip()
+    display_url = verify_url.replace("https://", "").replace("http://", "")
+    html = _TEMPLATE
+    for token, value in (
+        ("__BG__", _BG_B64),
+        ("__FONT_GV__", _FONT_GV_B64),
+        ("__NAME_FS__", _name_font_size(name)),
+        ("__COURSE_FS__", _course_font_size(course)),
+        ("__NAME__", _escape(name)),
+        ("__COURSE__", _escape(course)),
+        ("__DATE__", _escape(issued_display)),
+        ("__CERT_ID__", _escape(cert["certificate_id"])),
+        ("__QR__", _qr_b64(verify_url)),
+        ("__VERIFY_URL__", _escape(display_url)),
+    ):
+        html = html.replace(token, value)
+    return html
 
 
 async def verify_certificate_integrity(db, cert: dict) -> list[str]:

@@ -32,8 +32,8 @@ export default function Header() {
         <header className="glass-header sticky top-0 z-40 border-b border-b-border" data-testid="site-header">
             <div className="container-page flex items-center justify-between h-20 gap-6">
                 <Link to="/" className="shrink-0" data-testid="brand-home-link">
-                    <ITHRLockup size={36} className="hidden md:inline-flex" />
-                    <ITHRLockup size={30} variant="compact" className="md:hidden" />
+                    <ITHRLockup size={47} className="hidden md:inline-flex" />
+                    <ITHRLockup size={39} variant="compact" className="md:hidden" />
                 </Link>
 
                 <nav className="hidden lg:flex items-center gap-5 flex-1 justify-center min-w-0">
