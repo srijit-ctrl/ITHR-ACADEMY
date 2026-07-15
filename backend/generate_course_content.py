@@ -250,8 +250,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-gger.info("[contentgen] ALL DONE")
 
-
-if __name__ == "__main__":
-    asyncio.run(main())

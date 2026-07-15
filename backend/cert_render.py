@@ -108,7 +108,9 @@ def _qr_b64(verify_url: str) -> str:
 
 def pick_design(certificate_id: str) -> str:
     """Alternate between the two uploaded designs, deterministic per cert id."""
-    digest = hashlib.md5(certificate_id.encode()).hexdigest()
+    # nosec B324 — md5 used only as a stable bucketing hash (design A/B pick), not for security.
+    # Kept as md5 so previously issued certificates keep their original design.
+    digest = hashlib.md5(certificate_id.encode(), usedforsecurity=False).hexdigest()
     return "a" if int(digest, 16) % 2 == 0 else "b"
 
 

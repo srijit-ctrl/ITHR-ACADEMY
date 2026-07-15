@@ -197,3 +197,35 @@ have been added at each confirmed-false-positive site:
   through `secrets.token_urlsafe(...)` — grep `secrets\.` in the repo to
   confirm. `random` is the correct standard-library choice for pedagogical
   content ordering.
+
+---
+
+## July 2026 review cycle — additional verified items
+
+### 7. `cert_render.py` MD5 "weak cryptography"
+- **FIXED (cosmetically):** now `hashlib.md5(..., usedforsecurity=False)` + nosec.
+- md5 here is a stable A/B bucketing hash for certificate design selection — not
+  a security operation. It is deliberately NOT changed to sha256: doing so would
+  flip the design of every previously issued certificate.
+
+### 8. Test files "hardcoded secrets" (tests/test_iteration*.py)
+- These are local test-account credentials (also documented in
+  /app/memory/test_credentials.md) used against the preview database. Standard
+  practice; not production secrets. DO NOT churn.
+
+### 9. `tests/load/locustfile.py` weak random
+- Load-test traffic randomization. Zero security relevance.
+
+### 10. "14 undefined variables"
+- Verified with pyflakes across backend + routers: exactly ONE real instance
+  existed (`generate_course_content.py:253` corrupted duplicate `gger.info`
+  block from a bad historical edit) — FIXED July 2026. No others exist.
+
+### 11. Oversized-function refactors
+- `referral_system.handle_first_enrollment` split into `_issue_first_course_bypass`
+  + `_convert_referral` (July 2026, behavior preserved, retested).
+- `purge_test_data.purge`, `get_alerts`, `create_org_with_admin`,
+  `_issue_certificate_if_new`, `verify_certificate`, `_org_analytics_uncached`
+  are deliberately left as-is: linear, well-commented, fully tested operational
+  code where a split adds indirection without reducing risk. Revisit only if a
+  bug actually lands in one of them.

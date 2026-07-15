@@ -93,49 +93,39 @@ async def handle_referral_signup(referrer: dict, referred_id: str, referred_emai
     return True
 
 
-async def handle_first_enrollment(user_id: str, course: dict) -> None:
-    """Fire-and-forget hook called after a NEW enrollment is created.
-
-    a) First-course bypass: if this is the user's first enrollment and the
-       global 500-cap isn't exhausted, issue a unique bypass code + email it.
-    b) Referral conversion: lock the referred user's free-course entitlement
-       to this course, mark converted, reward the referrer (max 5) + email.
-    """
-    enrollment_count = await db.enrollments.count_documents({"user_id": user_id})
-    if enrollment_count != 1:
-        return  # only their first course triggers either mechanic
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "email": 1, "full_name": 1})
-    if not user:
-        return
-
-    # --- a) first-course bypass (first 500 first-enrollments) ---
+async def _issue_first_course_bypass(user: dict, course: dict) -> None:
+    """Mechanic a: first 500 first-enrollments platform-wide get a bypass code + email."""
     already = await db.course_entitlements.find_one(
-        {"user_id": user_id, "source": "first-course-bypass"}, {"_id": 1}
+        {"user_id": user["id"], "source": "first-course-bypass"}, {"_id": 1}
     )
-    if not already:
-        seq = await db.course_entitlements.count_documents({"source": "first-course-bypass"}) + 1
-        if seq <= BYPASS_CAP:
-            code = _code("FREE", 8)
-            await db.course_entitlements.insert_one({
-                "id": str(uuid.uuid4()),
-                "user_id": user_id,
-                "source": "first-course-bypass",
-                "code": code,
-                "seq": seq,
-                "course_id": course["id"],
-                "course_title": course["title"],
-                "redeemed": True,  # applies automatically to this course
-                "created_at": now_iso(),
-            })
-            logger.info(f"First-course bypass #{seq}/{BYPASS_CAP} issued to {user['email']} ({code})")
-            try:
-                from email_service import send_first_course_bypass_email
-                await send_first_course_bypass_email(user["email"], user.get("full_name") or "", code, course["title"], seq)
-            except Exception:
-                logger.exception("bypass email failed (non-fatal)")
+    if already:
+        return
+    seq = await db.course_entitlements.count_documents({"source": "first-course-bypass"}) + 1
+    if seq > BYPASS_CAP:
+        return
+    code = _code("FREE", 8)
+    await db.course_entitlements.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "source": "first-course-bypass",
+        "code": code,
+        "seq": seq,
+        "course_id": course["id"],
+        "course_title": course["title"],
+        "redeemed": True,  # applies automatically to this course
+        "created_at": now_iso(),
+    })
+    logger.info(f"First-course bypass #{seq}/{BYPASS_CAP} issued to {user['email']} ({code})")
+    try:
+        from email_service import send_first_course_bypass_email
+        await send_first_course_bypass_email(user["email"], user.get("full_name") or "", code, course["title"], seq)
+    except Exception:
+        logger.exception("bypass email failed (non-fatal)")
 
-    # --- b) referral conversion + referrer reward ---
-    signup = await db.referral_signups.find_one({"referred_id": user_id, "converted": False})
+
+async def _convert_referral(user: dict, course: dict) -> None:
+    """Mechanic b: lock referred user's free course, mark converted, reward referrer + email."""
+    signup = await db.referral_signups.find_one({"referred_id": user["id"], "converted": False})
     if not signup:
         return
     await db.referral_signups.update_one(
@@ -144,7 +134,7 @@ async def handle_first_enrollment(user_id: str, course: dict) -> None:
     )
     # lock the referred user's free first course to this course
     await db.course_entitlements.update_one(
-        {"user_id": user_id, "source": "referred-first-course", "course_id": None},
+        {"user_id": user["id"], "source": "referred-first-course", "course_id": None},
         {"$set": {"course_id": course["id"], "course_title": course["title"], "redeemed": True}},
     )
     rewards = await db.course_entitlements.count_documents(
@@ -173,6 +163,24 @@ async def handle_first_enrollment(user_id: str, course: dict) -> None:
             )
         except Exception:
             logger.exception("referral reward email failed (non-fatal)")
+
+
+async def handle_first_enrollment(user_id: str, course: dict) -> None:
+    """Fire-and-forget hook called after a NEW enrollment is created.
+
+    a) First-course bypass: if this is the user's first enrollment and the
+       global 500-cap isn't exhausted, issue a unique bypass code + email it.
+    b) Referral conversion: lock the referred user's free-course entitlement
+       to this course, mark converted, reward the referrer (max 5) + email.
+    """
+    enrollment_count = await db.enrollments.count_documents({"user_id": user_id})
+    if enrollment_count != 1:
+        return  # only their first course triggers either mechanic
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "email": 1, "full_name": 1})
+    if not user:
+        return
+    await _issue_first_course_bypass(user, course)
+    await _convert_referral(user, course)
 
 
 async def get_summary(user_id: str, share_base: str) -> dict:
