@@ -122,6 +122,29 @@ async def _fire(to_email: str, subject: str, html: str, text_fallback: str, tag:
         return False
 
 
+# ---- Shared premium-voice building blocks ----------------------------------
+
+
+def _first(full_name: str) -> str:
+    return _safe(full_name or "there").split(" ")[0]
+
+
+def _section(title: str) -> str:
+    return f'<p style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#16335E;margin:0 0 8px 0;">{title}</p>'
+
+
+def _signoff() -> str:
+    return (
+        '<p style="font-size:14px;line-height:1.5;margin:20px 0 0 0;border-top:1px solid #E5E9F0;padding-top:16px;">'
+        '<b style="color:#16335E;">ITHR Academy</b><br/>'
+        '<span style="color:#6b7280;font-style:italic;">Enterprise Agentic AI Academy</span><br/>'
+        '<span style="color:#6b7280;">Made in the UAE</span></p>'
+    )
+
+
+_TEXT_SIGNOFF = "\n\nITHR Academy — Enterprise Agentic AI Academy — Made in the UAE"
+
+
 # ---- Welcome on signup ----------------------------------------------------
 
 
@@ -199,36 +222,41 @@ async def send_founding_welcome_email(email: str, full_name: str, seq: int) -> b
     dash_url = f"{FRONTEND_URL}/dashboard"
     login_url = f"{FRONTEND_URL}/login"
     name = _safe(full_name or "there")
+    first = _first(full_name)
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Welcome, {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  Your referral code has been accepted. You are <b style="color:#16335E;">Founding Member #{seq} of 500</b>
-  at ITHR Academy — your account is marked <b style="color:#0f766e;">Paid</b> with no payment required.
+  It is our privilege to welcome you as <b style="color:#16335E;">Founding Member #{seq} of 500</b> at ITHR Academy.
+  Your referral code has been accepted and your account is marked <b style="color:#0f766e;">Paid</b> — no payment is required.
 </p>
-<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;"><b>Your access details</b></p>
-<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 12px 0;padding-left:18px;">
+{_section("Your access details")}
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:18px;">
   <li>Account email: <b>{_safe(email)}</b></li>
   <li>Status: Founding Member · Paid (referral)</li>
   <li>Sign in any time: <a href="{login_url}" style="color:#00A78B;">{login_url}</a></li>
 </ul>
-<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
-  Every course, video lesson and certification exam is unlocked. Aletheia, your AI tutor, is standing by inside each lesson.
+{_section("What this unlocks")}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 4px 0;">
+  Every course, video lesson, and certification examination on the platform is now available to you.
+  <b style="color:#16335E;">Aletheia</b>, your AI Learning Mentor, will accompany you inside every lesson.
 </p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Welcome aboard.</p>
+{_signoff()}
 """
     html = _wrap(
         kicker=f"ITHR Academy · Founding Member #{seq}",
-        heading=f"You're in, {name} — payment waived.",
+        heading=f"Welcome, {first} — your access is confirmed.",
         body_html=body,
-        cta_label="Open my dashboard",
+        cta_label="Access My Learning Portal",
         cta_url=dash_url,
-        footer_note="Keep this email — it confirms your Founding Member status.",
+        footer_note="Please retain this email — it confirms your Founding Member status.",
     )
     text = (
-        f"Welcome, {name}!\n\n"
-        f"Your referral code was accepted — Founding Member #{seq} of 500.\n"
+        f"Hello {first},\n\n"
+        f"Welcome — you are Founding Member #{seq} of 500 at ITHR Academy.\n"
         f"Your account ({email}) is marked Paid. No payment required.\n"
-        f"Sign in: {login_url}\nDashboard: {dash_url}\n\n"
-        "— ITHR Academy"
+        f"Sign in: {login_url}\nLearning portal: {dash_url}\n\nWelcome aboard."
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"Founding Member #{seq} — your ITHR Academy access", html, text, tag="founding-welcome")
 
@@ -242,30 +270,43 @@ async def send_certificate_email(
     cert_url = f"{FRONTEND_URL}/certificate/{certificate_id}"
     passport_url = f"{FRONTEND_URL}/passport"
     name = _safe(full_name or "there")
+    first = _first(full_name)
     course = _safe(course_title)
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Congratulations, {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  You've officially earned your certificate in <b style="color:#16335E;">{course}</b> with a score of <b style="color:#00A78B;">{score}%</b>. Your credential is <b>publicly verifiable</b> at <a href="{cert_url}" style="color:#00A78B;">{cert_url}</a> — share it on LinkedIn, drop it in your résumé, or email the link to your leadership team.
+  Congratulations. You have officially earned your certification in <b style="color:#16335E;">{course}</b>
+  with a score of <b style="color:#00A78B;">{score}%</b> — a formal recognition of your professional AI capability.
 </p>
+{_section("Share your achievement")}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Your credential is <b>publicly verifiable</b> at
+  <a href="{cert_url}" style="color:#00A78B;">{cert_url}</a> — share it on LinkedIn, add it to your résumé,
+  or forward the link to your leadership team.
+</p>
+{_section("Your AI Skills Passport")}
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
-  You can also add it to your public <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a> — a single link that shows everything you've earned across ITHR Academy.
+  This credential has also been added to your public
+  <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a> — a single, verifiable record of
+  everything you have earned across ITHR Academy.
 </p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">We are proud to certify your progress.</p>
+{_signoff()}
 """
     html = _wrap(
         kicker="Credential Earned · ITHR Academy",
-        heading=f"You're certified in {course}.",
+        heading=f"You are certified in {course}.",
         body_html=body,
-        cta_label="View & download my certificate",
+        cta_label="View & Download My Certificate",
         cta_url=cert_url,
-        footer_note="Your certificate PDF, QR code, and LinkedIn share button are all on the page.",
+        footer_note="Your certificate PDF, verification QR code, and LinkedIn share option are available on the certificate page.",
     )
     text = (
-        f"Congratulations {name}!\n\n"
-        f'You earned your certificate in "{course}" with a score of {score}%.\n\n'
-        f"View + download: {cert_url}\n"
-        f"AI Skills Passport: {passport_url}\n\n"
-        "— ITHR Academy"
+        f"Hello {first},\n\n"
+        f'Congratulations — you have earned your certification in "{course}" with a score of {score}%.\n\n'
+        f"View and download: {cert_url}\n"
+        f"AI Skills Passport: {passport_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"Certified in {course_title}", html, text, tag="cert")
 
@@ -280,30 +321,37 @@ async def send_org_invite_email(
     admin = _safe(admin_name or "your team admin")
     org = _safe(org_name or "your organization")
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi there —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello,</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  <b style="color:#16335E;">{admin}</b> has invited you to join <b style="color:#16335E;">{org}</b> on the ITHR Enterprise Agentic AI Academy.
+  <b style="color:#16335E;">{admin}</b> has invited you to join <b style="color:#16335E;">{org}</b>
+  on the ITHR Academy — Enterprise Agentic AI Academy.
 </p>
-<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  Your invite code: <b style="font-family:monospace;background:#F6F8FB;padding:4px 10px;border-radius:4px;color:#00A78B;letter-spacing:1px;">{invite_code}</b>
+{_section("Your invitation code")}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 16px 0;">
+  <b style="font-family:monospace;background:#F6F8FB;padding:4px 10px;border-radius:4px;color:#00A78B;letter-spacing:1px;">{invite_code}</b>
 </p>
+{_section("What your enterprise seat includes")}
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
-  You'll get full access to the course catalog, AI tutor, and any team-specific learning paths — all under {org}'s enterprise seat.
+  Full access to the complete course catalog, Aletheia — your AI Learning Mentor, and any team-specific
+  learning paths curated by {org} — all under your organization's enterprise seat.
 </p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">We look forward to welcoming you.</p>
+{_signoff()}
 """
     html = _wrap(
-        kicker="Team Invite · ITHR Academy",
-        heading=f"You're invited to {org}.",
+        kicker="Enterprise Invitation · ITHR Academy",
+        heading=f"You are invited to join {org}.",
         body_html=body,
-        cta_label="Accept invite & join",
+        cta_label="Accept Invitation & Join",
         cta_url=join_url,
-        footer_note="If you didn't expect this invite, you can safely ignore this email — no account was created for you.",
+        footer_note="If you did not expect this invitation, you may safely disregard this email — no account has been created for you.",
     )
     text = (
-        f"You're invited to join {org} on ITHR Academy.\n\n"
-        f"Invite code: {invite_code}\n"
-        f"Accept: {join_url}\n\n"
-        "— ITHR Academy"
+        f"Hello,\n\n"
+        f"{admin} has invited you to join {org} on ITHR Academy.\n\n"
+        f"Invitation code: {invite_code}\n"
+        f"Accept: {join_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"You're invited to {org_name} on ITHR Academy", html, text, tag="invite")
 
@@ -317,13 +365,15 @@ async def send_payment_confirmation_email(
 ) -> bool:
     dash_url = f"{FRONTEND_URL}/dashboard"
     name = _safe(full_name or "there")
+    first = _first(full_name)
     item = _safe(item_description)
     amt_str = f"${amount:,.2f} {currency.upper()}"
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 16px 0;">
-  Thank you for your payment. Your enrollment / seat purchase is confirmed and access is live.
+  Thank you for your purchase. Your payment has been received and your access is now active.
 </p>
+{_section("Payment summary")}
 <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-radius:6px;margin:0 0 8px 0;">
   <tr><td style="padding:16px 20px;">
     <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;margin-bottom:4px;">Item</div>
@@ -334,22 +384,29 @@ async def send_payment_confirmation_email(
   </td></tr>
 </table>
 {f'<p style="font-size:13px;margin:16px 0 0 0;"><a href="{receipt_url}" style="color:#00A78B;">View full receipt →</a></p>' if receipt_url else ''}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:16px 0 0 0;">
+  Should you have any billing questions, simply reply to this email and one of our Academy specialists
+  will respond promptly.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Thank you for investing in your AI capability.</p>
+{_signoff()}
 """
     html = _wrap(
         kicker="Payment Confirmed · ITHR Academy",
-        heading=f"You're all set, {name}.",
+        heading=f"Your payment is confirmed, {first}.",
         body_html=body,
-        cta_label="Continue to my dashboard",
+        cta_label="Access My Learning Portal",
         cta_url=dash_url,
-        footer_note="This payment was processed securely via Stripe. Reach out to billing@ithr.tech for any billing questions.",
+        footer_note="This payment was processed securely via Stripe.",
     )
     text = (
-        f"Hi {name},\n\n"
-        f"Payment confirmed for {item}.\n"
+        f"Hello {first},\n\n"
+        f"Thank you for your purchase — payment confirmed for {item}.\n"
         f"Amount: {amt_str}\n"
         + (f"Invoice: {invoice_id}\n" if invoice_id else "")
         + (f"Receipt: {receipt_url}\n" if receipt_url else "")
-        + f"\nContinue: {dash_url}\n\n— ITHR Academy"
+        + f"\nAccess your learning portal: {dash_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, "Payment confirmed — ITHR Academy", html, text, tag="payment")
 
@@ -361,31 +418,38 @@ async def send_validity_expiration_email(
     email: str, full_name: str, credential_or_plan: str, expires_on: str, renewal_url: str | None = None,
 ) -> bool:
     name = _safe(full_name or "there")
+    first = _first(full_name)
     item = _safe(credential_or_plan)
     cta_url = renewal_url or f"{FRONTEND_URL}/pricing"
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  A quick heads-up: your <b style="color:#16335E;">{item}</b> is scheduled to expire on <b style="color:#00A78B;">{_safe(expires_on)}</b>.
+  This is a courtesy notice that your <b style="color:#16335E;">{item}</b> is scheduled to expire on
+  <b style="color:#00A78B;">{_safe(expires_on)}</b>.
 </p>
+{_section("Why renew now")}
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  Renewing now keeps your credentials verifiable, your team's seats active, and your dashboard streak intact — with no re-onboarding required.
+  Renewing keeps your credentials publicly verifiable, your team's seats active, and your learning
+  progress uninterrupted — with no re-onboarding required.
 </p>
 <p style="font-size:13px;line-height:1.6;color:#6b7280;margin:16px 0 0 0;">
-  Not planning to renew? No action needed — you'll receive one final reminder 24 hours before the expiration date, then access winds down gracefully.
+  Not planning to renew? No action is needed — you will receive one final reminder 24 hours before the
+  expiration date, after which access winds down gracefully.
 </p>
+{_signoff()}
 """
     html = _wrap(
-        kicker="Renewal Reminder · ITHR Academy",
+        kicker="Renewal Notice · ITHR Academy",
         heading=f"Your {item} expires soon.",
         body_html=body,
-        cta_label="Renew now",
+        cta_label="Renew My Access",
         cta_url=cta_url,
         footer_note="",
     )
     text = (
-        f"Hi {name},\n\n"
-        f"Your {item} expires on {expires_on}. Renew: {cta_url}\n\n— ITHR Academy"
+        f"Hello {first},\n\n"
+        f"Your {item} expires on {expires_on}. Renew: {cta_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"Renewal reminder: {credential_or_plan}", html, text, tag="expiration")
 
@@ -397,33 +461,39 @@ async def send_complaint_response_email(
     email: str, full_name: str, ticket_ref: str, response_text: str, agent_name: str = "The ITHR Support Team",
 ) -> bool:
     name = _safe(full_name or "there")
+    first = _first(full_name)
     # Escape the response body but keep line breaks
     safe_response = _safe(response_text).replace("\n", "<br>")
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 16px 0;">
-  Thank you for reaching out. Here is our response to your inquiry (reference <span style="font-family:monospace;color:#00A78B;">{_safe(ticket_ref)}</span>):
+  Thank you for contacting ITHR Academy. Please find below our response to your inquiry
+  (reference <span style="font-family:monospace;color:#00A78B;">{_safe(ticket_ref)}</span>):
 </p>
 <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-left:4px solid #00A78B;border-radius:0 6px 6px 0;margin:0 0 16px 0;">
   <tr><td style="padding:16px 20px;font-size:14px;line-height:1.65;color:#16335E;">{safe_response}</td></tr>
 </table>
 <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0;">
-  If this fully answers your question, feel free to close the thread. If not, simply reply to this email and it will route back to me directly — we&apos;ll keep working until it&apos;s resolved.
+  If this fully resolves your inquiry, no further action is required. Should you need anything more,
+  simply reply to this email — it will route directly back to your assigned specialist, and we will
+  continue working with you until the matter is fully resolved.
 </p>
 <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:14px 0 0 0;">
-  — {_safe(agent_name)}
+  With regards,<br/><b style="color:#16335E;">{_safe(agent_name)}</b>
 </p>
+{_signoff()}
 """
     html = _wrap(
         kicker=f"Support Response · Ref {_safe(ticket_ref)}",
         heading="A response to your inquiry.",
         body_html=body,
-        cta_label="Reply / open ticket",
+        cta_label="Reply / Open My Ticket",
         cta_url=f"{FRONTEND_URL}/support?ref={ticket_ref}",
-        footer_note="You can reply directly to this email — all replies are logged against your ticket automatically.",
+        footer_note="You may reply directly to this email — all replies are logged against your ticket automatically.",
     )
     text = (
-        f"Hi {name},\n\nRe: {ticket_ref}\n\n{response_text}\n\n— {agent_name}\nITHR Support"
+        f"Hello {first},\n\nRe: {ticket_ref}\n\n{response_text}\n\nWith regards,\n{agent_name}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"Re: your ITHR support ticket [{ticket_ref}]", html, text, tag="support")
 
@@ -442,14 +512,18 @@ async def send_credential_verification_alert(
     "signal of interest" — this is a feature, not a security alert.
     """
     name = _safe(full_name or "there")
+    first = _first(full_name)
     course = _safe(course_title)
     verify_url = f"{FRONTEND_URL}/verify/{certificate_id}"
     passport_url = f"{FRONTEND_URL}/passport"
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  Someone just verified your <b style="color:#16335E;">{course}</b> credential on the public verification page. That usually means a recruiter, hiring manager, or partner is checking your qualifications right now.
+  Your <b style="color:#16335E;">{course}</b> credential was just verified on the public verification page.
+  This typically indicates a recruiter, hiring manager, or business partner is confirming your
+  qualifications — a strong signal of professional interest.
 </p>
+{_section("Verification details")}
 <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-radius:6px;margin:12px 0;">
   <tr><td style="padding:12px 16px;font-size:12px;color:#6b7280;">
     <div><b style="color:#16335E;">Credential:</b> {course}</div>
@@ -459,25 +533,27 @@ async def send_credential_verification_alert(
   </td></tr>
 </table>
 <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:14px 0 0 0;">
-  A great time to make sure your <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a> is up to date — that&apos;s what verifiers see when they scan the QR code.
+  This is an excellent moment to ensure your <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a>
+  reflects your latest credentials — it is what verifiers see when they scan your QR code.
 </p>
+{_signoff()}
 """
     html = _wrap(
         kicker="Credential Verified · ITHR Academy",
-        heading="Someone just verified your credential.",
+        heading="Your credential was just verified.",
         body_html=body,
-        cta_label="View my passport",
+        cta_label="View My Skills Passport",
         cta_url=passport_url,
         footer_note=(
-            "This is a positive signal — verifiers only reach this page when they want to confirm your qualifications. "
-            "If you did NOT expect this and don't recognize any pending job/partnership contexts, "
-            f"you can still view the public record at {verify_url}."
+            "This is a positive signal — verifiers only reach this page when they wish to confirm your qualifications. "
+            f"You can view the public record at {verify_url}."
         ),
     )
     text = (
-        f"Hi {name},\n\n"
-        f"Someone verified your {course} credential ({certificate_id}) at {verified_at} UTC.\n\n"
-        f"View public record: {verify_url}\nAI Skills Passport: {passport_url}\n\n— ITHR Academy"
+        f"Hello {first},\n\n"
+        f"Your {course} credential ({certificate_id}) was verified at {verified_at} UTC.\n\n"
+        f"Public record: {verify_url}\nAI Skills Passport: {passport_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f'Your "{course_title}" credential was just verified', html, text, tag="verify-alert")
 
@@ -506,34 +582,40 @@ async def send_impressions_digest_email(
     ) or '<tr><td colspan="2" style="padding:12px 0;font-size:13px;color:#6b7280;">—</td></tr>'
 
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hi {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {_first(full_name)},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  Your credentials were verified <b style="color:#00A78B;">{week_impressions} time{'s' if week_impressions != 1 else ''}</b> this week — typically that means recruiters, hiring managers, or partners are checking your qualifications. Great signal of professional interest.
+  Your credentials were verified <b style="color:#00A78B;">{week_impressions} time{'s' if week_impressions != 1 else ''}</b>
+  this week. Verifications typically come from recruiters, hiring managers, and business partners confirming
+  your qualifications — a strong signal of professional interest in your profile.
 </p>
+{_section("Most-verified this week")}
 <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;background:#F6F8FB;border-radius:6px;margin:8px 0;">
   <tr>
-    <td style="padding:6px 16px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;">Most-verified this week</td>
+    <td style="padding:6px 16px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;">Credential</td>
     <td style="padding:6px 16px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b7280;text-align:right;">Verifies</td>
   </tr>
   <tr><td colspan="2" style="padding:0 16px 12px 16px;"><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">{rows_html}</table></td></tr>
 </table>
 <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:14px 0 0 0;">
-  Perfect time to double-check that your <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a> and public profile reflect your latest credentials.
+  This is an excellent moment to ensure your <a href="{passport_url}" style="color:#00A78B;">AI Skills Passport</a>
+  and public profile reflect your latest credentials.
 </p>
+{_signoff()}
 """
     html = _wrap(
         kicker="Weekly Credential Report · ITHR Academy",
         heading=f"{week_impressions} verification{'s' if week_impressions != 1 else ''} this week.",
         body_html=body,
-        cta_label="View my passport",
+        cta_label="View My Skills Passport",
         cta_url=passport_url,
         footer_note=f"To pause these weekly summaries, adjust your notification settings at {dash_url}/settings.",
     )
     text = (
-        f"Hi {name},\n\n"
+        f"Hello {_first(full_name)},\n\n"
         f"Your credentials were verified {week_impressions} time(s) this past week.\n\n"
         + "\n".join(f'  {c.get("course_title","?")} — {c.get("impressions",0)}×' for c in (top_credentials[:5] or []))
-        + f"\n\nPassport: {passport_url}\n\n— ITHR Academy"
+        + f"\n\nAI Skills Passport: {passport_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"You had {week_impressions} credential verification(s) this week", html, text, tag="digest-impressions")
 
@@ -545,29 +627,38 @@ async def send_first_course_bypass_email(email: str, full_name: str, code: str, 
     """First 500 first-enrollments: unique bypass code = that course + cert free."""
     dash_url = f"{FRONTEND_URL}/dashboard"
     name = _safe(full_name or "there")
+    first = _first(full_name)
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Congratulations, {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  You are enrollment <b style="color:#16335E;">#{seq} of the first 500</b> on ITHR Academy. Your course
-  <b style="color:#16335E;">{_safe(course_title)}</b> — including the full certification — is on us, free of charge.
+  Congratulations. You are enrollment <b style="color:#16335E;">#{seq} of the first 500</b> at ITHR Academy —
+  and as part of our founding cohort, your course <b style="color:#16335E;">{_safe(course_title)}</b>,
+  including its full certification, is complimentary.
 </p>
-<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">Your unique bypass code (already applied to your account):</p>
-<p style="font-family:monospace;font-size:22px;letter-spacing:3px;color:#00A78B;background:#F0FDF9;border:1px dashed #00A78B;padding:14px 18px;text-align:center;margin:0;">{_safe(code)}</p>
+{_section("Your bypass code — already applied")}
+<p style="font-family:monospace;font-size:22px;letter-spacing:3px;color:#00A78B;background:#F0FDF9;border:1px dashed #00A78B;padding:14px 18px;text-align:center;margin:0 0 16px 0;">{_safe(code)}</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
+  No action is required — the code has been applied to your account automatically. Continue your course,
+  complete the certification examination, and your credential will be issued at no charge.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Enjoy the journey.</p>
+{_signoff()}
 """
     html = _wrap(
-        kicker="ITHR Academy · First 500",
-        heading="Your first course is free.",
+        kicker=f"ITHR Academy · First 500 — #{seq}",
+        heading="Your first course is complimentary.",
         body_html=body,
-        cta_label="Continue learning",
+        cta_label="Continue My Learning",
         cta_url=dash_url,
         footer_note="This one-time bypass applies to your first enrolled course and its certificate.",
     )
     text = (
-        f"Congratulations {name}!\n\n"
-        f"You are enrollment #{seq} of the first 500 on ITHR Academy.\n"
-        f"Your course \"{course_title}\" incl. certification is free.\n"
+        f"Hello {first},\n\n"
+        f"Congratulations — you are enrollment #{seq} of the first 500 at ITHR Academy.\n"
+        f"Your course \"{course_title}\", including certification, is complimentary.\n"
         f"Bypass code (already applied): {code}\n\n"
-        f"Dashboard: {dash_url}\n— ITHR Academy"
+        f"Continue learning: {dash_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"You're #{seq} of 500 — your first course is free", html, text, tag="bypass")
 
@@ -576,28 +667,34 @@ async def send_referral_reward_email(email: str, full_name: str, referred_name: 
     """Referrer earned a free course of choice (max 5)."""
     dash_url = f"{FRONTEND_URL}/dashboard"
     name = _safe(full_name or "there")
+    first = _first(full_name)
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Great news, {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  <b style="color:#16335E;">{_safe(referred_name)}</b> joined ITHR Academy with your referral code and enrolled in their first course.
+  Excellent news — <b style="color:#16335E;">{_safe(referred_name)}</b> joined ITHR Academy using your
+  referral code and has enrolled in their first course.
 </p>
+{_section("Your reward")}
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
-  That earns you <b style="color:#00A78B;">free course #{reward_num} of 5</b> — any course of your choice.
-  Redeem it from your dashboard's Referrals panel.
+  This earns you <b style="color:#00A78B;">complimentary course #{reward_num} of 5</b> — any course of your
+  choice, including its certification. Redeem it from the Referrals panel on your dashboard.
 </p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Thank you for growing the Academy community.</p>
+{_signoff()}
 """
     html = _wrap(
-        kicker="ITHR Academy · Referral reward",
-        heading=f"You've earned free course #{reward_num} of 5.",
+        kicker="Referral Reward · ITHR Academy",
+        heading=f"Complimentary course #{reward_num} of 5 unlocked.",
         body_html=body,
-        cta_label="Redeem my free course",
+        cta_label="Redeem My Complimentary Course",
         cta_url=dash_url,
-        footer_note="Share your code with up to 5 people — each conversion unlocks another free course.",
+        footer_note="Share your code with up to 5 professionals — each successful enrollment unlocks another complimentary course.",
     )
     text = (
-        f"Great news {name}!\n\n"
-        f"{referred_name} joined with your referral code and enrolled in their first course.\n"
-        f"You've earned free course #{reward_num} of 5 — redeem from your dashboard.\n\n"
-        f"Dashboard: {dash_url}\n— ITHR Academy"
+        f"Hello {first},\n\n"
+        f"{referred_name} joined ITHR Academy with your referral code and enrolled in their first course.\n"
+        f"You've earned complimentary course #{reward_num} of 5 — redeem from your dashboard's Referrals panel.\n\n"
+        f"Learning portal: {dash_url}"
+        + _TEXT_SIGNOFF
     )
     return await _fire(email, f"Referral reward unlocked — free course #{reward_num} of 5", html, text, tag="referral-reward")
