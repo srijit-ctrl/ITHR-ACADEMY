@@ -15,13 +15,15 @@ import base64
 import io
 import os
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from core import logger
 
-router = APIRouter(prefix="/api/voice", tags=["voice"])
+from security_service import require_flag
+
+router = APIRouter(prefix="/api/voice", tags=["voice"], dependencies=[Depends(require_flag("voice_io"))])
 
 
 # ---------------- STT (Whisper) ----------------

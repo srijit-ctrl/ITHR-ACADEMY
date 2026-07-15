@@ -13,6 +13,7 @@ import uuid
 
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from pydantic import BaseModel
 
 from auth import (
     JWT_REFRESH_EXPIRY_DAYS,
@@ -63,9 +64,17 @@ def _clear_refresh_cookie(response: Response) -> None:
 
 @router.post("/auth/register", response_model=AuthResponse)
 async def register(payload: UserRegister, response: Response):
+    import security_service as sec
+    if not await sec.flag_enabled("registrations"):
+        raise HTTPException(status_code=403, detail="New registrations are temporarily disabled")
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    policy = (await sec.get_security_settings())["password_policy"]
+    policy_errors = sec.validate_password(payload.password, policy)
+    if policy_errors:
+        raise HTTPException(status_code=400, detail="; ".join(policy_errors))
 
     # Validate any provided referral code BEFORE creating the account so a
     # typo'd code fails loudly instead of silently registering a free account.
@@ -168,20 +177,68 @@ async def register(payload: UserRegister, response: Response):
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
 
 
-@router.post("/auth/login", response_model=AuthResponse)
+@router.post("/auth/login", response_model=None)
 async def login(payload: UserLogin, request: Request, response: Response):
     doc = await db.users.find_one({"email": payload.email.lower()})
     if not doc or not verify_password(payload.password, doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if doc.get("is_suspended"):
         raise HTTPException(status_code=403, detail="This account has been suspended. Contact your administrator.")
+    import security_service as sec
+    if doc.get("mfa_enabled"):
+        # Password OK, TOTP pending: issue a 5-min challenge token instead of real tokens.
+        return {"mfa_required": True, "challenge_token": sec.create_mfa_challenge_token(doc["id"])}
     access = create_access_token(doc["id"], doc["email"], doc["role"])
     _set_refresh_cookie(response, doc["id"])
     # Fire-and-forget login tracking (updates last_login_at, login_count,
     # IP + geo + language). Never blocks the auth response.
     from login_tracking import schedule_login_tracking
     schedule_login_tracking(doc["id"], request)
-    return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
+    result = {"token": access, "user": user_to_public(doc)}
+    settings = await sec.get_security_settings()
+    if sec.mfa_enforcement_covers(settings["mfa_enforcement"], doc.get("role", "learner")):
+        result["mfa_setup_required"] = True
+    return result
+
+
+class MfaVerifyPayload(BaseModel):
+    challenge_token: str
+    code: str
+
+
+@router.post("/auth/mfa-verify", response_model=None)
+async def mfa_verify_login(payload: MfaVerifyPayload, request: Request, response: Response):
+    import hashlib
+    import pyotp
+    import security_service as sec
+    try:
+        user_id = sec.decode_mfa_challenge_token(payload.challenge_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired MFA challenge — sign in again")
+    doc = await db.users.find_one({"id": user_id})
+    if not doc or not doc.get("mfa_enabled") or not doc.get("mfa_secret"):
+        raise HTTPException(status_code=400, detail="MFA is not configured for this account")
+    code = payload.code.strip().upper()
+    ok = pyotp.TOTP(doc["mfa_secret"]).verify(code, valid_window=1)
+    if not ok:
+        # Backup-code fallback (single use)
+        code_hash = hashlib.sha256(code.encode()).hexdigest()
+        backups = doc.get("mfa_backup_codes") or []
+        for b in backups:
+            if not b.get("used") and b.get("hash") == code_hash:
+                await db.users.update_one(
+                    {"id": user_id, "mfa_backup_codes.hash": code_hash},
+                    {"$set": {"mfa_backup_codes.$.used": True}},
+                )
+                ok = True
+                break
+    if not ok:
+        raise HTTPException(status_code=401, detail="Invalid MFA code")
+    access = create_access_token(doc["id"], doc["email"], doc["role"])
+    _set_refresh_cookie(response, doc["id"])
+    from login_tracking import schedule_login_tracking
+    schedule_login_tracking(doc["id"], request)
+    return {"token": access, "user": user_to_public(doc)}
 
 
 @router.post("/auth/refresh", response_model=AuthResponse)

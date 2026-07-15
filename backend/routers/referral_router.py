@@ -7,9 +7,10 @@ from pydantic import BaseModel
 from auth import get_current_user_id
 from core import db
 from models import Enrollment
+from security_service import require_flag
 import referral_system
 
-router = APIRouter(prefix="/api/referrals", tags=["referrals"])
+router = APIRouter(prefix="/api/referrals", tags=["referrals"], dependencies=[Depends(require_flag("referrals"))])
 
 
 @router.get("/me")

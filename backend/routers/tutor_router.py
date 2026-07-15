@@ -15,6 +15,11 @@ router = APIRouter(prefix="/api", tags=["ai"])
 
 @router.post("/ai/tutor")
 async def ai_tutor(payload: ChatRequest, user_id: str = Depends(get_current_user_id)):
+    from security_service import flag_enabled
+    if not await flag_enabled("ai_tutor"):
+        raise HTTPException(status_code=403, detail="The AI tutor is currently disabled")
+    if payload.mode == "quiz" and not await flag_enabled("chat_quiz"):
+        raise HTTPException(status_code=403, detail="In-chat quizzes are currently disabled")
     session_id = payload.session_id or str(uuid.uuid4())
     session = await db.chat_sessions.find_one({"id": session_id, "user_id": user_id}, {"_id": 0})
     history = session["messages"] if session else []

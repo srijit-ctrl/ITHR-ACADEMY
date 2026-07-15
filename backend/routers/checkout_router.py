@@ -24,6 +24,9 @@ async def list_packages():
 
 @router.post("/checkout/session")
 async def create_checkout(payload: dict, request: Request, user_id: str = Depends(get_current_user_id)):
+    from security_service import flag_enabled
+    if not await flag_enabled("checkout"):
+        raise HTTPException(status_code=403, detail="Checkout is temporarily disabled")
     package_id = payload.get("package_id")
     origin_url = payload.get("origin_url", "").rstrip("/")
     quantity = int(payload.get("quantity") or 1)

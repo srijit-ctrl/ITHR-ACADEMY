@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Copy, Gift, Users, Loader2, Check, Linkedin, MessageCircle } from "lucide-react";
+import useFlags from "@/hooks/useFlags";
 import { toast } from "sonner";
 
 export const ReferralPanel = () => {
+    const { isEnabled } = useFlags();
     const [data, setData] = useState(null);
     const [courses, setCourses] = useState([]);
     const [pick, setPick] = useState("");
@@ -20,7 +22,7 @@ export const ReferralPanel = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data]);
 
-    if (!data?.code) return null;
+    if (!isEnabled("referrals") || !data?.code) return null;
 
     const copy = (text, label) => {
         navigator.clipboard.writeText(text);

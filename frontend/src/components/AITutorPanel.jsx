@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import useFlags from "@/hooks/useFlags";
 import TutorLauncher from "@/components/tutor/TutorLauncher";
 import TutorDrawer from "@/components/tutor/TutorDrawer";
 
@@ -10,9 +11,10 @@ import TutorDrawer from "@/components/tutor/TutorDrawer";
  */
 export default function AITutorPanel({ courseSlug = null }) {
     const { user } = useAuth();
+    const { isEnabled } = useFlags();
     const [open, setOpen] = useState(false);
 
-    if (!user) return null;
+    if (!user || !isEnabled("ai_tutor")) return null;
 
     return (
         <>

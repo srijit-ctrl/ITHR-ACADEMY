@@ -57,6 +57,16 @@ export function AuthProvider({ children }) {
 
     const login = useCallback(async (email, password) => {
         const res = await api.post("/auth/login", { email, password });
+        if (res.data.mfa_required) {
+            return { mfaRequired: true, challengeToken: res.data.challenge_token };
+        }
+        setAccessToken(res.data.token);
+        setUser(res.data.user);
+        return res.data.user;
+    }, []);
+
+    const verifyMfa = useCallback(async (challengeToken, code) => {
+        const res = await api.post("/auth/mfa-verify", { challenge_token: challengeToken, code });
         setAccessToken(res.data.token);
         setUser(res.data.user);
         return res.data.user;
@@ -132,8 +142,8 @@ export function AuthProvider({ children }) {
     }, []);
 
     const value = useMemo(
-        () => ({ user, loading, login, register, logout, refreshUser, impersonation, beginImpersonation, endImpersonation }),
-        [user, loading, login, register, logout, refreshUser, impersonation, beginImpersonation, endImpersonation]
+        () => ({ user, loading, login, verifyMfa, register, logout, refreshUser, impersonation, beginImpersonation, endImpersonation }),
+        [user, loading, login, verifyMfa, register, logout, refreshUser, impersonation, beginImpersonation, endImpersonation]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

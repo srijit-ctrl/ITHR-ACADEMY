@@ -15,8 +15,10 @@ import SessionsPanel from "@/components/admin/SessionsPanel";
 import GlobalSearchBar from "@/components/admin/GlobalSearchBar";
 import VideoQuizPanel from "@/components/admin/VideoQuizPanel";
 import DataHygienePanel from "@/components/admin/DataHygienePanel";
+import SecurityPanel from "@/components/admin/SecurityPanel";
+import FeatureFlagsPanel from "@/components/admin/FeatureFlagsPanel";
 
-const VALID_TABS = ["analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz"];
+const VALID_TABS = ["analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz", "security", "flags"];
 
 /**
  * Super-Admin console.
@@ -130,6 +132,8 @@ export default function SuperAdminPortal() {
                     <TabButton active={tab === "emails"} onClick={() => setTab("emails")} label="Send email" count={""} testId="tab-emails" />
                     <TabButton active={tab === "audit"} onClick={() => setTab("audit")} label="Audit log" count={""} testId="tab-audit" />
                     <TabButton active={tab === "videoquiz"} onClick={() => setTab("videoquiz")} label="Video quizzes" count={""} testId="tab-videoquiz" />
+                    <TabButton active={tab === "security"} onClick={() => setTab("security")} label="Security" count={""} testId="tab-security" />
+                    <TabButton active={tab === "flags"} onClick={() => setTab("flags")} label="Flags" count={""} testId="tab-flags" />
                     <div className="ml-auto pb-2">
                         <GlobalSearchBar onNavigateUser={() => setTab("users")} />
                     </div>
@@ -154,6 +158,8 @@ export default function SuperAdminPortal() {
                 {tab === "traffic" && <TrafficPanel />}
                 {tab === "sessions" && <SessionsPanel />}
                 {tab === "videoquiz" && <VideoQuizPanel />}
+                {tab === "security" && <SecurityPanel />}
+                {tab === "flags" && <FeatureFlagsPanel />}
 
                 {tab === "orgs" && (
                     <div>

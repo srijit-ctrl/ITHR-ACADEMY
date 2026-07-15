@@ -10,13 +10,15 @@ function googleSignIn() {
 }
 
 export default function Login() {
-    const { login } = useAuth();
+    const { login, verifyMfa } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
+    const [challengeToken, setChallengeToken] = useState(null);
+    const [mfaCode, setMfaCode] = useState("");
     const showPasswordResetBanner = location.state?.passwordReset === true;
 
     const submit = async (e) => {
@@ -24,7 +26,11 @@ export default function Login() {
         setErr("");
         setLoading(true);
         try {
-            await login(email, password);
+            const result = await login(email, password);
+            if (result?.mfaRequired) {
+                setChallengeToken(result.challengeToken);
+                return;
+            }
             const redirect = location.state?.from || "/dashboard";
             navigate(redirect);
         } catch (e) {
@@ -33,6 +39,56 @@ export default function Login() {
             setLoading(false);
         }
     };
+
+    const submitMfa = async (e) => {
+        e.preventDefault();
+        setErr("");
+        setLoading(true);
+        try {
+            await verifyMfa(challengeToken, mfaCode);
+            navigate(location.state?.from || "/dashboard");
+        } catch (e) {
+            setErr(e.response?.data?.detail || "Verification failed.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (challengeToken) {
+        return (
+            <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center container-page py-16 pattern-dots">
+                <div className="w-full max-w-md" data-testid="mfa-challenge">
+                    <div className="overline mb-4">Two-factor authentication</div>
+                    <h1 className="font-serif text-4xl tracking-tighter leading-none mb-3">Enter your code.</h1>
+                    <p className="text-muted-foreground mb-8">Open your authenticator app and enter the 6-digit code — or use one of your backup codes.</p>
+                    <form onSubmit={submitMfa} className="space-y-4">
+                        <input
+                            type="text"
+                            autoFocus
+                            value={mfaCode}
+                            onChange={(e) => setMfaCode(e.target.value)}
+                            required
+                            data-testid="mfa-code-input"
+                            className="w-full bg-surface border border-border rounded-sm px-4 py-3 font-mono text-center text-2xl tracking-[0.5em] focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                            placeholder="000000"
+                            maxLength={16}
+                        />
+                        {err && (
+                            <div data-testid="mfa-error" className="flex items-center gap-2 text-sm text-brand bg-brand/5 border border-brand/20 rounded-sm px-4 py-2">
+                                <AlertCircle className="w-4 h-4" /> {err}
+                            </div>
+                        )}
+                        <button type="submit" disabled={loading || !mfaCode.trim()} data-testid="mfa-submit" className="btn-primary w-full">
+                            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify & sign in"}
+                        </button>
+                        <button type="button" onClick={() => { setChallengeToken(null); setMfaCode(""); setErr(""); }} data-testid="mfa-back" className="text-sm text-muted-foreground hover:text-brand w-full">
+                            ← Back to sign in
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center container-page py-16 pattern-dots">
