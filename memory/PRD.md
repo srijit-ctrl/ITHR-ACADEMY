@@ -1087,3 +1087,7 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 ## 2026-07-15 (later 7) — 2nd code-quality report triage (SELF-TESTED ✅)
 - Refactored auth_router.register() (111 lines → 25-line handler + _validate_registration/_apply_signup_perks/_dispatch_signup_side_effects). All 6 registration paths curl-regression tested incl. personal referral + live welcome email from info@ithr.online.
 - Everything else in the report = repeats already fixed/triaged (MD5, eval FP, secrets FP, random FP, oversized fns) — CODE_QUALITY_NOTES.md items 12-13 added.
+
+## 2026-07-15 (later 8) — Premium welcome email copy (SELF-TESTED ✅ live send)
+- send_welcome_email rewritten with user's executive copy: "Hello {first}" greeting, exclusive-access positioning, START YOUR LEARNING JOURNEY + NEED ASSISTANCE? sections, Aletheia as "AI Learning Mentor", "Welcome aboard." sign-off block (ITHR Academy / Enterprise Agentic AI Academy / Made in the UAE), CTA "Access My Learning Portal", subject "Welcome to ITHR Academy — Your Learning Journey Begins". Matching plain-text version. Live-send verified.
+- NOTE: production (https://ithr.online) deployed — user must REDEPLOY to push this + all recent changes to prod, and ensure prod env has RESEND_API_KEY/SENDER_EMAIL/PREFERRED_SENDER_EMAIL/PREFERRED_SENDER_DOMAIN_ID.

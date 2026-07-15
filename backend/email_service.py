@@ -129,31 +129,69 @@ async def send_welcome_email(email: str, full_name: str) -> bool:
     dash_url = f"{FRONTEND_URL}/dashboard"
     catalog_url = f"{FRONTEND_URL}/courses"
     name = _safe(full_name or "there")
+    first = name.split(" ")[0]
     body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Welcome, {name} —</p>
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
-  You now have access to <b style="color:#16335E;">Enterprise Agentic AI Academy</b> — the training platform built to move your career and your team from AI-curious to AI-productive.
+  Welcome to <b style="color:#16335E;">ITHR Academy</b>. Your learning journey begins today.
 </p>
-<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
-  Here's a fast way in: enroll in <a href="{catalog_url}" style="color:#00A78B;">Agentic AI Foundations</a> (our most-taken course) and Aletheia, your AI tutor, will walk you through each lesson.
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  You now have exclusive access to the ITHR Academy — a next-generation learning platform designed to help
+  professionals and organizations build practical AI capabilities that deliver measurable business outcomes.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 20px 0;">
+  Whether you're taking your first steps into Artificial Intelligence or advancing toward enterprise AI
+  leadership, you're in the right place.
+</p>
+<p style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#16335E;margin:0 0 8px 0;">Start your learning journey</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  We recommend beginning with <a href="{catalog_url}" style="color:#00A78B;font-weight:600;">Agentic AI Foundations</a>,
+  where you'll gain a strong understanding of AI agents, automation, enterprise use cases, and modern AI workflows.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 20px 0;">
+  Throughout your learning experience, <b style="color:#16335E;">Aletheia</b>, your AI Learning Mentor, will guide
+  you through each module, answer your questions, and help you apply concepts in real-world scenarios.
+</p>
+<p style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#16335E;margin:0 0 8px 0;">Need assistance?</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 20px 0;">
+  Our support team is here to help. Simply reply to this email or contact us through the support portal,
+  and one of our Academy specialists will respond promptly.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 4px 0;">
+  We look forward to being part of your AI transformation journey.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:0 0 20px 0;">Welcome aboard.</p>
+<p style="font-size:14px;line-height:1.5;margin:0;border-top:1px solid #E5E9F0;padding-top:16px;">
+  <b style="color:#16335E;">ITHR Academy</b><br/>
+  <span style="color:#6b7280;font-style:italic;">Enterprise Agentic AI Academy</span><br/>
+  <span style="color:#6b7280;">Made in the UAE</span>
 </p>
 """
     html = _wrap(
-        kicker="ITHR Academy · You're in",
-        heading=f"Welcome to the Academy, {name}.",
+        kicker="ITHR Academy · Enterprise Agentic AI Academy",
+        heading=f"Welcome to the Academy, {first}.",
         body_html=body,
-        cta_label="Open my dashboard",
+        cta_label="Access My Learning Portal",
         cta_url=dash_url,
-        footer_note="Reply to this email or reach out via the contact page — a human on the ITHR team reads every response.",
+        footer_note="You are receiving this email because an account was created for you at ITHR Academy.",
     )
     text = (
-        f"Welcome, {name}!\n\n"
-        f"You now have access to Enterprise Agentic AI Academy.\n"
-        f"Open your dashboard: {dash_url}\n"
+        f"Hello {first},\n\n"
+        "Welcome to ITHR Academy. Your learning journey begins today.\n\n"
+        "You now have exclusive access to the ITHR Academy — a next-generation learning platform "
+        "designed to help professionals and organizations build practical AI capabilities that deliver "
+        "measurable business outcomes.\n\n"
+        "START YOUR LEARNING JOURNEY\n"
+        "We recommend beginning with Agentic AI Foundations. Aletheia, your AI Learning Mentor, "
+        "will guide you through each module.\n\n"
+        f"Access your learning portal: {dash_url}\n"
         f"Browse the catalog: {catalog_url}\n\n"
-        "— ITHR Academy"
+        "NEED ASSISTANCE?\n"
+        "Simply reply to this email and one of our Academy specialists will respond promptly.\n\n"
+        "Welcome aboard.\n\n"
+        "ITHR Academy — Enterprise Agentic AI Academy — Made in the UAE"
     )
-    return await _fire(email, "Welcome to ITHR Academy", html, text, tag="welcome")
+    return await _fire(email, "Welcome to ITHR Academy — Your Learning Journey Begins", html, text, tag="welcome")
 
 
 async def send_founding_welcome_email(email: str, full_name: str, seq: int) -> bool:
