@@ -52,7 +52,7 @@ export default function CourseDetail() {
                         <div className="absolute inset-0">
                             <CourseIntroHero course={course} />
                         </div>
-                        <div className="absolute inset-0 bg-background/94 backdrop-blur-[2px]" />
+                        <div className="absolute inset-0 bg-background/95 backdrop-blur-[2px]" />
                     </>
                 )}
                 <div className="relative container-page py-16 md:py-24 grid grid-cols-1 lg:grid-cols-12 gap-10">

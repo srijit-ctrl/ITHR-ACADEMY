@@ -170,6 +170,57 @@ async def seed_database():
     total = await db.courses.count_documents({})
     logger.info(f"Seed complete. Total courses: {total}.")
 
+    # Hydrate LLM-generated course content from committed assets so the
+    # production DB gets the same material as preview on first boot.
+    import json as _json
+    gen_dir = os.path.join(os.path.dirname(__file__), "assets", "generated_courses")
+    if os.path.isdir(gen_dir):
+        hydrated = 0
+        for fname in sorted(os.listdir(gen_dir)):
+            if not fname.endswith(".json") or fname == "content_overrides.json":
+                continue
+            slug = fname[:-5]
+            doc = await db.courses.find_one({"slug": slug}, {"_id": 0, "modules": 1})
+            if doc is not None and not doc.get("modules"):
+                with open(os.path.join(gen_dir, fname), encoding="utf-8") as f:
+                    data = _json.load(f)
+                await db.courses.update_one(
+                    {"slug": slug},
+                    {"$set": {
+                        "modules": data["modules"],
+                        "quiz": data.get("quiz") or [],
+                        "has_full_content": True,
+                    }},
+                )
+                hydrated += 1
+        enriched_courses = 0
+        ov_path = os.path.join(gen_dir, "content_overrides.json")
+        if os.path.exists(ov_path):
+            with open(ov_path, encoding="utf-8") as f:
+                file_overrides = _json.load(f)
+            for slug, per in file_overrides.items():
+                course = await db.courses.find_one({"slug": slug}, {"_id": 0, "id": 1, "modules": 1})
+                if not course:
+                    continue
+                sets = {}
+                for key, o in per.items():
+                    mi, li = (int(x) for x in key.split(":"))
+                    try:
+                        lesson = course["modules"][mi]["lessons"][li]
+                    except (IndexError, KeyError):
+                        continue
+                    if len(lesson.get("content", "")) < len(o["content"]):
+                        prefix = f"modules.{mi}.lessons.{li}"
+                        sets[f"{prefix}.content"] = o["content"]
+                        sets[f"{prefix}.key_takeaways"] = o.get("key_takeaways", [])
+                        if o.get("code_sample"):
+                            sets[f"{prefix}.code_sample"] = o["code_sample"]
+                if sets:
+                    await db.courses.update_one({"id": course["id"]}, {"$set": sets})
+                    enriched_courses += 1
+        if hydrated or enriched_courses:
+            logger.info(f"Asset hydration: {hydrated} generated courses filled, {enriched_courses} builder courses enriched.")
+
     # Re-apply persisted lesson video URLs + LLM-enriched lesson content
     # (course upserts above replace docs, which would otherwise wipe
     # admin-configured videos / generated content on restart).

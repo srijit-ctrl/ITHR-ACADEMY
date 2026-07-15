@@ -1,0 +1,23 @@
+{
+  "summary": "Iter 46 — Course content hydration + hero contrast + paths regression VERIFIED end-to-end. Backend pytest 11/11 pass (7 content-richness cases, 3 paths cases, 1 list-endpoint check). Live hydration regression proven: wiped ai-product-management (modules=0, quiz=0, has_full_content=False), restarted supervisor, waited 10s, backend log emitted 'Asset hydration: 1 generated courses filled, 11 builder courses enriched.' and GET /api/courses/ai-product-management returned 4 modules · 12 lessons (all content 2446-3910 chars) · 15-question quiz. Contrast fix verified on 3 course-detail pages: h1 color rgb(29,55,93) navy on overlay rgba(248,250,252,0.95) ivory — dark-on-light, clearly readable, screenshots captured. Modules accordion (4 items) + Enroll button render on all 3 pages. Full learner flow: registered @example.com throwaway, logged in, opened /courses/vector-databases, clicked Enroll, landed on /learn/vector-databases/<mod>/<lesson> with formatted lesson content (6.3k chars visible, prose blocks intact, sidebar navigation with 4 modules). Cleanup: purged the throwaway via POST /api/admin/data-hygiene/purge as superadmin — DB back to 4 users. All 7 target course slugs (generative-ai-executives, llm-architecture-deep-dive, ai-security-red-team, agentic-ai-hospitality, ai-product-management, ai-change-management, vector-databases) have 12+ lessons ≥1200 chars + 15-Q quiz. Both learning paths ('AI-Ready Executive' → 4 courses, 'Agentic Engineer' → 7 courses) resolve to courses that ALL have has_full_content=True.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration46_content_hydration.py",
+    "/app/test_reports/pytest/iter46_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "seed_database asset-hydration block writes has_full_content=True but the /api/courses/{slug} response omitted it (returned None) for the freshly-hydrated course — the DB doc DOES have has_full_content=True, so likely a response-model projection issue. Cosmetic, but if the frontend ever gated a UI element on that field via the detail endpoint it would misbehave. Recommend making the Pydantic response model include has_full_content or ensuring the field always round-trips.",
+    "paths_router.ROLE_PATHS is hard-coded in the module — course_slugs could drift from actual seeded course slugs and be silently dropped by the {'$in': [...]} query. Recommend a startup assertion that every path.course_slugs entry resolves to a course, or at least log a WARN when it doesn't (today: silent).",
+    "GET /api/courses list-endpoint response omits the 'modules' key entirely (returns [] appearance), which is expected for a list view, but callers cannot distinguish 'empty course' from 'list-view stripped' — currently the has_full_content flag disambiguates. Fine, but worth a code comment on the endpoint for future maintainers."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration46_content_hydration.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% (all 5 review flows)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 — verified working. Throwaway learner created (test.learner+iter46_1784080468@example.com) and purged.",
+  "seed_data_creation": "Created 1 throwaway @example.com learner for the lesson-viewer E2E, then purged via /api/admin/data-hygiene/purge. DB left in restored (rich) state — remaining_users=4, all 28 courses with has_full_content=True.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both bugs from this iteration are FIXED and STABLE. Asset hydration on cold-start correctly repopulates any wiped course from /app/backend/assets/generated_courses/ (verified live). Hero overlay bg-background/95 renders as rgba(248,250,252,0.95) — ivory. Backend has 28 courses, all with has_full_content=True. The 4 courses NOT in the 7 target list but referenced by paths (ai-governance-compliance, chief-ai-officer-track, prompt-engineering-mastery, rag-enterprise, multi-agent-systems, mcp-a2a-protocols, ai-devops-mlops) were also spot-checked and all have 12+ lessons + 15+ quiz.",
+  "rca of the issue": "N/A — both reported bugs (empty courses + invisible titles) are fully resolved. Iter 46 is a green regression pass."
+}
