@@ -84,7 +84,9 @@ async def _resolve_sender() -> str:
     sender = SENDER_EMAIL
     try:
         d = await asyncio.to_thread(resend.Domains.get, PREFERRED_SENDER_DOMAIN_ID)
-        if (d or {}).get("status") in ("verified", "partially_verified"):
+        records = (d or {}).get("records") or []
+        sending_records = [r for r in records if r.get("record") in ("DKIM", "SPF")]
+        if sending_records and all(r.get("status") == "verified" for r in sending_records):
             sender = PREFERRED_SENDER_EMAIL
     except Exception:
         logger.warning("Preferred-sender domain check failed — using fallback sender")

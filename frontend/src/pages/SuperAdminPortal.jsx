@@ -112,7 +112,7 @@ export default function SuperAdminPortal() {
     return (
         <div className="sa-shell">
             {/* Top header bar */}
-            <div className="border-b border-border px-5 py-3 flex items-center justify-between gap-4 sticky top-0 z-40" style={{ background: "hsl(216 62% 8% / .92)", backdropFilter: "blur(12px)" }}>
+            <div className="sa-header border-b border-border px-5 py-3 flex items-center justify-between gap-4 sticky top-0 z-40">
                 <div className="flex items-center gap-3 min-w-0">
                     <Shield className="w-4 h-4 sa-gold shrink-0" />
                     <div className="min-w-0">
@@ -148,7 +148,7 @@ export default function SuperAdminPortal() {
                 </aside>
 
                 {/* Mobile tab strip */}
-                <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border overflow-x-auto flex gap-1 px-2 py-2" style={{ background: "hsl(216 62% 8%)" }}>
+                <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border overflow-x-auto flex gap-1 px-2 py-2 bg-white">
                     {NAV.flatMap((g) => g.items).map(([key, label]) => (
                         <button key={key} onClick={() => setTab(key)} className={`sa-sidebar-link whitespace-nowrap w-auto ${tab === key ? "active" : ""}`}>{label}</button>
                     ))}
