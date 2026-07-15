@@ -62,23 +62,19 @@ def _clear_refresh_cookie(response: Response) -> None:
     )
 
 
-@router.post("/auth/register", response_model=AuthResponse)
-async def register(payload: UserRegister, response: Response):
+async def _validate_registration(payload: UserRegister) -> dict | None:
+    """Gate checks before account creation. Returns the personal referrer (or None)."""
     import security_service as sec
     if not await sec.flag_enabled("registrations"):
         raise HTTPException(status_code=403, detail="New registrations are temporarily disabled")
-    existing = await db.users.find_one({"email": payload.email.lower()})
-    if existing:
+    if await db.users.find_one({"email": payload.email.lower()}):
         raise HTTPException(status_code=400, detail="Email already registered")
-
     policy = (await sec.get_security_settings())["password_policy"]
     policy_errors = sec.validate_password(payload.password, policy)
     if policy_errors:
         raise HTTPException(status_code=400, detail="; ".join(policy_errors))
-
     # Validate any provided referral code BEFORE creating the account so a
     # typo'd code fails loudly instead of silently registering a free account.
-    personal_referrer = None
     if payload.referral_code:
         from founding_member import is_valid_referral_code
         if not is_valid_referral_code(payload.referral_code):
@@ -86,41 +82,28 @@ async def register(payload: UserRegister, response: Response):
             personal_referrer = await referral_system.find_referrer_by_code(payload.referral_code)
             if not personal_referrer:
                 raise HTTPException(status_code=400, detail="Invalid referral code")
+            return personal_referrer
+    return None
 
-    user_id = str(uuid.uuid4())
-    doc = {
-        "id": user_id,
-        "email": payload.email.lower(),
-        "password_hash": hash_password(payload.password),
-        "full_name": payload.full_name,
-        "role": payload.role or "learner",
-        "organization": payload.organization,
-        "title": payload.title,
-        "avatar_url": None,
-        "xp": 0,
-        "streak_days": 0,
-        "created_at": now_iso(),
-    }
-    await db.users.insert_one(doc)
+
+async def _apply_signup_perks(doc: dict, payload: UserRegister, personal_referrer: dict | None) -> dict | None:
+    """Founding-member allocation + referral redemption. Returns founding referral result (or None)."""
+    user_id = doc["id"]
     # Founding-member perk allocation (first 500 signups get a lifetime perk on
     # their first enrolled course — free modules 6-15 + free certificate).
     try:
         from founding_member import assign_if_eligible
         result = await assign_if_eligible(user_id)
         if result:
-            # Re-hydrate local doc so the response reflects the newly-assigned
-            # founding_member_seq + signup_discount_code fields.
             doc["founding_member_seq"] = result["seq"]
             doc["signup_discount_code"] = result["code"]
             doc["founding_cert_used"] = False
     except Exception:
-        # Non-fatal — user is still registered. Log loudly so future silent
-        # regressions of the "seq/code stay null" class don't slip through.
         logger.exception("Founding-member allocation raised during registration")
 
-    # Referral-code payment bypass (first 500 redemptions -> marked Paid).
     referral_applied = None
     if payload.referral_code and not personal_referrer:
+        # FOUNDING500-style payment bypass (first 500 redemptions -> marked Paid).
         try:
             from founding_member import redeem_referral_code
             referral_applied = await redeem_referral_code(user_id, payload.referral_code)
@@ -144,11 +127,13 @@ async def register(payload: UserRegister, response: Response):
                 }})
         except Exception:
             logger.exception("Personal-referral signup raised during registration")
+    return referral_applied
 
-    # Send the welcome email as a fire-and-forget task so a slow / failing
-    # Resend call never blocks the register response.
+
+def _dispatch_signup_side_effects(doc: dict, referral_applied: dict | None) -> None:
+    """Fire-and-forget welcome email + super-admin activity feed — never blocks the response."""
+    import asyncio as _asyncio
     try:
-        import asyncio as _asyncio
         if referral_applied:
             from email_service import send_founding_welcome_email
             _asyncio.create_task(send_founding_welcome_email(
@@ -159,18 +144,39 @@ async def register(payload: UserRegister, response: Response):
             _asyncio.create_task(send_welcome_email(doc["email"], doc.get("full_name") or ""))
     except Exception:
         logger.exception("Welcome-email dispatch failed (non-fatal)")
-
-    # Log to the super-admin live activity feed (fire-and-forget).
     try:
         from core import log_activity
-        import asyncio as _asyncio
         _asyncio.create_task(log_activity(
             kind="signup",
             message=f"New signup: {doc['full_name']} ({doc['email']})",
-            actor_id=user_id, actor_name=doc.get("full_name"),
+            actor_id=doc["id"], actor_name=doc.get("full_name"),
         ))
     except Exception:
         logger.exception("Activity-log dispatch failed (non-fatal)")
+
+
+@router.post("/auth/register", response_model=AuthResponse)
+async def register(payload: UserRegister, response: Response):
+    personal_referrer = await _validate_registration(payload)
+
+    user_id = str(uuid.uuid4())
+    doc = {
+        "id": user_id,
+        "email": payload.email.lower(),
+        "password_hash": hash_password(payload.password),
+        "full_name": payload.full_name,
+        "role": payload.role or "learner",
+        "organization": payload.organization,
+        "title": payload.title,
+        "avatar_url": None,
+        "xp": 0,
+        "streak_days": 0,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(doc)
+
+    referral_applied = await _apply_signup_perks(doc, payload, personal_referrer)
+    _dispatch_signup_side_effects(doc, referral_applied)
 
     access = create_access_token(user_id, doc["email"], doc["role"])
     _set_refresh_cookie(response, user_id)

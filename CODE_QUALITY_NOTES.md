@@ -229,3 +229,15 @@ have been added at each confirmed-false-positive site:
   are deliberately left as-is: linear, well-commented, fully tested operational
   code where a split adds indirection without reducing risk. Revisit only if a
   bug actually lands in one of them.
+
+### 12. `auth_router.register()` complexity (July 2026 report)
+- **FIXED July 2026:** split into `_validate_registration`, `_apply_signup_perks`,
+  `_dispatch_signup_side_effects` + a 25-line handler. All paths regression
+  tested (duplicate email, policy rejection, invalid code, normal, founding
+  code, personal referral).
+
+### 13. Type-hint coverage on seed/test scripts
+- `export_generated_content.py`, `seed_video_quizzes.py`, test files: one-shot
+  operational scripts. Type annotations add no safety here; deliberately skipped.
+  Core business modules (security_service, referral_system, email_service,
+  ai_service) are typed.

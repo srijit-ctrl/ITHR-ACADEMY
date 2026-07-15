@@ -1083,3 +1083,7 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 ## 2026-07-15 (later 6) — Code Quality Report triage (SELF-TESTED ✅, regression passed)
 - REAL FIXES: (1) generate_course_content.py corrupted duplicate trailing block ('gger.info') removed — was the only true undefined-variable in the codebase (pyflakes now clean). (2) cert_render.pick_design → hashlib.md5(usedforsecurity=False) + nosec (kept md5 so existing cert designs don't flip). (3) referral_system.handle_first_enrollment split into _issue_first_course_bypass + _convert_referral (behavior identical, E2E referral flow retested: converted 1 / rewards 1).
 - FALSE POSITIVES (documented in /app/CODE_QUALITY_NOTES.md items 7-11): eval() claim (no eval exists), seed_super_admin sentinel constant, test-file credentials, assessment_router random shuffles (SystemRandom already used), locustfile random, `is True/None` in tests, remaining oversized functions (deliberate, tested).
+
+## 2026-07-15 (later 7) — 2nd code-quality report triage (SELF-TESTED ✅)
+- Refactored auth_router.register() (111 lines → 25-line handler + _validate_registration/_apply_signup_perks/_dispatch_signup_side_effects). All 6 registration paths curl-regression tested incl. personal referral + live welcome email from info@ithr.online.
+- Everything else in the report = repeats already fixed/triaged (MD5, eval FP, secrets FP, random FP, oversized fns) — CODE_QUALITY_NOTES.md items 12-13 added.
