@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { AlertCircle, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
@@ -13,13 +13,14 @@ function googleSignIn() {
 export default function Register() {
     const { register } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [form, setForm] = useState({
         full_name: "",
         email: "",
         password: "",
         organization: "",
         title: "",
-        referral_code: "",
+        referral_code: (searchParams.get("ref") || "").toUpperCase(),
     });
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
@@ -35,8 +36,11 @@ export default function Register() {
             if (!payload.referral_code.trim()) delete payload.referral_code;
             const u = await register(payload);
             if (form.referral_code.trim()) {
+                const code = form.referral_code.trim().toUpperCase();
                 if (u?.paid_via_referral) {
                     toast.success(`Founding Member #${u.referral_seq} of 500 — payment waived, full access unlocked. Check your inbox for access details.`);
+                } else if (code.startsWith("ITHR-")) {
+                    toast.success("Referral applied — your first course (incl. certificate) is free once you enroll!");
                 } else {
                     toast.info("Referral code valid, but the first-500 cap has been reached — a standard account was created.");
                 }

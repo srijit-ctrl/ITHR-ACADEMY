@@ -83,7 +83,14 @@ async def _fire(to_email: str, subject: str, html: str, text_fallback: str, tag:
         "text": text_fallback,
     }
     try:
-        result = await asyncio.to_thread(resend.Emails.send, params)
+        for attempt in range(4):
+            try:
+                result = await asyncio.to_thread(resend.Emails.send, params)
+                break
+            except resend.exceptions.RateLimitError:
+                if attempt == 3:
+                    raise
+                await asyncio.sleep(1.2 * (attempt + 1))
         rid = result.get("id") if isinstance(result, dict) else result
         logger.info(f"[email/{tag}] Sent to {to_email} (resend id: {rid})")
         return True
@@ -468,3 +475,68 @@ async def send_impressions_digest_email(
         + f"\n\nPassport: {passport_url}\n\n— ITHR Academy"
     )
     return await _fire(email, f"You had {week_impressions} credential verification(s) this week", html, text, tag="digest-impressions")
+
+
+# ---- Referral system emails ------------------------------------------------
+
+
+async def send_first_course_bypass_email(email: str, full_name: str, code: str, course_title: str, seq: int) -> bool:
+    """First 500 first-enrollments: unique bypass code = that course + cert free."""
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    name = _safe(full_name or "there")
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Congratulations, {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  You are enrollment <b style="color:#16335E;">#{seq} of the first 500</b> on ITHR Academy. Your course
+  <b style="color:#16335E;">{_safe(course_title)}</b> — including the full certification — is on us, free of charge.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">Your unique bypass code (already applied to your account):</p>
+<p style="font-family:monospace;font-size:22px;letter-spacing:3px;color:#00A78B;background:#F0FDF9;border:1px dashed #00A78B;padding:14px 18px;text-align:center;margin:0;">{_safe(code)}</p>
+"""
+    html = _wrap(
+        kicker="ITHR Academy · First 500",
+        heading="Your first course is free.",
+        body_html=body,
+        cta_label="Continue learning",
+        cta_url=dash_url,
+        footer_note="This one-time bypass applies to your first enrolled course and its certificate.",
+    )
+    text = (
+        f"Congratulations {name}!\n\n"
+        f"You are enrollment #{seq} of the first 500 on ITHR Academy.\n"
+        f"Your course \"{course_title}\" incl. certification is free.\n"
+        f"Bypass code (already applied): {code}\n\n"
+        f"Dashboard: {dash_url}\n— ITHR Academy"
+    )
+    return await _fire(email, f"You're #{seq} of 500 — your first course is free", html, text, tag="bypass")
+
+
+async def send_referral_reward_email(email: str, full_name: str, referred_name: str, reward_num: int) -> bool:
+    """Referrer earned a free course of choice (max 5)."""
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    name = _safe(full_name or "there")
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Great news, {name} —</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  <b style="color:#16335E;">{_safe(referred_name)}</b> joined ITHR Academy with your referral code and enrolled in their first course.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0;">
+  That earns you <b style="color:#00A78B;">free course #{reward_num} of 5</b> — any course of your choice.
+  Redeem it from your dashboard's Referrals panel.
+</p>
+"""
+    html = _wrap(
+        kicker="ITHR Academy · Referral reward",
+        heading=f"You've earned free course #{reward_num} of 5.",
+        body_html=body,
+        cta_label="Redeem my free course",
+        cta_url=dash_url,
+        footer_note="Share your code with up to 5 people — each conversion unlocks another free course.",
+    )
+    text = (
+        f"Great news {name}!\n\n"
+        f"{referred_name} joined with your referral code and enrolled in their first course.\n"
+        f"You've earned free course #{reward_num} of 5 — redeem from your dashboard.\n\n"
+        f"Dashboard: {dash_url}\n— ITHR Academy"
+    )
+    return await _fire(email, f"Referral reward unlocked — free course #{reward_num} of 5", html, text, tag="referral-reward")

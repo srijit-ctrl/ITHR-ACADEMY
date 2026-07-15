@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy } from "lucide-react";
 import { toast } from "sonner";
 import CredentialImpressions from "@/components/CredentialImpressions";
+import { ReferralPanel } from "@/components/ReferralPanel";
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -98,6 +99,8 @@ export default function Dashboard() {
                     </Link>
                 </div>
             </div>
+
+            <ReferralPanel />
 
             {/* Next-best recommendation banner */}
             {nextBest && (

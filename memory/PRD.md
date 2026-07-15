@@ -1038,3 +1038,14 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - BUG 2 (invisible course titles): hero overlay used INVALID Tailwind class bg-background/94 → no overlay → navy text on dark image. Fixed to /95. Verified on 3 pages (navy on ivory).
 - 'AI-Ready Executive' & 'Agentic Engineer' are learning PATHS — constituent courses all rich.
 - IMPORTANT for future agents: whenever generate_course_content.py runs again, ALSO run export_generated_content.py so prod stays in sync.
+
+## 2026-07-15 (later) — 2-Tier Referral System LIVE + Resend emails FIXED (SELF-TESTED ✅ E2E curl + screenshot)
+- Resend: user supplied new API key (valid). ROOT CAUSE of send failures after key swap: ithr.online + ithr.tech domains have status FAILED on the user's Resend account; only aiilm.me is VERIFIED. SENDER_EMAIL temporarily switched to no-reply@aiilm.me → all emails now deliver. USER ACTION: re-verify ithr.online DNS at resend.com/domains, then flip SENDER_EMAIL back.
+- Rate-limit hardening: Resend free tier = 2 req/sec; _fire() now retries 4x with backoff on RateLimitError (signup bursts fire 3-4 emails at once).
+- Referral system (referral_system.py + routers/referral_router.py, now wired into server.py):
+  • Mechanic 1: first 500 first-enrollments platform-wide get a unique FREE-XXXXXXXX bypass code (course + cert free, auto-applied) + email.
+  • Mechanic 2: every user has a personal ITHR-XXXXXX code (GET /api/referrals/me, lazily generated). Referred signups (register with code or /register?ref=CODE) get first course free; on their first enrollment the referrer earns 1 free course of choice (max 5), redeemed via POST /api/referrals/redeem {course_slug} (enrolls directly).
+  • Hooks: auth_router register (personal-code branch alongside legacy FOUNDING500 path), catalog_router enroll → handle_first_enrollment (fire-and-forget). Emails: send_first_course_bypass_email, send_referral_reward_email.
+  • Frontend: ReferralPanel.jsx on Dashboard (code + copy, share URL, signups x/5 progress, rewards count + redeem dropdown); Register.jsx prefills ?ref= param + distinct toast for ITHR- codes.
+- E2E verified by curl: signup w/ code → enroll → conversion + reward + all 4 emails Sent (resend ids logged); redeem works; credit-cap + double-redeem rejected; dashboard panel screenshot OK.
+- Collections: referral_signups, course_entitlements (sources: first-course-bypass | referred-first-course | referral-reward).

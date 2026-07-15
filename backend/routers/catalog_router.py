@@ -204,6 +204,14 @@ async def enroll(slug: str, user_id: str = Depends(get_current_user_id)):
     except Exception:
         pass
 
+    # Referral mechanics: first-course bypass (first 500) + referral conversion
+    try:
+        import asyncio as _asyncio
+        import referral_system
+        _asyncio.create_task(referral_system.handle_first_enrollment(user_id, course))
+    except Exception:
+        pass
+
     # Live activity feed
     try:
         import asyncio as _asyncio

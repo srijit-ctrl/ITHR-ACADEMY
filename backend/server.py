@@ -15,7 +15,7 @@ from routers import (
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, password_reset_router, paths_router,
     recommendation_router, trust_router, tutor_router, voice_router, podcast_router,
-    admin_control_router, traffic_router, video_quiz_router,
+    admin_control_router, traffic_router, video_quiz_router, referral_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
 
@@ -287,6 +287,7 @@ for r in (
     demo_router.router,
     trust_router.router,
     video_quiz_router.router,
+    referral_router.router,
 ):
     app.include_router(r)
 

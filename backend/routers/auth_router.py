@@ -69,10 +69,14 @@ async def register(payload: UserRegister, response: Response):
 
     # Validate any provided referral code BEFORE creating the account so a
     # typo'd code fails loudly instead of silently registering a free account.
+    personal_referrer = None
     if payload.referral_code:
         from founding_member import is_valid_referral_code
         if not is_valid_referral_code(payload.referral_code):
-            raise HTTPException(status_code=400, detail="Invalid referral code")
+            import referral_system
+            personal_referrer = await referral_system.find_referrer_by_code(payload.referral_code)
+            if not personal_referrer:
+                raise HTTPException(status_code=400, detail="Invalid referral code")
 
     user_id = str(uuid.uuid4())
     doc = {
@@ -107,7 +111,7 @@ async def register(payload: UserRegister, response: Response):
 
     # Referral-code payment bypass (first 500 redemptions -> marked Paid).
     referral_applied = None
-    if payload.referral_code:
+    if payload.referral_code and not personal_referrer:
         try:
             from founding_member import redeem_referral_code
             referral_applied = await redeem_referral_code(user_id, payload.referral_code)
@@ -117,6 +121,20 @@ async def register(payload: UserRegister, response: Response):
                 doc["referral_seq"] = referral_applied["seq"]
         except Exception:
             logger.exception("Referral redemption raised during registration")
+    elif personal_referrer:
+        # Personal referral (ITHR-XXXXXX): record signup + grant first-course-free
+        try:
+            import referral_system
+            ok = await referral_system.handle_referral_signup(
+                personal_referrer, user_id, doc["email"], payload.referral_code
+            )
+            if ok:
+                await db.users.update_one({"id": user_id}, {"$set": {
+                    "referred_by": personal_referrer["id"],
+                    "referred_via_code": payload.referral_code.strip().upper(),
+                }})
+        except Exception:
+            logger.exception("Personal-referral signup raised during registration")
 
     # Send the welcome email as a fire-and-forget task so a slow / failing
     # Resend call never blocks the register response.
