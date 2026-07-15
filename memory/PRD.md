@@ -1049,3 +1049,13 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
   • Frontend: ReferralPanel.jsx on Dashboard (code + copy, share URL, signups x/5 progress, rewards count + redeem dropdown); Register.jsx prefills ?ref= param + distinct toast for ITHR- codes.
 - E2E verified by curl: signup w/ code → enroll → conversion + reward + all 4 emails Sent (resend ids logged); redeem works; credit-cap + double-redeem rejected; dashboard panel screenshot OK.
 - Collections: referral_signups, course_entitlements (sources: first-course-bypass | referred-first-course | referral-reward).
+
+## 2026-07-15 (later 2) — AI Tutor pedagogical upgrade + quiz mode + personas + referral share buttons (TESTED ✅ iter47, 100%)
+- Email templates answer: 11 branded templates in email_service.py; sender = ITHR Academy <no-reply@aiilm.me> (TEMP — ithr.online DNS verification FAILED on user's Resend account; switch SENDER_EMAIL back once user re-verifies at resend.com/domains).
+- Tutor upgrade (user chose: 1b prompt-only, 2a structured meta in UI, 3a quiz mode, 4b per-course personas, 5a labeled general knowledge):
+  • ai_service.build_tutor_system_prompt: condensed pedagogy rules (teaching cycle, adaptivity, hint ladder, 80-250 words, grounding + labeled general knowledge, safety). Personas by category keywords: Athena (strategy/mgmt/product/change/enterprise), Daedalus (architecture/devops/vector/retrieval/mcp/fine-tuning/observability), Themis (governance/security/responsible), Calliope (LLM/prompt), Aletheia default.
+  • Structured footer: model appends @@META@@{understanding,mode,suggested_actions,knowledge_check} single-line JSON after visible answer. Frontend splitTutorMeta (tutorMeta.js) strips it live during streaming and renders action chips (TutorMetaExtras) + knowledge-check highlight. Router strips META before saving to chat_sessions.
+  • Quiz mode: ChatRequest.mode='quiz' → 5-question one-at-a-time quiz, MCQ options delivered as suggested_actions chips (A/B/C/D), running score, multi-turn continuity via last-8-turns history injected into system prompt. TutorDrawer has Quiz me / End quiz buttons + 'Quiz mode active' header state.
+  • GET /api/ai/tutor-profile?course_slug= returns persona for drawer header.
+- ReferralPanel: one-click Share on LinkedIn (share-offsite) + WhatsApp (wa.me prefilled with code + link) buttons.
+- Iter47: backend 8/8, frontend 4/4 flows. Non-blocking review notes in report (sentinel collision-resistance, SSE meta-as-separate-event idea) — deferred.
