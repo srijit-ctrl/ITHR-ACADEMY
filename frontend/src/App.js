@@ -67,11 +67,12 @@ function AppShell() {
 
     // Hide chrome on lesson viewer for immersive reading
     const isLesson = location.pathname.startsWith("/learn/");
+    const isAdmin = location.pathname.startsWith("/admin");
 
     return (
         <div className="min-h-screen flex flex-col">
             <ImpersonationBanner />
-            <Header />
+            {!isAdmin && <Header />}
             <main className="flex-1">
                 <Routes>
                     <Route path="/" element={<Landing />} />
@@ -115,8 +116,8 @@ function AppShell() {
                     <Route path="/legal/compliance" element={<LegalDoc docKey="compliance" />} />
                 </Routes>
             </main>
-            {!isLesson && <Footer />}
-            {user && <AITutorPanel courseSlug={location.pathname.startsWith("/learn/") ? location.pathname.split("/")[2] : null} />}
+            {!isLesson && !isAdmin && <Footer />}
+            {user && !isAdmin && <AITutorPanel courseSlug={location.pathname.startsWith("/learn/") ? location.pathname.split("/")[2] : null} />}
         </div>
     );
 }

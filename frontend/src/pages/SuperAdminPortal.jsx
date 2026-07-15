@@ -17,8 +17,22 @@ import VideoQuizPanel from "@/components/admin/VideoQuizPanel";
 import DataHygienePanel from "@/components/admin/DataHygienePanel";
 import SecurityPanel from "@/components/admin/SecurityPanel";
 import FeatureFlagsPanel from "@/components/admin/FeatureFlagsPanel";
+import CommandCenter from "@/components/admin/CommandCenter";
+import AlertCenter from "@/components/admin/AlertCenter";
+import { Org360Drawer, User360Drawer } from "@/components/admin/Admin360Panels";
+import "@/styles/superadmin.css";
 
-const VALID_TABS = ["analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz", "security", "flags"];
+const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz", "security", "flags"];
+
+const NAV = [
+    { group: "Overview", items: [
+        ["command", "Command Centre"], ["alertcenter", "Alerts"], ["analytics", "Analytics"], ["traffic", "Traffic"],
+    ]},
+    { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"]] },
+    { group: "Learning & AI", items: [["videoquiz", "Video quizzes"], ["sessions", "AI sessions"]] },
+    { group: "Operations", items: [["emails", "Send email"], ["audit", "Audit log"]] },
+    { group: "Governance", items: [["security", "Security"], ["flags", "Feature flags"]] },
+];
 
 /**
  * Super-Admin console.
@@ -39,8 +53,10 @@ export default function SuperAdminPortal() {
     // Tabs are real URL links: /admin?tab=<name> — deep-linkable, back/forward aware.
     const [searchParams, setSearchParams] = useSearchParams();
     const urlTab = searchParams.get("tab");
-    const tab = VALID_TABS.includes(urlTab) ? urlTab : "analytics";
+    const tab = VALID_TABS.includes(urlTab) ? urlTab : "command";
     const setTab = (t) => setSearchParams({ tab: t });
+    const [openUserId, setOpenUserId] = useState(null);
+    const [openOrgId, setOpenOrgId] = useState(null);
 
     const loadAll = useCallback(async () => {
         setBusy(true);
@@ -94,50 +110,56 @@ export default function SuperAdminPortal() {
     };
 
     return (
-        <div className="min-h-screen">
-            {/* Very intentionally minimal chrome — this is an operator surface. */}
-            <div className="container-page py-10">
-                <div className="flex items-center justify-between mb-8">
-                    <div>
-                        <div className="inline-flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-brand-teal">
-                            <Shield className="w-3.5 h-3.5" /> Internal · Super Admin
+        <div className="sa-shell">
+            {/* Top header bar */}
+            <div className="border-b border-border px-5 py-3 flex items-center justify-between gap-4 sticky top-0 z-40" style={{ background: "hsl(216 62% 8% / .92)", backdropFilter: "blur(12px)" }}>
+                <div className="flex items-center gap-3 min-w-0">
+                    <Shield className="w-4 h-4 sa-gold shrink-0" />
+                    <div className="min-w-0">
+                        <div className="font-serif text-lg leading-none truncate">ITHR Super Admin</div>
+                        <div className="text-[9px] font-mono uppercase tracking-[0.22em] text-muted-foreground mt-0.5">Enterprise command centre</div>
+                    </div>
+                </div>
+                <div className="flex-1 max-w-lg hidden md:block">
+                    <GlobalSearchBar onNavigateUser={() => setTab("users")} />
+                </div>
+                <div className="text-right text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground shrink-0">
+                    <div className="sa-gold">super_admin</div>
+                    <div className="mt-0.5">{user.email}</div>
+                </div>
+            </div>
+
+            <div className="flex">
+                {/* Sidebar */}
+                <aside className="w-56 shrink-0 border-r border-border min-h-[calc(100vh-57px)] py-3 px-2 hidden lg:block sticky top-[57px] self-start" data-testid="sa-sidebar">
+                    {NAV.map((g) => (
+                        <div key={g.group}>
+                            <div className="sa-sidebar-group">{g.group}</div>
+                            {g.items.map(([key, label]) => (
+                                <button key={key} onClick={() => setTab(key)} data-testid={`tab-${key}`}
+                                    className={`sa-sidebar-link ${tab === key ? "active" : ""}`}>
+                                    {label}
+                                    {key === "orgs" && <span className="ml-auto text-[10px] font-mono text-muted-foreground">{orgs.length}</span>}
+                                    {key === "users" && <span className="ml-auto text-[10px] font-mono text-muted-foreground">{totalUsers}</span>}
+                                </button>
+                            ))}
                         </div>
-                        <h1 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none mt-2">
-                            ITHR Operator Console
-                        </h1>
-                        <p className="text-muted-foreground mt-2 text-sm">
-                            Provision enterprise orgs, manage their first admin user, and act on password / access requests.
-                        </p>
-                    </div>
-                    <div className="text-right text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground">
-                        <div>Signed in as</div>
-                        <div className="text-foreground mt-1">{user.email}</div>
-                    </div>
+                    ))}
+                </aside>
+
+                {/* Mobile tab strip */}
+                <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border overflow-x-auto flex gap-1 px-2 py-2" style={{ background: "hsl(216 62% 8%)" }}>
+                    {NAV.flatMap((g) => g.items).map(([key, label]) => (
+                        <button key={key} onClick={() => setTab(key)} className={`sa-sidebar-link whitespace-nowrap w-auto ${tab === key ? "active" : ""}`}>{label}</button>
+                    ))}
                 </div>
 
-                {/* Stat row */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                    <StatCard label="Enterprise orgs" value={orgs.length} icon={Building2} testId="stat-orgs" />
-                    <StatCard label="Total users" value={totalUsers} icon={Users} testId="stat-users" />
-                    <StatCard label="Total seats issued" value={orgs.reduce((s, o) => s + (o.seat_count || 0), 0)} icon={Users} testId="stat-seats" />
-                </div>
-
-                {/* Tabs */}
-                <div className="border-b border-border mb-6 flex gap-1 items-end flex-wrap">
-                    <TabButton active={tab === "analytics"} onClick={() => setTab("analytics")} label="Overview" count={""} testId="tab-analytics" />
-                    <TabButton active={tab === "traffic"} onClick={() => setTab("traffic")} label="Traffic" count={""} testId="tab-traffic" />
-                    <TabButton active={tab === "orgs"} onClick={() => setTab("orgs")} label="Organizations" count={orgs.length} testId="tab-orgs" />
-                    <TabButton active={tab === "users"} onClick={() => setTab("users")} label="Users" count={totalUsers} testId="tab-users" />
-                    <TabButton active={tab === "sessions"} onClick={() => setTab("sessions")} label="Sessions" count={""} testId="tab-sessions" />
-                    <TabButton active={tab === "emails"} onClick={() => setTab("emails")} label="Send email" count={""} testId="tab-emails" />
-                    <TabButton active={tab === "audit"} onClick={() => setTab("audit")} label="Audit log" count={""} testId="tab-audit" />
-                    <TabButton active={tab === "videoquiz"} onClick={() => setTab("videoquiz")} label="Video quizzes" count={""} testId="tab-videoquiz" />
-                    <TabButton active={tab === "security"} onClick={() => setTab("security")} label="Security" count={""} testId="tab-security" />
-                    <TabButton active={tab === "flags"} onClick={() => setTab("flags")} label="Flags" count={""} testId="tab-flags" />
-                    <div className="ml-auto pb-2">
-                        <GlobalSearchBar onNavigateUser={() => setTab("users")} />
-                    </div>
-                </div>
+                {/* Main content */}
+                <main className="flex-1 min-w-0 p-5 lg:p-8 pb-24 lg:pb-8">
+                {tab === "command" && (
+                    <CommandCenter onNavigate={setTab} onOpenUser={setOpenUserId} onOpenOrg={setOpenOrgId} />
+                )}
+                {tab === "alertcenter" && <AlertCenter onNavigate={setTab} />}
 
                 {tab === "analytics" && (
                     <div className="space-y-6">
@@ -173,7 +195,7 @@ export default function SuperAdminPortal() {
                                 <Plus className="w-4 h-4" /> New enterprise org
                             </button>
                         </div>
-                        <OrgTable orgs={orgs} onDelete={handleDeleteOrg} busy={busy} />
+                        <OrgTable orgs={orgs} onDelete={handleDeleteOrg} busy={busy} onOpen={setOpenOrgId} />
                     </div>
                 )}
 
@@ -184,7 +206,11 @@ export default function SuperAdminPortal() {
                 {tab === "emails" && <EmailDispatchPanel />}
 
                 {tab === "audit" && <AuditLogPanel />}
+                </main>
             </div>
+
+            {openOrgId && <Org360Drawer orgId={openOrgId} onClose={() => setOpenOrgId(null)} onOpenUser={(id) => { setOpenOrgId(null); setOpenUserId(id); }} />}
+            {openUserId && <User360Drawer userId={openUserId} onClose={() => setOpenUserId(null)} />}
 
             {showCreate && (
                 <CreateOrgModal
@@ -207,31 +233,7 @@ export default function SuperAdminPortal() {
     );
 }
 
-function StatCard({ label, value, icon: Icon, testId }) {
-    return (
-        <div className="card-flat p-5" data-testid={testId}>
-            <Icon className="w-4 h-4 mb-2 text-muted-foreground" />
-            <div className="font-serif text-3xl leading-none">{value}</div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-2">{label}</div>
-        </div>
-    );
-}
-
-function TabButton({ active, onClick, label, count, testId }) {
-    return (
-        <button
-            onClick={onClick}
-            data-testid={testId}
-            className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                active ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-        >
-            {label} <span className="ml-1 text-[10px] font-mono text-muted-foreground">{count}</span>
-        </button>
-    );
-}
-
-function OrgTable({ orgs, onDelete, busy }) {
+function OrgTable({ orgs, onDelete, busy, onOpen }) {
     if (busy) return <div className="card-flat p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></div>;
     if (orgs.length === 0) return <div className="card-flat p-8 text-center text-sm text-muted-foreground">No enterprise organizations yet. Click &quot;New enterprise org&quot; to provision one.</div>;
     return (
@@ -247,8 +249,10 @@ function OrgTable({ orgs, onDelete, busy }) {
             {orgs.map((o) => (
                 <div key={o.id} className="grid grid-cols-12 gap-3 p-4 items-center text-sm" data-testid={`org-row-${o.slug}`}>
                     <div className="col-span-4">
-                        <div className="font-serif text-base leading-tight">{o.name}</div>
-                        <div className="text-xs text-muted-foreground">{o.slug}</div>
+                        <button onClick={() => onOpen && onOpen(o.id)} data-testid={`org-360-${o.slug}`} className="text-left hover:underline decoration-dotted">
+                            <div className="font-serif text-base leading-tight">{o.name}</div>
+                            <div className="text-xs text-muted-foreground">{o.slug} · click for 360°</div>
+                        </button>
                     </div>
                     <div className="col-span-2 font-mono text-xs">@{o.domain || "—"}</div>
                     <div className="col-span-2 text-xs">{o.industry || "—"}</div>

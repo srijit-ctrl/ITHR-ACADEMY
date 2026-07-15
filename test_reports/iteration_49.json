@@ -1,0 +1,38 @@
+{
+  "summary": "Iter 49 — Phase 1 Super Admin Command Centre rebuild FULLY VERIFIED end-to-end. Backend pytest 13/13 pass covering command-center (22 KPIs @ 7/30/90d, delta_pct, 403 for learner, expected KPI keys). Alerts (list, sorted-by-severity, ack persists). Org360 (stats shape, members, 404). User360 (no password_hash/mfa_secret, no ip in recent_logins, course_title on enrollments, 404). Frontend Playwright: superadmin login lands on /admin?tab=command with dark navy shell (sa-sidebar visible), 22 kpi cards render, cc-date-range switches 7/30/90 and header updates 'comparing vs prior Xd', cc-refresh works, cc-export downloads 'ithr-command-center-30d.csv'. KPI drill-downs verified: kpi-total_users→users tab (users-table), kpi-total_orgs→orgs tab (orgs-table). Alerts tab renders 'Low seat utilization' alert; ack button flips status to 'acked' badge. Org360 drawer opens with all 6 stats (members/seats/enrollments/completions/avg progress/AI sessions), profile + members list; clicking org360-member-* opens User360 drawer with all 5 sections (Account, Enrollments, Credentials, Recent logins, Admin audit trail); close buttons on both work. All 12 sidebar tabs (command, alertcenter, analytics, traffic, orgs, users, sessions, emails, audit, videoquiz, security, flags) navigate correctly and their content panels render inside the dark shell with good contrast. Public site chrome (ITHR ACADEMY navbar, footer, Ask Aletheia launcher) properly hidden on /admin. Regression: learner refe_1784091849@test.com login succeeds → /dashboard shows public navbar (7 links), footer, referral-panel (ITHR-INBHPH), 'Ask Aletheia' launcher visible.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration49_command_center.py",
+    "/app/test_reports/pytest/iter49_results.xml"
+  ],
+  "verified_flows": [
+    "SA login → /admin defaults to Command Centre with sa-sidebar visible and 22 KPI cards (kpi-total_users, kpi-new_users, kpi-dau, kpi-mau, kpi-total_orgs, kpi-seats_purchased, kpi-seats_used, kpi-new_enrollments, kpi-completions, kpi-completion_rate, kpi-assessment_attempts, kpi-pass_rate, kpi-certificates_issued, kpi-total_certs, kpi-verifications, kpi-ai_sessions, kpi-ai_active_users, kpi-revenue, kpi-referral_signups, kpi-active_users, kpi-suspended_users, kpi-mfa_users)",
+    "cc-date-range 7/30/90 days switching → header text updates, refresh + CSV export ('ithr-command-center-30d.csv') work",
+    "KPI drill-downs: kpi-total_users → tab=users (users-table); kpi-total_orgs → tab=orgs (orgs-table)",
+    "Alert & Action Centre: 'Low seat utilization: ITHR Technologies Consulting LLC' alert (1/10 seats) renders; alert-ack-* click adds '· acked' badge; POST persists via ack endpoint (verified in backend test)",
+    "Organizations tab → org-360-* click opens org360 drawer (6 stats), member click opens user360 drawer (5 sections). Both drawers close via *-close buttons.",
+    "All 12 sidebar tabs navigate + content renders (command, alertcenter, analytics, traffic, orgs, users, sessions, emails, audit, videoquiz, security, flags). Security panel MFA select, Feature Flags 7 toggles, Users table 17 rows, Audit log 22 entries, Analytics charts — all readable/clear in dark shell.",
+    "Public site chrome hidden on /admin: 0 Aletheia launchers, 0 footer, 0 public navbar tagline",
+    "Regression: learner login OK, /dashboard shows Ask Aletheia + referral panel (ITHR-INBHPH) + public nav + footer"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "command_center_router.py `_period_counts` runs 12+ separate DB queries per period; called twice per /command-center request (24 queries). Fine at current scale (17 users, 1 org) but consider $facet aggregation once data grows into millions of records.",
+    "AlertCenter.jsx `act()` calls load() after ack/resolve — swallows errors from load(). Consider surfacing toast for reload failure so user isn't stuck on stale list.",
+    "CommandCenter.jsx uses `Number(v).toLocaleString()` in fmtVal but revenue with format='usd' does `Number(v).toLocaleString(undefined, {maximumFractionDigits: 0})` which strips cents — intentional for exec summary, but no unit indicator when value truncates (e.g. $1,234.99 shown as $1,235).",
+    "Admin360Panels.jsx Org360Drawer stats grid is grid-cols-3 with 6 stats — works, but 'Seats' label overflows on narrow drawer (fixed width sa-drawer). Minor visual only.",
+    "SuperAdminPortal.jsx: 12 tabs share one top-level useEffect(loadAll) that fetches /admin/orgs + /admin/users on every mount even when landing on non-orgs/users tabs (e.g. Command Centre) — small waste; lazy-load per-tab if perf becomes a concern.",
+    "command_center_router.py alert states collection `admin_alert_states` upsert never sets an `alerted_at` timestamp on first ack — hard to audit alert-timeline forensically. Minor observability gap."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration49_command_center.py"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% (all 8 requested flows verified)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026; learner refe_1784091849@test.com / Passw0rd!",
+  "seed_data_creation": "None (used existing seed org 'ITHR Technologies Consulting LLC' and existing 17 users). During testing, alert state was ack'd once then cleaned up. Final DB state: admin_alert_states collection empty (matches expected fresh state).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "IMPORTANT: Alert 'Low seat utilization' (key: unused-seats-<orgId>) is present because ITHR Technologies Consulting LLC has 1/10 seats used (<30%). If you resolve it via UI, backend suppresses it for 7 days — to re-test, delete via `db.admin_alert_states.delete_many({})` in mongo. All test cleanup done: alert_states cleared, no MFA on superadmin, all 7 flags ON, password_policy min_length=8. CSV download tested via page.expect_download; playwright default context supports downloads. Superadmin login response uses `token` key (not `access_token`) — see _login helper in test file. All 12 sidebar testids format: tab-<key>.",
+  "rca of the issue": "N/A — no bugs found. All Phase 1 Command Centre rebuild features working end-to-end."
+}

@@ -1,0 +1,77 @@
+/* Super-Admin dark shell — navy / white / gold / electric-blue.
+   Scoped re-theme: overrides the design-token HSL vars inside .sa-shell so
+   every existing admin panel inherits the dark enterprise look. */
+.sa-shell {
+    --background: 216 62% 8%;          /* #060F1F deep navy */
+    --foreground: 210 40% 96%;
+    --surface: 217 55% 12%;            /* #0D1B33 panel */
+    --surface-alt: 217 50% 16%;
+    --card: 217 55% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 217 55% 12%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 218 100% 59%;           /* electric blue #2E7DFF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 50% 16%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 50% 16%;
+    --muted-foreground: 215 25% 62%;
+    --accent: 42 62% 52%;              /* gold #C9A227 */
+    --accent-foreground: 216 62% 8%;
+    --brand: 42 62% 52%;
+    --brand-hover: 42 66% 44%;
+    --brand-teal: 42 62% 52%;
+    --border: 217 38% 22%;
+    --input: 217 38% 22%;
+    --ring: 218 100% 59%;
+
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    min-height: 100vh;
+}
+
+.sa-shell .card-flat {
+    background: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+}
+
+.sa-blue { color: #2E7DFF; }
+.sa-gold { color: hsl(42 62% 58%); }
+
+.sa-sidebar-link {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; text-align: left;
+    padding: 9px 14px; border-radius: 6px;
+    font-size: 13px; color: hsl(215 25% 68%);
+    border-left: 2px solid transparent;
+    transition: background-color .15s, color .15s;
+}
+.sa-sidebar-link:hover { background: hsl(217 50% 14%); color: hsl(210 40% 96%); }
+.sa-sidebar-link.active {
+    background: hsl(217 55% 15%);
+    color: #fff;
+    border-left-color: hsl(42 62% 52%);
+}
+.sa-sidebar-group {
+    font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
+    color: hsl(215 25% 45%); padding: 18px 14px 6px;
+    font-family: ui-monospace, monospace;
+}
+
+.sa-kpi-up { color: #35C48D; }
+.sa-kpi-down { color: #E2574C; }
+
+.sa-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 60;
+    width: min(560px, 96vw);
+    background: hsl(217 58% 10%);
+    border-left: 1px solid hsl(217 38% 22%);
+    box-shadow: -30px 0 80px -20px rgba(0,0,0,.6);
+    overflow-y: auto;
+    animation: sa-slide-in .22s ease-out;
+}
+@keyframes sa-slide-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.sa-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+.sa-shell ::-webkit-scrollbar-thumb { background: hsl(217 38% 24%); border-radius: 6px; }
+.sa-shell ::-webkit-scrollbar-track { background: transparent; }
