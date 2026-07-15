@@ -17,6 +17,9 @@ import resend
 from core import logger
 
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "no-reply@ithr.tech")
+PREFERRED_SENDER_EMAIL = os.environ.get("PREFERRED_SENDER_EMAIL", "")
+PREFERRED_SENDER_DOMAIN_ID = os.environ.get("PREFERRED_SENDER_DOMAIN_ID", "")
+_sender_cache = {"value": None, "checked_at": 0.0}
 FRONTEND_URL = (os.environ.get("FRONTEND_URL") or "").rstrip("/")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 
@@ -70,13 +73,33 @@ def _wrap(kicker: str, heading: str, body_html: str, cta_label: str, cta_url: st
 """
 
 
+async def _resolve_sender() -> str:
+    """Prefers PREFERRED_SENDER_EMAIL once its Resend domain verifies; re-checks hourly."""
+    import time
+    if not (PREFERRED_SENDER_EMAIL and PREFERRED_SENDER_DOMAIN_ID):
+        return SENDER_EMAIL
+    now = time.monotonic()
+    if _sender_cache["value"] and now - _sender_cache["checked_at"] < 3600:
+        return _sender_cache["value"]
+    sender = SENDER_EMAIL
+    try:
+        d = await asyncio.to_thread(resend.Domains.get, PREFERRED_SENDER_DOMAIN_ID)
+        if (d or {}).get("status") == "verified":
+            sender = PREFERRED_SENDER_EMAIL
+    except Exception:
+        logger.warning("Preferred-sender domain check failed — using fallback sender")
+    _sender_cache.update(value=sender, checked_at=now)
+    return sender
+
+
 async def _fire(to_email: str, subject: str, html: str, text_fallback: str, tag: str) -> bool:
     """Actually send. Always safe — logs on failure, returns False."""
     if not RESEND_API_KEY:
         logger.warning(f"[email/{tag}] RESEND_API_KEY not set — email skipped for {to_email}")
         return False
+    sender = await _resolve_sender()
     params = {
-        "from": f"ITHR Academy <{SENDER_EMAIL}>",
+        "from": f"ITHR Academy <{sender}>",
         "to": [to_email],
         "subject": subject,
         "html": html,

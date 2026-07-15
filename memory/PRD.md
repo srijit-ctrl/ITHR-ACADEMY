@@ -1059,3 +1059,8 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
   • GET /api/ai/tutor-profile?course_slug= returns persona for drawer header.
 - ReferralPanel: one-click Share on LinkedIn (share-offsite) + WhatsApp (wa.me prefilled with code + link) buttons.
 - Iter47: backend 8/8, frontend 4/4 flows. Non-blocking review notes in report (sentinel collision-resistance, SSE meta-as-separate-event idea) — deferred.
+
+## 2026-07-15 (later 3) — Auto-switching email sender + Google Ads tag (SELF-TESTED ✅)
+- Google tag AW-18307147092 (gtag.js) added to frontend/public/index.html <head> — verified served on port 3000.
+- Sender auto-switch: email_service._resolve_sender() checks Resend domain f599cfc2-149a-4165-91e4-42af93b00043 (ithr.online) hourly; sends from PREFERRED_SENDER_EMAIL=info@ithr.online once status=verified, else SENDER_EMAIL=no-reply@aiilm.me. New .env keys: PREFERRED_SENDER_EMAIL, PREFERRED_SENDER_DOMAIN_ID. No code change needed when user fixes DNS.
+- ithr.online DNS records STILL MISSING at user's DNS provider (verify re-triggered → failed again): needs TXT resend._domainkey (DKIM p=MIGf...), MX send→feedback-smtp.eu-west-1.amazonses.com (prio 10), TXT send→"v=spf1 include:amazonses.com ~all".
