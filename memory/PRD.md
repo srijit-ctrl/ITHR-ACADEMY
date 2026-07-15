@@ -1032,3 +1032,9 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - User complaint 'dummy data still showing' = PROD DB residue. Built one-click fix: Data Hygiene card on /admin Overview → GET /api/admin/data-hygiene (dry-run scan) + POST /api/admin/data-hygiene/purge (cascade purge, audit-logged, protected accounts safe). Works in prod without pod shell.
 - Tabs are real URL links (/admin?tab=users, back/forward, deep links). KPI dashboard is realtime: 30s auto-refresh (visibility-gated) + LIVE indicator + refresh-now; backend cache TTLs 10-60s.
 - purge() reuses core.db pool; purge() returns summary dict (CLI unchanged).
+
+## 2026-07-15 — Course content shipped as assets + title contrast fix (TESTED ✅ iter46, 100%)
+- BUG 1 (9 'empty' courses on prod): generated content lived only in preview DB. FIX: /app/backend/assets/generated_courses/ (17 full-course JSONs + content_overrides.json, 3.7MB, committed) + seed 'Asset hydration' step fills empty courses & positionally enriches builder courses at every boot. Prod self-heals on redeploy. Export tool: export_generated_content.py (re-run after future content generation!).
+- BUG 2 (invisible course titles): hero overlay used INVALID Tailwind class bg-background/94 → no overlay → navy text on dark image. Fixed to /95. Verified on 3 pages (navy on ivory).
+- 'AI-Ready Executive' & 'Agentic Engineer' are learning PATHS — constituent courses all rich.
+- IMPORTANT for future agents: whenever generate_course_content.py runs again, ALSO run export_generated_content.py so prod stays in sync.
