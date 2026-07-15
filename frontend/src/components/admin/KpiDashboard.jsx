@@ -101,9 +101,11 @@ export default function KpiDashboard({ onNavigate }) {
     useEffect(() => { load(); }, [load]);
     useEffect(() => { loadTs(); }, [loadTs]);
 
-    // Realtime: silently refresh the snapshot every 30s (backend caches are 10-60s).
+    // Realtime: silently refresh the snapshot every 30s (skips hidden tabs).
     useEffect(() => {
-        const id = setInterval(() => load(true), 30000);
+        const id = setInterval(() => {
+            if (document.visibilityState === "visible") load(true);
+        }, 30000);
         return () => clearInterval(id);
     }, [load]);
 

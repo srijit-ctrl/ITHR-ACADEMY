@@ -52,8 +52,6 @@ import asyncio
 import logging
 import os
 
-from motor.motor_asyncio import AsyncIOMotorClient
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("purge_test_data")
 
@@ -110,8 +108,7 @@ async def purge(
     dry_run: bool,
     drop_sample_cert: bool,
 ):
-    c = AsyncIOMotorClient(MONGO_URL)
-    db = c[DB_NAME]
+    from core import db  # reuse the app's Motor pool (works for CLI + endpoint)
 
     combined = _build_regex(patterns)
     protected = PROTECTED_EMAILS | keep_emails

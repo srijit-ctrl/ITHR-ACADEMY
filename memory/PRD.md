@@ -1027,3 +1027,8 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - Content: verified + topped up remaining 8 short lessons — ALL 28 courses now fully rich (every lesson ≥1200 chars, most 2-5K).
 - Admin dashboard: stub alerts removed (real signals only), 'Mock revenue' → 'Revenue (paid)' (API kpis.revenue_total from real paid payment_transactions), KPI cards clickable (users/sessions tabs, time-series metric switch), top-course bars open course pages, /admin?tab= deep links work, keyboard a11y on KPI cards, orphan enrollment cleaned.
 - All numbers on the dashboard are live DB aggregations — no dummy values remain. NOTE (not done, by scope): public catalog cards still show seeded marketing enrolled_count/rating values.
+
+## 2026-07-14 (later) — Realtime dashboard + tabs-as-links + one-click Data Hygiene (TESTED ✅ iter45, 100%)
+- User complaint 'dummy data still showing' = PROD DB residue. Built one-click fix: Data Hygiene card on /admin Overview → GET /api/admin/data-hygiene (dry-run scan) + POST /api/admin/data-hygiene/purge (cascade purge, audit-logged, protected accounts safe). Works in prod without pod shell.
+- Tabs are real URL links (/admin?tab=users, back/forward, deep links). KPI dashboard is realtime: 30s auto-refresh (visibility-gated) + LIVE indicator + refresh-now; backend cache TTLs 10-60s.
+- purge() reuses core.db pool; purge() returns summary dict (CLI unchanged).
