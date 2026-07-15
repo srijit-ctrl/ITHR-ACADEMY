@@ -1074,3 +1074,8 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - BUG FIXED during dev: useEffect(load) with promise-returning load → 'destroy is not a function' blank page. Lesson: always wrap.
 - MFA test user in test_credentials.md (mfa_1784095269@test.com, TOTP secret recorded).
 - Email template preview shown to user (shared _wrap layout rendered + screenshotted).
+
+## 2026-07-15 (later 5) — Emails now send from info@ithr.online ✅ (SELF-TESTED)
+- User re-registered ithr.online on Resend in ap-northeast-1 (new domain id 02ca961e-691b-4a7f-9b13-f75697018236) and added DNS: DKIM + SPF MX + SPF TXT all VERIFIED (status partially_verified — only inbound Receiving MX pending, not needed for sending).
+- Updated PREFERRED_SENDER_DOMAIN_ID in .env to new id; _resolve_sender now accepts verified|partially_verified. All platform emails now go out as ITHR Academy <info@ithr.online> (verified live send, resend id cfea2991…). aiilm.me remains fallback if domain status ever regresses.
+- Old failed eu-west-1 ithr.online registration (f599cfc2) still exists on the Resend account — harmless, user can delete it in the Resend dashboard.
