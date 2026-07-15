@@ -83,7 +83,7 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
             )}
 
             {(open || messages.length > 0) && (
-                <TutorConversation messages={messages} streaming={streaming} />
+                <TutorConversation messages={messages} streaming={streaming} onAction={handleSend} />
             )}
 
             <div className="mt-4 flex gap-2">

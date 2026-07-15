@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Copy, Gift, Users, Loader2, Check } from "lucide-react";
+import { Copy, Gift, Users, Loader2, Check, Linkedin, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const ReferralPanel = () => {
@@ -62,6 +62,24 @@ export const ReferralPanel = () => {
                     <button onClick={() => copy(data.share_url, "Share link")} data-testid="referral-copy-link" className="text-xs text-brand hover:underline font-mono break-all text-left">
                         {data.share_url}
                     </button>
+                    <div className="flex gap-2 mt-3">
+                        <a
+                            href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(data.share_url)}`}
+                            target="_blank" rel="noopener noreferrer"
+                            data-testid="referral-share-linkedin"
+                            className="flex-1 flex items-center justify-center gap-2 border border-border hover:border-[#0A66C2] hover:text-[#0A66C2] rounded-sm px-3 py-2 text-xs font-medium transition-colors"
+                        >
+                            <Linkedin className="w-3.5 h-3.5" /> Share on LinkedIn
+                        </a>
+                        <a
+                            href={`https://wa.me/?text=${encodeURIComponent(`Your first AI course at ITHR Academy is free with my referral code ${data.code} — enroll here: ${data.share_url}`)}`}
+                            target="_blank" rel="noopener noreferrer"
+                            data-testid="referral-share-whatsapp"
+                            className="flex-1 flex items-center justify-center gap-2 border border-border hover:border-[#25D366] hover:text-[#128C4A] rounded-sm px-3 py-2 text-xs font-medium transition-colors"
+                        >
+                            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                        </a>
+                    </div>
                     <p className="text-sm text-muted-foreground mt-4 leading-relaxed">
                         Share with up to {data.max_uses} people. They get their first course free — and each one who enrolls unlocks a free course of your choice for you.
                     </p>

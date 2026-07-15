@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from ai_service import generate_course_outline, stream_tutor_response
+from ai_service import generate_course_outline, get_tutor_persona, stream_tutor_response, TUTOR_META_MARKER
 from auth import get_current_user_id
 from core import db, logger, now_iso
 from models import ChatMessage, ChatRequest, ChatSession
@@ -19,18 +19,19 @@ async def ai_tutor(payload: ChatRequest, user_id: str = Depends(get_current_user
     session = await db.chat_sessions.find_one({"id": session_id, "user_id": user_id}, {"_id": 0})
     history = session["messages"] if session else []
 
-    course_context = None
+    course = None
     if payload.course_context:
-        c = await db.courses.find_one({"slug": payload.course_context}, {"_id": 0, "title": 1, "subtitle": 1})
-        if c:
-            course_context = f"{c['title']} — {c['subtitle']}"
+        course = await db.courses.find_one(
+            {"slug": payload.course_context},
+            {"_id": 0, "title": 1, "subtitle": 1, "category": 1, "difficulty": 1, "description": 1},
+        )
 
     async def event_generator():
         collected = []
         try:
             async for chunk in stream_tutor_response(
                 session_id=session_id, user_message=payload.message,
-                course_context=course_context, history=history,
+                course=course, history=history, mode=payload.mode,
             ):
                 collected.append(chunk)
                 yield f"data: {json.dumps({'delta': chunk})}\n\n"
@@ -40,8 +41,9 @@ async def ai_tutor(payload: ChatRequest, user_id: str = Depends(get_current_user
             return
 
         full_response = "".join(collected)
+        visible = full_response.split(TUTOR_META_MARKER, 1)[0].strip() if TUTOR_META_MARKER in full_response else full_response
         new_user_msg = ChatMessage(role="user", content=payload.message).model_dump()
-        new_ai_msg = ChatMessage(role="assistant", content=full_response).model_dump()
+        new_ai_msg = ChatMessage(role="assistant", content=visible).model_dump()
 
         if session:
             await db.chat_sessions.update_one(
@@ -62,6 +64,16 @@ async def ai_tutor(payload: ChatRequest, user_id: str = Depends(get_current_user
         event_generator(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
     )
+
+
+@router.get("/ai/tutor-profile")
+async def tutor_profile(course_slug: str = None, user_id: str = Depends(get_current_user_id)):
+    category = None
+    if course_slug:
+        c = await db.courses.find_one({"slug": course_slug}, {"_id": 0, "category": 1})
+        category = (c or {}).get("category")
+    name, style = get_tutor_persona(category)
+    return {"name": name, "style": style, "category": category}
 
 
 @router.get("/ai/sessions")

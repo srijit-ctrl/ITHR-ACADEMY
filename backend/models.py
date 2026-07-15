@@ -206,6 +206,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     course_context: Optional[str] = None  # course id for context
+    mode: Optional[str] = None  # "quiz" activates in-chat quiz mode
 
 
 class ChatSession(BaseModel):
