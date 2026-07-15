@@ -20,16 +20,20 @@ import FeatureFlagsPanel from "@/components/admin/FeatureFlagsPanel";
 import CommandCenter from "@/components/admin/CommandCenter";
 import AlertCenter from "@/components/admin/AlertCenter";
 import { Org360Drawer, User360Drawer } from "@/components/admin/Admin360Panels";
+import { LearningFunnelPanel, AssessmentAnalyticsPanel, CredentialManagerPanel, AiOpsPanel } from "@/components/admin/Phase2Panels";
 import "@/styles/superadmin.css";
 
-const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz", "security", "flags"];
+const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "audit", "videoquiz", "security", "flags"];
 
 const NAV = [
     { group: "Overview", items: [
         ["command", "Command Centre"], ["alertcenter", "Alerts"], ["analytics", "Analytics"], ["traffic", "Traffic"],
     ]},
     { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"]] },
-    { group: "Learning & AI", items: [["videoquiz", "Video quizzes"], ["sessions", "AI sessions"]] },
+    { group: "Learning & AI", items: [
+        ["funnel", "Learning funnel"], ["assessments", "Assessments"], ["credentials", "Credentials"],
+        ["aiops", "AI operations"], ["videoquiz", "Video quizzes"], ["sessions", "AI sessions"],
+    ]},
     { group: "Operations", items: [["emails", "Send email"], ["audit", "Audit log"]] },
     { group: "Governance", items: [["security", "Security"], ["flags", "Feature flags"]] },
 ];
@@ -160,6 +164,10 @@ export default function SuperAdminPortal() {
                     <CommandCenter onNavigate={setTab} onOpenUser={setOpenUserId} onOpenOrg={setOpenOrgId} />
                 )}
                 {tab === "alertcenter" && <AlertCenter onNavigate={setTab} />}
+                {tab === "funnel" && <LearningFunnelPanel />}
+                {tab === "assessments" && <AssessmentAnalyticsPanel />}
+                {tab === "credentials" && <CredentialManagerPanel />}
+                {tab === "aiops" && <AiOpsPanel />}
 
                 {tab === "analytics" && (
                     <div className="space-y-6">

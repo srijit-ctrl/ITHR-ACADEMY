@@ -313,6 +313,11 @@ async def verify_certificate(certificate_id: str, request: Request):
     )
     if not cert:
         raise HTTPException(status_code=404, detail="Certificate not found")
+    if cert.get("revoked"):
+        return {"valid": False, "revoked": True,
+                "message": "This credential has been revoked by the issuing authority.",
+                "certificate_id": certificate_id}
+
 
     # ---- Impression tracking + holder alert -----------------------------
     # A single verifier IP on a given day counts as one impression, no matter
