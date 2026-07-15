@@ -174,11 +174,20 @@ async def purge(
 
     if dry_run:
         log.info("=== DRY RUN — no writes. Re-run with --confirm to actually delete. ===")
-        return
+        return {
+            "dry_run": True,
+            "total_users": total_users,
+            "victims": len(victim_user_ids),
+            "victim_preview": victim_emails[:5],
+            "cascade": counts,
+            "orphaned_orgs": len(orphaned_orgs),
+        }
 
     # Actually delete
+    deleted_users = 0
     if victim_user_ids:
         r_users = await db.users.delete_many({"id": {"$in": victim_user_ids}})
+        deleted_users = r_users.deleted_count
         r_enroll = await db.enrollments.delete_many({"user_id": {"$in": victim_user_ids}})
         r_certs = await db.certificates.delete_many({"user_id": {"$in": victim_user_ids}, "certificate_id": {"$nin": list(protected_cert_set)}})
         r_members = await db.org_members.delete_many({"user_id": {"$in": victim_user_ids}})
@@ -233,6 +242,18 @@ async def purge(
     # Post-run sanity: real learner accounts remaining
     remaining = await db.users.count_documents({})
     log.info(f"Post-purge user count: {remaining}")
+    return {
+        "dry_run": False,
+        "victims": len(victim_user_ids),
+        "deleted_users": deleted_users,
+        "cascade": counts,
+        "orphaned_orgs": len(orphaned_orgs),
+        "orphan_sweep": {
+            "activity_events": r_act_orphan.deleted_count,
+            "admin_audit_log": r_audit_orphan.deleted_count,
+        },
+        "remaining_users": remaining,
+    }
 
 
 def main():

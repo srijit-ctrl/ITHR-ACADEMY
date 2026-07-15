@@ -71,16 +71,18 @@ export default function KpiDashboard({ onNavigate }) {
     const [tsDays, setTsDays] = useState(30);
     const [tsData, setTsData] = useState(null);
     const [tsLoading, setTsLoading] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(null);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const load = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const res = await api.get("/admin/dashboard");
             setData(res.data);
+            setLastUpdated(new Date());
         } catch (e) {
             console.debug("[KpiDashboard] load failed:", e?.message);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, []);
 
@@ -98,6 +100,12 @@ export default function KpiDashboard({ onNavigate }) {
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => { loadTs(); }, [loadTs]);
+
+    // Realtime: silently refresh the snapshot every 30s (backend caches are 10-60s).
+    useEffect(() => {
+        const id = setInterval(() => load(true), 30000);
+        return () => clearInterval(id);
+    }, [load]);
 
     const langData = useMemo(
         () => (data?.language_distribution || []).map((l) => ({ name: l.language, value: l.count })),
@@ -120,6 +128,20 @@ export default function KpiDashboard({ onNavigate }) {
 
     return (
         <div className="space-y-6" data-testid="kpi-dashboard">
+            <div className="flex items-center justify-between" data-testid="live-indicator">
+                <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground">
+                    <span className="inline-block w-2 h-2 rounded-full bg-success animate-pulse" />
+                    Live · auto-refreshes every 30s
+                    {lastUpdated && <span>· updated {lastUpdated.toLocaleTimeString()}</span>}
+                </div>
+                <button
+                    onClick={() => { load(true); loadTs(); }}
+                    data-testid="dashboard-refresh"
+                    className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand hover:underline"
+                >
+                    refresh now
+                </button>
+            </div>
             {/* KPI Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4" data-testid="kpi-row">
                 <Kpi icon={Users} label="Total users" value={k.total_users.toLocaleString()} testId="kpi-total-users" onClick={() => onNavigate?.("users")} linkLabel="users" />

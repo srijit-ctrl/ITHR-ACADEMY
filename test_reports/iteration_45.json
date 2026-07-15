@@ -1,0 +1,26 @@
+{
+  "summary": "Iter 45 — Data Hygiene panel + realtime KPI dashboard + tabs-as-URL-links verified end-to-end. Backend pytest 8/8 pass. Frontend: super admin login works, /admin?tab=<name> deep-links + back/forward + KPI-click-navigation all correct, live indicator shows 'Live · auto-refreshes every 30s · updated HH:MM:SS' and clicking 'refresh now' updates the timestamp, hygiene-clean rendered on a clean DB, after registering 3 @example.com throwaways the hygiene-panel correctly showed '3 test accounts detected · 3 linked records', clicking Purge -> Yes, delete permanently deleted all 3, reloaded the page, and the panel returned to hygiene-clean. audit tab contains a data.purge_test row. Learner tokens correctly get 403 on both /api/admin/data-hygiene endpoints. Protected accounts (superadmin@ithr.online, srijit*, sri0564823232) all survived. Cleanup: preview DB is clean at end of run.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration45_data_hygiene.py",
+    "/app/test_reports/pytest/iter45_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "purge_test_data.purge() opens a NEW AsyncIOMotorClient on every call (line 113) instead of reusing core.db. Under high-frequency hygiene-scan polling (or a distracted operator hammering the dashboard) this leaks Motor pools. Recommend switching to `from core import db` and dropping the client-open/close.",
+    "DataHygienePanel.jsx does a full window.location.reload() after purge (line 30). Works, but blows away any auth banner, unsaved state, or scroll position. Prefer refetching /admin/dashboard + /admin/data-hygiene in place (already have `load()` — could also call the KPI dashboard's load).",
+    "admin_control_router.data_hygiene_report calls purge(dry_run=True) which counts + returns victim previews but is unauthenticated inside the purge helper — auth is enforced only via the FastAPI dep. If someone imports purge_test_data.purge from another router in the future, they must remember to gate it. Consider adding a defensive assertion / role check inside purge() too.",
+    "SuperAdminPortal.jsx VALID_TABS excludes any legacy tab name — if someone shares an older bookmarked link (/admin?tab=analytics2), the falls-through-to-analytics default is silent; consider a toast 'Unknown tab, showing Overview' for observability. Non-blocking.",
+    "KpiDashboard.jsx setInterval 30s does not pause when the tab is backgrounded (document.visibilityState==='hidden') — for a heavily-used console this wastes API calls. Consider gating on `document.visibilityState === 'visible'`.",
+    "purge() writes to db.pw_reset_rate.delete_many({}) unconditionally on every purge (line 208). This wipes rate-limit buckets for ALL users, not just victims. Low blast radius (worst case is that one attacker regains a request or two), but worth scoping to victim emails."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration45_data_hygiene.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (all 7 review flows)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 — verified working",
+  "seed_data_creation": "Registered 3 @example.com throwaway users via /api/auth/register for the purge E2E — all 3 were then purged in the same run. DB is clean at end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "IMPORTANT: If you register users via `page.request.post()` on the SAME playwright browser context that is logged in as super_admin, the register endpoint's Set-Cookie (ithr_refresh) will OVERWRITE the super_admin's refresh cookie in that context and the next /admin navigation will redirect you to /dashboard as the newly-registered learner. Fix: register throwaway users via a NEW `page.context.browser.new_context()` request or via a plain `requests` session in pytest. Verified purge flow: hygiene-clean panel on clean DB → after 3 @example.com registrations, hygiene-panel with correct '3 test accounts detected' + purge/confirm buttons → after UI purge, hygiene-clean returns and Total Users KPI drops back. Backend cache TTL was set to 10s so KPI increments were visible after ~12s wait. Full test suite at /app/backend/tests/test_iteration45_data_hygiene.py.",
+  "rca of the issue": "N/A — feature verification pass, no bugs found. All 8 backend tests + 7 frontend flows from the review request passed. Only false-alarm during exploratory UI testing was the page.request.post cookie-pollution artifact described above, which was self-inflicted by the test script, not an app bug."
+}

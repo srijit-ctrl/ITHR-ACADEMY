@@ -323,6 +323,28 @@ async def get_alerts(_admin_id: str = Depends(get_current_super_admin)):
     return {"alerts": alerts, "count": len(alerts)}
 
 
+# --------- DATA HYGIENE (test/dummy data detection + one-click purge) ---------
+@router.get("/data-hygiene")
+async def data_hygiene_report(_admin_id: str = Depends(get_current_super_admin)):
+    """Dry-run scan: how much test/dummy data is in THIS environment's DB."""
+    from purge_test_data import DEFAULT_PATTERNS, purge
+    return await purge(patterns=list(DEFAULT_PATTERNS), keep_emails=set(), dry_run=True, drop_sample_cert=False)
+
+
+@router.post("/data-hygiene/purge")
+async def data_hygiene_purge(request: Request, admin_id: str = Depends(get_current_super_admin)):
+    """Execute the test-data purge (users matching test patterns + full cascade).
+    Protected accounts are never touched. Audit-logged."""
+    from purge_test_data import DEFAULT_PATTERNS, purge
+    summary = await purge(patterns=list(DEFAULT_PATTERNS), keep_emails=set(), dry_run=False, drop_sample_cert=False)
+    await log_admin_action(
+        admin_id, "data.purge_test", "system", "data-hygiene", "one-click test-data purge",
+        {"deleted_users": summary.get("deleted_users", 0), "remaining_users": summary.get("remaining_users")},
+        request,
+    )
+    return summary
+
+
 # --------- GLOBAL SEARCH ---------
 @router.get("/search")
 async def global_search(q: str, _admin_id: str = Depends(get_current_super_admin)):

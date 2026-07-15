@@ -50,7 +50,7 @@ async def _day_series(collection, date_field: str, start_iso: str, labels: list[
     return [{"date": d, "count": counts.get(d, 0)} for d in labels]
 
 
-@cached(ttl_seconds=45, key_prefix="admin_dashboard_kpis")
+@cached(ttl_seconds=10, key_prefix="admin_dashboard_kpis")
 async def _compute_kpis() -> dict:
     now = datetime.now(timezone.utc)
     d7 = (now - timedelta(days=7)).isoformat()
@@ -86,7 +86,7 @@ async def _compute_kpis() -> dict:
     }
 
 
-@cached(ttl_seconds=120, key_prefix="admin_dashboard_top_courses")
+@cached(ttl_seconds=30, key_prefix="admin_dashboard_top_courses")
 async def _top_courses(limit: int = 8) -> list[dict]:
     pipeline = [
         {"$group": {"_id": "$course_id", "enrollments": {"$sum": 1}}},
@@ -105,7 +105,7 @@ async def _top_courses(limit: int = 8) -> list[dict]:
     ]
 
 
-@cached(ttl_seconds=180, key_prefix="admin_dashboard_band")
+@cached(ttl_seconds=60, key_prefix="admin_dashboard_band")
 async def _band_distribution() -> list[dict]:
     """Distribution of enrollments by course difficulty (band)."""
     pipeline = [
@@ -118,7 +118,7 @@ async def _band_distribution() -> list[dict]:
     return [{"band": r["_id"], "count": r["count"]} for r in rows]
 
 
-@cached(ttl_seconds=180, key_prefix="admin_dashboard_language")
+@cached(ttl_seconds=60, key_prefix="admin_dashboard_language")
 async def _language_distribution() -> list[dict]:
     """Distribution of logins by primary Accept-Language tag over the last 30 days."""
     d30 = _iso_days_ago(30)
@@ -135,7 +135,7 @@ async def _language_distribution() -> list[dict]:
     return [{"code": r["_id"], "language": label_by_code.get(r["_id"], (r["_id"] or "").upper()), "count": r["count"]} for r in rows]
 
 
-@cached(ttl_seconds=180, key_prefix="admin_dashboard_geo")
+@cached(ttl_seconds=30, key_prefix="admin_dashboard_geo")
 async def _geo_summary(days: int = 30) -> dict:
     dfrom = _iso_days_ago(days)
     logins_30d = await db.user_login_logs.count_documents({"created_at": {"$gte": dfrom}})
@@ -167,7 +167,7 @@ async def _geo_summary(days: int = 30) -> dict:
     }
 
 
-@cached(ttl_seconds=120, key_prefix="admin_dashboard_signups_enrollments")
+@cached(ttl_seconds=30, key_prefix="admin_dashboard_signups_enrollments")
 async def _signups_enrollments_series(days: int = 30) -> list[dict]:
     labels = _date_labels(days)
     start_iso = _iso_days_ago(days)

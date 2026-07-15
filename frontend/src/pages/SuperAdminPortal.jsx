@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, BarChart3, Mail, Send, ScrollText } from "lucide-react";
@@ -14,6 +14,9 @@ import AlertsPanel from "@/components/admin/AlertsPanel";
 import SessionsPanel from "@/components/admin/SessionsPanel";
 import GlobalSearchBar from "@/components/admin/GlobalSearchBar";
 import VideoQuizPanel from "@/components/admin/VideoQuizPanel";
+import DataHygienePanel from "@/components/admin/DataHygienePanel";
+
+const VALID_TABS = ["analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz"];
 
 /**
  * Super-Admin console.
@@ -31,10 +34,11 @@ export default function SuperAdminPortal() {
     const [busy, setBusy] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [tempCreds, setTempCreds] = useState(null); // {email, temp_password, org_name}
-    const [tab, setTab] = useState(() => {
-        const t = new URLSearchParams(window.location.search).get("tab");
-        return ["analytics", "traffic", "orgs", "users", "sessions", "emails", "audit", "videoquiz"].includes(t) ? t : "analytics";
-    });
+    // Tabs are real URL links: /admin?tab=<name> — deep-linkable, back/forward aware.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const urlTab = searchParams.get("tab");
+    const tab = VALID_TABS.includes(urlTab) ? urlTab : "analytics";
+    const setTab = (t) => setSearchParams({ tab: t });
 
     const loadAll = useCallback(async () => {
         setBusy(true);
@@ -133,6 +137,7 @@ export default function SuperAdminPortal() {
 
                 {tab === "analytics" && (
                     <div className="space-y-6">
+                        <DataHygienePanel />
                         <AlertsPanel />
                         <KpiDashboard onNavigate={setTab} />
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
