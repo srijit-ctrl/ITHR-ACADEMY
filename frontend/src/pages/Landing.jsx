@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { ArrowRight, Sparkles, Radio, Zap } from "lucide-react";
 import CourseCard from "@/components/CourseCard";
 import TryALesson from "@/components/TryALesson";
+import InauguralFlasher from "@/components/InauguralFlasher";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1526314114033-349ef6f72220?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmFsJTIwbGlicmFyeXxlbnwwfHx8fDE3ODMxNTI1NTV8MA&ixlib=rb-4.1.0&q=85";
 const ENTERPRISE_IMG = "https://images.pexels.com/photos/7698712/pexels-photo-7698712.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -28,6 +29,7 @@ export default function Landing() {
 
     return (
         <div className="min-h-screen">
+            <InauguralFlasher />
             {/* HERO — aiilm-inspired centered with soft blobs */}
             <section className="relative overflow-hidden bg-white pattern-dots">
                 {/* Floating soft blobs (aiilm signature) */}
