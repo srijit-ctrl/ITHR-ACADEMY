@@ -406,7 +406,7 @@ New forgot-password / reset-password flow with real transactional email delivery
 - `RESEND_API_KEY=<user-provided>` — from user's Resend account.
 - `SENDER_EMAIL=onboarding@resend.dev` — Resend sandbox sender. Flip to `no-reply@ithr.tech` (or any verified domain address) once the domain is verified at https://resend.com/domains — zero code change.
 - `PASSWORD_RESET_TOKEN_TTL_MINUTES=60` — default 1-hour expiry (adjustable).
-- `FRONTEND_URL=https://voice-tutor-labs.preview.emergentagent.com` — used for the reset link URL in the email body.
+- `FRONTEND_URL=https://ithr-agentic-hub.preview.emergentagent.com` — used for the reset link URL in the email body.
 
 **Resend sandbox limitation (not a bug):** until a sender domain is verified in the user's Resend dashboard, Resend only accepts sends addressed to the account owner (currently `srijit@ithr360.com`). Sends to other recipients raise a `ResendError` server-side but the 200 API response to the client is unchanged (deliberate — no enumeration leak). All error paths are logged via `logger.exception`.
 

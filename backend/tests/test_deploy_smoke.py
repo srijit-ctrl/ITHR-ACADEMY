@@ -10,7 +10,7 @@ Covers:
 import os
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://voice-tutor-labs.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://ithr-agentic-hub.preview.emergentagent.com").rstrip("/")
 SUPER_EMAIL = "superadmin@ithr.online"
 SUPER_PWD = "Dubai_deram2026"
 
