@@ -13,7 +13,7 @@ import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 SUPER_ADMIN_EMAIL = "superadmin@ithr.online"
-SUPER_ADMIN_PASSWORD = "Dubai_deram2026"
+SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "")
 
 
 @pytest.fixture(scope="module")

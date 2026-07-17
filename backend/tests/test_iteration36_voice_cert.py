@@ -28,7 +28,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL").rstrip("/")
 SAMPLE_CERT_ID = "SAMPLE-ITHR-2026-001"
 
 SUPER_ADMIN_EMAIL = "superadmin@ithr.online"
-SUPER_ADMIN_PASSWORD = "Dubai_deram2026"
+SUPER_ADMIN_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "")
 
 
 # ---------------- Fixtures ----------------

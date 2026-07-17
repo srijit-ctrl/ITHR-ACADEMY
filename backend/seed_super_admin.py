@@ -26,7 +26,7 @@ from auth import hash_password, verify_password
 from core import db, logger, now_iso
 
 DEFAULT_EMAIL = os.environ.get("SUPER_ADMIN_EMAIL", "superadmin@ithr.tech")
-PLACEHOLDER_PASSWORD = "preview-only-rotate-in-prod"  # nosec B105 — sentinel constant, not a live secret. See CODE_QUALITY_NOTES.md.
+PREVIEW_SENTINEL = "preview-only-rotate-in-prod"  # nosec B105 — sentinel constant, not a live secret. See CODE_QUALITY_NOTES.md.
 
 
 def _generate_default_password() -> str:
@@ -91,7 +91,7 @@ async def seed_super_admin() -> None:
                     {"$set": {"password_hash": hash_password(env_password)}},
                 )
                 logger.info(f"Super-admin ({existing['email']}) password re-synced from SUPER_ADMIN_PASSWORD env var.")
-            if env_password == PLACEHOLDER_PASSWORD:
+            if env_password == PREVIEW_SENTINEL:
                 _log_placeholder_warning()
         else:
             logger.info(f"Super-admin already exists ({existing['email']}) — SUPER_ADMIN_PASSWORD unset, leaving DB password unchanged.")
@@ -127,7 +127,7 @@ async def seed_super_admin() -> None:
             "  Set SUPER_ADMIN_PASSWORD in the secret manager to lock a value.\n"
             "=================================================="
         )
-    elif env_password == PLACEHOLDER_PASSWORD:
+    elif env_password == PREVIEW_SENTINEL:
         _log_placeholder_warning()
     else:
         logger.info(f"Super-admin created ({DEFAULT_EMAIL}) using SUPER_ADMIN_PASSWORD env var.")

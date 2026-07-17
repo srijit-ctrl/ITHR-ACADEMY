@@ -6,7 +6,7 @@ import requests
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://ithr-agentic-hub.preview.emergentagent.com").rstrip("/")
 
 SUPER_EMAIL = "superadmin@ithr.online"
-SUPER_PASSWORD = "Dubai_deram2026"
+SUPER_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "")
 LEARNER_EMAIL = "refe_1784091849@test.com"
 LEARNER_PASSWORD = "Passw0rd!"
 

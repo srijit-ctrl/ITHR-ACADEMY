@@ -10,7 +10,7 @@ BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or "https://i
 API = f"{BASE_URL}/api"
 
 SUPER_EMAIL = "superadmin@ithr.online"
-SUPER_PASSWORD = "Dubai_deram2026"
+SUPER_PASSWORD = os.environ.get("SUPER_ADMIN_PASSWORD", "")
 
 SAMPLE_CERT_ID = "SAMPLE-ITHR-2026-001"
 

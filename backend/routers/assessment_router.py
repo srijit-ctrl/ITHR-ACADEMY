@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import random
+import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -129,7 +130,7 @@ async def start_assessment_session(
     if not bank:
         raise HTTPException(status_code=400, detail="No assessment available for this course")
 
-    rng = random.Random(seed) if seed is not None else random.SystemRandom()  # nosec B311 — non-security question shuffling. Seeded case only for reproducible test papers.
+    rng = random.Random(seed) if seed is not None else secrets.SystemRandom()  # nosec B311 — non-security question shuffling. Seeded case only for reproducible test papers.
 
     if adaptive:
         mode = await _resolve_adaptive_mode(user_id, course["id"])

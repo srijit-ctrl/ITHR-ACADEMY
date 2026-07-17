@@ -74,9 +74,14 @@ class AnswerPayload(BaseModel):
 
 async def _reset_lesson_progress(user_id: str, course_id: str, lesson_id: str) -> None:
     """Full lesson-progress reset after 3 failed checkpoint attempts."""
-    course = await db.courses.find_one({"id": course_id}, {"_id": 0, "modules": 1})
-    enrollment = await db.enrollments.find_one({"user_id": user_id, "course_id": course_id})
-    if not course or not enrollment:
+    course = await db.courses.find_one({"id": course_id}, {"_id": 0, "id": 1, "modules": 1})
+    if not course:
+        # checkpoint may carry a stale course_id from a re-seed — resolve by lesson membership
+        course = await db.courses.find_one({"modules.lessons.id": lesson_id}, {"_id": 0, "id": 1, "modules": 1})
+    if not course:
+        return
+    enrollment = await db.enrollments.find_one({"user_id": user_id, "course_id": course["id"]})
+    if not enrollment:
         return
     completed = set(enrollment.get("completed_lessons", []))
     completed.discard(lesson_id)
@@ -88,7 +93,7 @@ async def _reset_lesson_progress(user_id: str, course_id: str, lesson_id: str) -
         if lesson_id in lesson_ids:
             completed_modules.discard(m["id"])
     await db.enrollments.update_one(
-        {"user_id": user_id, "course_id": course_id},
+        {"user_id": user_id, "course_id": course["id"]},
         {"$set": {
             "completed_lessons": list(completed),
             "completed_modules": list(completed_modules),

@@ -9,7 +9,7 @@ Scenarios:
    a throwaway learner with 'superadmin@ithr.online', restart backend, verify:
      - super_admin email REMAINS 'superadmin@ithr.tech' (rename skipped)
      - "Cannot rename super-admin" is logged
-     - login with superadmin@ithr.tech + Dubai_deram2026 still works (password re-sync intact)
+     - login with superadmin@ithr.tech + $SUPER_ADMIN_PASSWORD still works (password re-sync intact)
 4) Cleanup: delete throwaway learner, restart backend, verify super_admin email is
    back to 'superadmin@ithr.online' and canonical login works.
 
@@ -51,7 +51,7 @@ DB_NAME = _backend_env.get("DB_NAME") or os.environ.get("DB_NAME")
 
 CANONICAL_EMAIL = "superadmin@ithr.online"
 LEGACY_EMAIL = "superadmin@ithr.tech"
-SUPER_PWD = "Dubai_deram2026"
+SUPER_PWD = os.environ.get("SUPER_ADMIN_PASSWORD", "")
 
 BACKEND_LOG = "/var/log/supervisor/backend.err.log"
 BACKEND_OUT = "/var/log/supervisor/backend.out.log"

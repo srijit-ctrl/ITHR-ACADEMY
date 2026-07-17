@@ -73,6 +73,17 @@ def _wrap(kicker: str, heading: str, body_html: str, cta_label: str, cta_url: st
 """
 
 
+async def _preferred_domain_verified() -> bool:
+    try:
+        d = await asyncio.to_thread(resend.Domains.get, PREFERRED_SENDER_DOMAIN_ID)
+        records = (d or {}).get("records") or []
+        sending_records = [r for r in records if r.get("record") in ("DKIM", "SPF")]
+        return bool(sending_records) and all(r.get("status") == "verified" for r in sending_records)
+    except Exception:
+        logger.warning("Preferred-sender domain check failed — using fallback sender")
+        return False
+
+
 async def _resolve_sender() -> str:
     """Prefers PREFERRED_SENDER_EMAIL once its Resend domain verifies; re-checks hourly."""
     import time
@@ -81,15 +92,7 @@ async def _resolve_sender() -> str:
     now = time.monotonic()
     if _sender_cache["value"] and now - _sender_cache["checked_at"] < 3600:
         return _sender_cache["value"]
-    sender = SENDER_EMAIL
-    try:
-        d = await asyncio.to_thread(resend.Domains.get, PREFERRED_SENDER_DOMAIN_ID)
-        records = (d or {}).get("records") or []
-        sending_records = [r for r in records if r.get("record") in ("DKIM", "SPF")]
-        if sending_records and all(r.get("status") == "verified" for r in sending_records):
-            sender = PREFERRED_SENDER_EMAIL
-    except Exception:
-        logger.warning("Preferred-sender domain check failed — using fallback sender")
+    sender = PREFERRED_SENDER_EMAIL if await _preferred_domain_verified() else SENDER_EMAIL
     _sender_cache.update(value=sender, checked_at=now)
     return sender
 
@@ -153,9 +156,21 @@ _TEXT_SIGNOFF = "\n\nITHR Academy — Enterprise Agentic AI Academy — Made in 
 async def send_welcome_email(email: str, full_name: str) -> bool:
     dash_url = f"{FRONTEND_URL}/dashboard"
     catalog_url = f"{FRONTEND_URL}/courses"
-    name = _safe(full_name or "there")
-    first = name.split(" ")[0]
-    body = f"""\
+    first = _first(full_name)
+    html = _wrap(
+        kicker="ITHR Academy · Enterprise Agentic AI Academy",
+        heading=f"Welcome to the Academy, {first}.",
+        body_html=_welcome_body(first, catalog_url),
+        cta_label="Access My Learning Portal",
+        cta_url=dash_url,
+        footer_note="You are receiving this email because an account was created for you at ITHR Academy.",
+    )
+    text = _welcome_text(first, dash_url, catalog_url)
+    return await _fire(email, "Welcome to ITHR Academy — Your Learning Journey Begins", html, text, tag="welcome")
+
+
+def _welcome_body(first: str, catalog_url: str) -> str:
+    return f"""\
 <p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
   Welcome to <b style="color:#16335E;">ITHR Academy</b>. Your learning journey begins today.
@@ -192,15 +207,10 @@ async def send_welcome_email(email: str, full_name: str) -> bool:
   <span style="color:#6b7280;">Made in the UAE</span>
 </p>
 """
-    html = _wrap(
-        kicker="ITHR Academy · Enterprise Agentic AI Academy",
-        heading=f"Welcome to the Academy, {first}.",
-        body_html=body,
-        cta_label="Access My Learning Portal",
-        cta_url=dash_url,
-        footer_note="You are receiving this email because an account was created for you at ITHR Academy.",
-    )
-    text = (
+
+
+def _welcome_text(first: str, dash_url: str, catalog_url: str) -> str:
+    return (
         f"Hello {first},\n\n"
         "Welcome to ITHR Academy. Your learning journey begins today.\n\n"
         "You now have exclusive access to the ITHR Academy — a next-generation learning platform "
@@ -216,7 +226,6 @@ async def send_welcome_email(email: str, full_name: str) -> bool:
         "Welcome aboard.\n\n"
         "ITHR Academy — Enterprise Agentic AI Academy — Made in the UAE"
     )
-    return await _fire(email, "Welcome to ITHR Academy — Your Learning Journey Begins", html, text, tag="welcome")
 
 
 async def send_founding_welcome_email(email: str, full_name: str, seq: int) -> bool:
@@ -513,12 +522,32 @@ async def send_credential_verification_alert(
     is being checked (e.g., during a hiring interview). Positioning:
     "signal of interest" — this is a feature, not a security alert.
     """
-    name = _safe(full_name or "there")
     first = _first(full_name)
     course = _safe(course_title)
     verify_url = f"{FRONTEND_URL}/verify/{certificate_id}"
     passport_url = f"{FRONTEND_URL}/passport"
-    body = f"""\
+    html = _wrap(
+        kicker="Credential Verified · ITHR Academy",
+        heading="Your credential was just verified.",
+        body_html=_verify_alert_body(first, course, certificate_id, verified_at, verifier_ip_hash, passport_url),
+        cta_label="View My Skills Passport",
+        cta_url=passport_url,
+        footer_note=(
+            "This is a positive signal — verifiers only reach this page when they wish to confirm your qualifications. "
+            f"You can view the public record at {verify_url}."
+        ),
+    )
+    text = (
+        f"Hello {first},\n\n"
+        f"Your {course} credential ({certificate_id}) was verified at {verified_at} UTC.\n\n"
+        f"Public record: {verify_url}\nAI Skills Passport: {passport_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(email, f'Your "{course_title}" credential was just verified', html, text, tag="verify-alert")
+
+
+def _verify_alert_body(first: str, course: str, certificate_id: str, verified_at: str, verifier_ip_hash: str, passport_url: str) -> str:
+    return f"""\
 <p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
   Your <b style="color:#16335E;">{course}</b> credential was just verified on the public verification page.
@@ -540,24 +569,6 @@ async def send_credential_verification_alert(
 </p>
 {_signoff()}
 """
-    html = _wrap(
-        kicker="Credential Verified · ITHR Academy",
-        heading="Your credential was just verified.",
-        body_html=body,
-        cta_label="View My Skills Passport",
-        cta_url=passport_url,
-        footer_note=(
-            "This is a positive signal — verifiers only reach this page when they wish to confirm your qualifications. "
-            f"You can view the public record at {verify_url}."
-        ),
-    )
-    text = (
-        f"Hello {first},\n\n"
-        f"Your {course} credential ({certificate_id}) was verified at {verified_at} UTC.\n\n"
-        f"Public record: {verify_url}\nAI Skills Passport: {passport_url}"
-        + _TEXT_SIGNOFF
-    )
-    return await _fire(email, f'Your "{course_title}" credential was just verified', html, text, tag="verify-alert")
 
 
 # ---- Weekly credential-impressions digest --------------------------------
@@ -573,18 +584,37 @@ async def send_impressions_digest_email(
     """
     if week_impressions < 1:
         return False
-    name = _safe(full_name or "there")
     passport_url = f"{FRONTEND_URL}/passport"
     dash_url = f"{FRONTEND_URL}/dashboard"
+    html = _wrap(
+        kicker="Weekly Credential Report · ITHR Academy",
+        heading=f"{week_impressions} verification{'s' if week_impressions != 1 else ''} this week.",
+        body_html=_digest_body(_first(full_name), week_impressions, _digest_rows_html(top_credentials), passport_url),
+        cta_label="View My Skills Passport",
+        cta_url=passport_url,
+        footer_note=f"To pause these weekly summaries, adjust your notification settings at {dash_url}/settings.",
+    )
+    text = (
+        f"Hello {_first(full_name)},\n\n"
+        f"Your credentials were verified {week_impressions} time(s) this past week.\n\n"
+        + "\n".join(f'  {c.get("course_title","?")} — {c.get("impressions",0)}×' for c in (top_credentials[:5] or []))
+        + f"\n\nAI Skills Passport: {passport_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(email, f"You had {week_impressions} credential verification(s) this week", html, text, tag="digest-impressions")
 
-    rows_html = "".join(
+
+def _digest_rows_html(top_credentials: list[dict]) -> str:
+    return "".join(
         f'<tr><td style="padding:8px 0;border-bottom:1px solid #E5E7EB;font-size:14px;color:#16335E;">{_safe(c.get("course_title",""))}</td>'
         f'<td style="padding:8px 0;border-bottom:1px solid #E5E7EB;font-size:14px;text-align:right;font-family:monospace;color:#00A78B;">{int(c.get("impressions", 0))}×</td></tr>'
         for c in (top_credentials[:5] or [])
     ) or '<tr><td colspan="2" style="padding:12px 0;font-size:13px;color:#6b7280;">—</td></tr>'
 
-    body = f"""\
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {_first(full_name)},</p>
+
+def _digest_body(first: str, week_impressions: int, rows_html: str, passport_url: str) -> str:
+    return f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
 <p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
   Your credentials were verified <b style="color:#00A78B;">{week_impressions} time{'s' if week_impressions != 1 else ''}</b>
   this week. Verifications typically come from recruiters, hiring managers, and business partners confirming
@@ -604,22 +634,6 @@ async def send_impressions_digest_email(
 </p>
 {_signoff()}
 """
-    html = _wrap(
-        kicker="Weekly Credential Report · ITHR Academy",
-        heading=f"{week_impressions} verification{'s' if week_impressions != 1 else ''} this week.",
-        body_html=body,
-        cta_label="View My Skills Passport",
-        cta_url=passport_url,
-        footer_note=f"To pause these weekly summaries, adjust your notification settings at {dash_url}/settings.",
-    )
-    text = (
-        f"Hello {_first(full_name)},\n\n"
-        f"Your credentials were verified {week_impressions} time(s) this past week.\n\n"
-        + "\n".join(f'  {c.get("course_title","?")} — {c.get("impressions",0)}×' for c in (top_credentials[:5] or []))
-        + f"\n\nAI Skills Passport: {passport_url}"
-        + _TEXT_SIGNOFF
-    )
-    return await _fire(email, f"You had {week_impressions} credential verification(s) this week", html, text, tag="digest-impressions")
 
 
 # ---- Referral system emails ------------------------------------------------
