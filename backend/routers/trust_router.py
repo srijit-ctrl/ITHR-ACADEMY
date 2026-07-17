@@ -17,6 +17,23 @@ from weasyprint import HTML
 
 router = APIRouter(prefix="/api/trust", tags=["trust"])
 
+_seats_cache = {"at": 0.0, "data": None}
+
+
+@router.get("/founding-seats")
+async def founding_seats():
+    """Public live counter for the first-500 inaugural offer (60s cache)."""
+    import time
+    from core import db
+    from founding_member import FOUNDER_CAP
+    now = time.monotonic()
+    if _seats_cache["data"] and now - _seats_cache["at"] < 60:
+        return _seats_cache["data"]
+    claimed = min(await db.users.count_documents({"founding_member_seq": {"$exists": True}}), FOUNDER_CAP)
+    data = {"claimed": claimed, "total": FOUNDER_CAP, "remaining": FOUNDER_CAP - claimed}
+    _seats_cache.update(at=now, data=data)
+    return data
+
 
 # ---------- HTML fragments (styled minimally so WeasyPrint renders cleanly) ----------
 

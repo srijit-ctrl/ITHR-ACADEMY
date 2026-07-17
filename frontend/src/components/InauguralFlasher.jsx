@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { X, Gift, ArrowRight, Sparkles } from "lucide-react";
 
 const DISMISS_KEY = "ithr_inaugural_flasher_dismissed_v2";
@@ -7,10 +8,14 @@ const DISMISS_KEY = "ithr_inaugural_flasher_dismissed_v2";
 export default function InauguralFlasher() {
     const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === "1");
     const [visible, setVisible] = useState(false);
+    const [seats, setSeats] = useState(null);
 
     useEffect(() => {
         if (dismissed) return;
         const t = setTimeout(() => setVisible(true), 900);
+        axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/trust/founding-seats`)
+            .then((r) => setSeats(r.data))
+            .catch(() => {});
         return () => clearTimeout(t);
     }, [dismissed]);
 
@@ -86,6 +91,30 @@ export default function InauguralFlasher() {
                         <Gift className="inline w-3.5 h-3.5 -mt-0.5 mr-1" style={{ color: "#E4CE9A" }} />
                         Earn up to <b style={{ color: "#E4CE9A" }}>5 bonus courses</b> through referrals.
                     </p>
+
+                    {seats && (
+                        <div className="mt-3.5" data-testid="flasher-seat-counter">
+                            <div className="flex items-baseline justify-between text-[11px] font-mono uppercase tracking-[0.14em]">
+                                <span className="text-white/60">Seats claimed</span>
+                                <span style={{ color: "#E4CE9A" }} data-testid="flasher-seat-count">
+                                    <b className="text-sm">{seats.claimed}</b> / {seats.total}
+                                </span>
+                            </div>
+                            <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.12)" }}>
+                                <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                        width: `${Math.max(2, (seats.claimed / seats.total) * 100)}%`,
+                                        background: "linear-gradient(90deg, #C6A15A, #E4CE9A)",
+                                        transition: "width 1s ease-out",
+                                    }}
+                                />
+                            </div>
+                            <p className="mt-1 text-[10px] text-white/50 font-mono">
+                                Only <b style={{ color: "#E4CE9A" }}>{seats.remaining}</b> free seats left
+                            </p>
+                        </div>
+                    )}
 
                     <Link
                         to="/register"
