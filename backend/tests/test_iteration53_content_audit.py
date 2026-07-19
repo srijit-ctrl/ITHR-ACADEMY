@@ -135,3 +135,52 @@ def test_landmark_case_studies_lesson_has_citations():
     assert "anthropic.com" in content, "Anthropic citation missing"
     assert "salesforce.com/news/press-releases" in content, "Salesforce citation missing"
     assert "vendor-reported" in content, "Editorial caveat missing"
+
+
+def test_every_lesson_carries_editorial_footer():
+    """After the Feb 2026 citation pass, EVERY lesson exposes the same
+    editorial disclosure so learners know which numbers are cited vs
+    illustrative. Regression guard against a future content sync
+    silently dropping the footer."""
+    # Load the runtime overrides directly — we don't need to hit the API
+    # for what is effectively a static content check.
+    import json
+    from pathlib import Path
+    overrides_path = Path(__file__).resolve().parents[1] / "assets" / "generated_courses" / "content_overrides.json"
+    data = json.loads(overrides_path.read_text())
+    missing = []
+    total = 0
+    for slug, lessons in data.items():
+        for key, lesson in lessons.items():
+            if not isinstance(lesson, dict):
+                continue
+            content = lesson.get("content", "")
+            if not content:
+                continue
+            total += 1
+            if "*Editorial note on figures:" not in content:
+                missing.append(f"{slug}·{key}")
+    assert total >= 500, f"expected ≥500 lesson overrides, found {total}"
+    assert not missing, f"{len(missing)} lessons missing editorial footer: {missing[:5]}"
+
+
+def test_landmark_case_studies_real_citations_survive_transform():
+    """Belt-and-braces: after the mass illustrative-tag pass the primary-
+    source Klarna / Anthropic / Salesforce URLs on the Landmark lesson
+    must still be intact — no false-illustrative label suppressing them."""
+    r = httpx.get(f"{API_URL}/api/courses/agentic-ai-foundations", timeout=15)
+    course = r.json()
+    landmark = next(
+        l for m in course["modules"] for l in m["lessons"] if "Landmark" in l["title"]
+    )
+    c = landmark["content"]
+    # All three primary sources still present.
+    assert "klarna.com/international/press" in c
+    assert "anthropic.com" in c
+    assert "salesforce.com/news/press-releases" in c
+    # The Landmark paragraph specifically was NOT wrapped in composite-tag
+    # (it's a real cited case, not a composite).
+    klarna_para_start = c.find("Klarna")
+    klarna_para_end = c.find("\n\n", klarna_para_start)
+    klarna_para = c[klarna_para_start:klarna_para_end if klarna_para_end != -1 else len(c)]
+    assert "illustrative composite" not in klarna_para.lower()

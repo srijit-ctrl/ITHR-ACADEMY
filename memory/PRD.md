@@ -12,6 +12,18 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 53b — Feb 2026 · Full Citation Pass (526 lessons)
+- **Deep audit of the runtime lesson overrides** (`assets/generated_courses/content_overrides.json`) revealed 219 vendor-name-plus-number claims across all 28 courses — far more than the initial scan showed. Ran a controlled three-category rewrite via `backend/patch_content_citations_iter53b.py`:
+  1. **34 real primary-source citations added** for verifiable public facts: Klarna Feb-2024 press release, Salesforce Agentforce 2.0 (Dec 2024), McKinsey $4.4T report, Anthropic Contextual Retrieval blog, Anthropic prompt-caching launch, Google SRE Handbook, Stanford HELM benchmark, NIST AI RMF 1.0, Anthropic Responsible Scaling Policy, OpenAI Function Calling launch, PEP 405, OpenAI pricing page, Gemini 1.5 launch, McKinsey Three Horizons, Pydantic docs, Claude 2.1 200k context announcement.
+  2. **113 illustrative-composite tags** applied to paragraphs opening with anonymous case-study framing ("A Fortune 500 bank…", "A healthcare payer…", "One manufacturing client…", etc.) so no reader mistakes them for cited fact.
+  3. **9 named-vendor specific-system claims softened** to composite framing: Goldman Sachs M&A ReAct agent, UnitedHealth prior-authorization agent (14k/day + $22M), Anthem $18k conference incident, Anthropic 18% tool-explosion accuracy drop, Anthropic 61% RAG delimiter vulnerability, Anthropic 40% delimiter degradation, Meta 2023 multilingual audit, Gartner 40%-by-2026 A2A prediction.
+- **Every one of the 526 lessons** now carries a standardised editorial footer clarifying the citation regime: cited primary sources for named public vendors, illustrative-composite framing for unnamed organisations.
+- Regression tests added: `test_every_lesson_carries_editorial_footer` and `test_landmark_case_studies_real_citations_survive_transform`. Full suite: **10/10 iter-53 + 37/37 across iter 51+52+53 green**.
+- Files touched: `backend/patch_content_citations_iter53b.py` (new — the migration runner), `backend/assets/generated_courses/content_overrides.json` (all 526 lessons updated).
+- Backup preserved at `/tmp/content_overrides.backup.json` in case a fine-grained revert is ever needed.
+
+
+
 ### Iteration 53 — Feb 2026 · Content Audit · Coming-Soon Gate · Citations
 - **Publication gate (`status` field)**: every course now returns `status: "published" | "coming_soon"` derived at read-time from real data quality (non-empty `learning_objectives` + ≥10 modules + no "Full curriculum in preparation" marker). Result: 11 published courses, 17 correctly labelled `coming_soon`.
 - **Enrollment refused on stubs**: `POST /api/courses/{slug}/enroll` returns **409** for any `coming_soon` course with a helpful "join the waitlist" message. New `POST /api/courses/{slug}/waitlist` endpoint (idempotent, records interest in `course_waitlist`).
