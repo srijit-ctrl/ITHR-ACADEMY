@@ -26,7 +26,11 @@ def _mask_name(full_name: str) -> str:
 async def _aggregate_leaderboard(limit: int) -> list[dict]:
     """Return the top-N referrers by CONVERTED signups (real enrollments),
     with total signups as a secondary sort. Referrers with zero signups
-    are excluded."""
+    are excluded. Orphaned rows (referrer_id no longer resolves to a live
+    user) are dropped so the public leaderboard never advertises dead
+    'Anonymous' entries."""
+    # Ask for more than `limit` so orphan rows don't shrink the visible list.
+    fetch = max(1, min(limit, 100)) * 2 + 20
     pipeline = [
         {"$group": {
             "_id": "$referrer_id",
@@ -34,9 +38,9 @@ async def _aggregate_leaderboard(limit: int) -> list[dict]:
             "converted": {"$sum": {"$cond": [{"$eq": ["$converted", True]}, 1, 0]}},
         }},
         {"$sort": {"converted": -1, "signups": -1, "_id": 1}},
-        {"$limit": max(1, min(limit, 100))},
+        {"$limit": fetch},
     ]
-    rows = await db.referral_signups.aggregate(pipeline).to_list(limit)
+    rows = await db.referral_signups.aggregate(pipeline).to_list(fetch)
     user_ids = [r["_id"] for r in rows]
     users = await db.users.find(
         {"id": {"$in": user_ids}},
@@ -45,7 +49,9 @@ async def _aggregate_leaderboard(limit: int) -> list[dict]:
     by_id = {u["id"]: u for u in users}
     out = []
     for r in rows:
-        u = by_id.get(r["_id"], {})
+        u = by_id.get(r["_id"])
+        if not u:
+            continue  # orphan referrer — drop
         out.append({
             "user_id": r["_id"],
             "full_name": u.get("full_name") or "",
@@ -55,6 +61,8 @@ async def _aggregate_leaderboard(limit: int) -> list[dict]:
             "signups": r["signups"],
             "converted": r["converted"],
         })
+        if len(out) >= limit:
+            break
     return out
 
 

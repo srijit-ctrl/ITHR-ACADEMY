@@ -12,6 +12,23 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 52 — Feb 2026 · Onboarding Email Drip · Referral Leaderboard
+- **Onboarding drip** (2 new stages atop the existing Welcome email):
+  - Day-2 first-course nudge (`send_first_course_nudge_email`) for learners with 0 enrollments after 48h.
+  - Day-5 referral invite (`send_referral_invite_email`) for learners with ≥1 enrollment + 0 successful referrals after 120h; embeds their personal code + share URL.
+  - `POST /api/admin/drips/onboarding/run` (super-admin only, `dry_run` supported) drives both stages.
+  - Idempotent via `drip_send_log` unique index on `(user_id, stage)` — safe to re-run daily.
+  - Super Admin + Admin roles auto-excluded from candidate lists.
+- **Referral leaderboard**:
+  - Public: `GET /api/referrals/leaderboard` — top-N with names masked to `First L.`; signed-in callers also receive `viewer_rank` + `viewer_stats`; orphaned referrer rows (referrer_id no longer resolves to a live user) are dropped so the public board never advertises dead "Anonymous" entries.
+  - Super Admin: `GET /api/admin/referrals/leaderboard` — unmasked with real name, email, organization, referral code.
+  - Sort: converted DESC, signups DESC, user_id ASC (deterministic tiebreak).
+  - Dashboard `ReferralPanel.jsx` gains a "Founding referrers · Leaderboard" block with crown on rank #1 and "You are #N" viewer hint.
+- Files touched: `backend/onboarding_drip.py` (new), `backend/email_service.py` (+2 templates), `backend/routers/{admin_router.py, referral_router.py}`, `frontend/src/components/ReferralPanel.jsx`.
+- Testing: pytest suites `test_iteration51_share_ratings_seats.py` + `test_iteration52_drip_leaderboard.py` → **29/29 green**. Testing agent iteration 52 reported zero critical/UI/integration issues; the one "minor" observation about 5 orphaned Anonymous rows was fixed post-report by adding the orphan filter to `_aggregate_leaderboard`.
+
+
+
 ### Iteration 51 — Feb 2026 · Founding Seats CTA · Tutor Feedback Loop · LinkedIn Share
 - **Register page seat counter**: `/register` now surfaces the same live founding-500 counter as the floating flasher (progress bar + "Only N free seats left") — reads `/api/trust/founding-seats`, auto-hides when the cohort is full.
 - **AI Tutor thumbs-up / thumbs-down**: every completed non-welcome assistant reply in the InlineTutor, CertificateTutor, and floating TutorDrawer gets rate buttons. Backend: `POST /api/ai/tutor/rate` (ownership + turn-range checked, upserts to allow changes) and `GET /api/ai/tutor/ratings/{session_id}` (hydrates state on reload). Optional 500-char free-text reason on thumbs-down.
