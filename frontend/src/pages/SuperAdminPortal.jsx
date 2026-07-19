@@ -21,9 +21,10 @@ import CommandCenter from "@/components/admin/CommandCenter";
 import AlertCenter from "@/components/admin/AlertCenter";
 import { Org360Drawer, User360Drawer } from "@/components/admin/Admin360Panels";
 import { LearningFunnelPanel, AssessmentAnalyticsPanel, CredentialManagerPanel, AiOpsPanel } from "@/components/admin/Phase2Panels";
+import { WhatsAppAdminPanel } from "@/components/admin/WhatsAppAdminPanel";
 import "@/styles/superadmin.css";
 
-const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "audit", "videoquiz", "security", "flags"];
+const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "audit", "videoquiz", "security", "flags", "whatsapp"];
 
 const NAV = [
     { group: "Overview", items: [
@@ -168,6 +169,7 @@ export default function SuperAdminPortal() {
                 {tab === "assessments" && <AssessmentAnalyticsPanel />}
                 {tab === "credentials" && <CredentialManagerPanel />}
                 {tab === "aiops" && <AiOpsPanel />}
+                {tab === "whatsapp" && <WhatsAppAdminPanel />}
 
                 {tab === "analytics" && (
                     <div className="space-y-6">

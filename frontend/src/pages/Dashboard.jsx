@@ -6,6 +6,7 @@ import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Bu
 import { toast } from "sonner";
 import CredentialImpressions from "@/components/CredentialImpressions";
 import { ReferralPanel } from "@/components/ReferralPanel";
+import { WhatsAppOptInPanel } from "@/components/WhatsAppOptInPanel";
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -101,6 +102,7 @@ export default function Dashboard() {
             </div>
 
             <ReferralPanel />
+            <WhatsAppOptInPanel />
 
             {/* Next-best recommendation banner */}
             {nextBest && (

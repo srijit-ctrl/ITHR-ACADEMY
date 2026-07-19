@@ -52,6 +52,23 @@ class UserPublic(BaseModel):
     payment_status: Optional[str] = None
     paid_via_referral: bool = False
     referral_seq: Optional[int] = None
+    # WhatsApp opt-in (Meta policy: NEVER default true; consent must be explicit)
+    whatsapp_number: Optional[str] = None
+    whatsapp_opt_in: bool = False
+    whatsapp_opt_in_source: Optional[str] = None
+    whatsapp_opt_in_timestamp: Optional[str] = None
+
+
+class WhatsAppOptInPayload(BaseModel):
+    """Learner-initiated WhatsApp opt-in / opt-out payload.
+
+    `opt_in=False` clears the number and stops future sends immediately.
+    `source` records the surface (enrollment_form / account_settings) for
+    the compliance audit trail — required by Meta for template access.
+    """
+    opt_in: bool
+    whatsapp_number: Optional[str] = None  # E.164 with + prefix; validated server-side
+    source: Literal["enrollment_form", "account_settings", "registration"] = "account_settings"
 
 
 class AuthResponse(BaseModel):

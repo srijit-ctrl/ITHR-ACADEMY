@@ -35,6 +35,9 @@ export default function CourseDetail() {
     const [waitlisted, setWaitlisted] = useState(false);
     const [joiningWaitlist, setJoiningWaitlist] = useState(false);
 
+    const [enrollWhatsapp, setEnrollWhatsapp] = useState(false);
+    const [enrollWhatsappNumber, setEnrollWhatsappNumber] = useState("");
+
     useEffect(() => {
         api.get(`/courses/${slug}`).then((r) => { setCourse(r.data); setLoading(false); }).catch(() => setLoading(false));
         if (user) {
@@ -50,6 +53,16 @@ export default function CourseDetail() {
         setEnrolling(true);
         try {
             await api.post(`/courses/${slug}/enroll`);
+            // Optional WhatsApp opt-in submitted alongside the enrollment.
+            // Failures here must NEVER block the enrollment success path —
+            // learner can always opt in later from the dashboard.
+            if (enrollWhatsapp && enrollWhatsappNumber.trim()) {
+                api.post("/whatsapp/opt-in", {
+                    opt_in: true,
+                    whatsapp_number: enrollWhatsappNumber.trim(),
+                    source: "enrollment_form",
+                }).catch(() => {});
+            }
             setEnrolled(true);
             if (course.modules?.length > 0 && course.modules[0].lessons?.length > 0) {
                 navigate(`/learn/${slug}/${course.modules[0].id}/${course.modules[0].lessons[0].id}`);
@@ -173,14 +186,36 @@ export default function CourseDetail() {
                                     Continue learning <ArrowRight className="w-4 h-4" />
                                 </Link>
                             ) : (
-                                <button
-                                    onClick={handleEnroll}
-                                    disabled={enrolling}
-                                    data-testid="enroll-button"
-                                    className="btn-primary w-full mb-3"
-                                >
-                                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enroll — Modules 1-5 free"}
-                                </button>
+                                <>
+                                    <label className="flex items-start gap-2 mb-3 cursor-pointer text-xs text-muted-foreground leading-relaxed" data-testid="enrollment-whatsapp-optin-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={enrollWhatsapp}
+                                            onChange={(e) => setEnrollWhatsapp(e.target.checked)}
+                                            data-testid="enrollment-whatsapp-checkbox"
+                                            className="mt-0.5 w-3.5 h-3.5 rounded border-border accent-brand shrink-0"
+                                        />
+                                        <span>Send me course reminders and updates via WhatsApp <span className="opacity-60">(optional)</span></span>
+                                    </label>
+                                    {enrollWhatsapp && (
+                                        <input
+                                            type="tel"
+                                            value={enrollWhatsappNumber}
+                                            onChange={(e) => setEnrollWhatsappNumber(e.target.value)}
+                                            placeholder="+9715XXXXXXXX"
+                                            data-testid="enrollment-whatsapp-number"
+                                            className="w-full text-xs bg-surface border border-border rounded-sm px-3 py-1.5 mb-3 focus:outline-none focus:border-brand"
+                                        />
+                                    )}
+                                    <button
+                                        onClick={handleEnroll}
+                                        disabled={enrolling}
+                                        data-testid="enroll-button"
+                                        className="btn-primary w-full mb-3"
+                                    >
+                                        {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enroll — Modules 1-5 free"}
+                                    </button>
+                                </>
                             )}
                             {hasFull && course.quiz?.length > 0 && enrolled && (
                                 <Link to={`/quiz/${slug}`} data-testid="take-quiz-link" className="btn-outline w-full">
