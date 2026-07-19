@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { streamTutor } from "@/lib/api";
+import { api } from "@/lib/api";
 import { splitTutorMeta, TUTOR_META_MARKER } from "@/components/tutor/tutorMeta";
 
 /**
@@ -7,21 +8,57 @@ import { splitTutorMeta, TUTOR_META_MARKER } from "@/components/tutor/tutorMeta"
  * (and Panel) tutor. Keeps message list, session-id, streaming flag, and
  * exposes a single `send()` function. Strips the tutor's @@META@@ structured
  * footer from visible content and attaches it as `message.meta` on completion.
+ * Also owns per-turn thumbs-up / thumbs-down ratings so learner feedback can
+ * be surfaced in the Super Admin AI Ops panel.
  */
 export default function useTutorStream({ courseSlug, lesson, moduleTitle } = {}) {
     const [messages, setMessages] = useState([]);
     const [sessionId, setSessionId] = useState(null);
     const [streaming, setStreaming] = useState(false);
+    // Map of turn_index (0-based, assistant-only) -> "up" | "down"
+    const [ratings, setRatings] = useState({});
 
     // Reset transient state when the user moves to a different lesson
     useEffect(() => {
         setMessages([]);
         setSessionId(null);
+        setRatings({});
     }, [lesson?.id]);
+
+    // Hydrate the learner's existing ratings whenever we get a session id
+    // (so a page reload keeps the thumbs highlighted).
+    useEffect(() => {
+        if (!sessionId) return;
+        let cancelled = false;
+        api.get(`/ai/tutor/ratings/${sessionId}`)
+            .then((r) => { if (!cancelled) setRatings(r.data?.ratings || {}); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [sessionId]);
 
     const reset = () => {
         setMessages([]);
         setSessionId(null);
+        setRatings({});
+    };
+
+    /**
+     * Rate one assistant turn (0-based index over assistant-only messages).
+     * Optimistic — the UI flips immediately, and rolls back on error.
+     */
+    const rateTurn = async (turnIndex, rating, reason) => {
+        if (!sessionId) return;
+        const prev = ratings[turnIndex];
+        setRatings((r) => ({ ...r, [turnIndex]: rating }));
+        try {
+            await api.post("/ai/tutor/rate", { session_id: sessionId, turn_index: turnIndex, rating, reason: reason || null });
+        } catch {
+            setRatings((r) => {
+                const copy = { ...r };
+                if (prev) copy[turnIndex] = prev; else delete copy[turnIndex];
+                return copy;
+            });
+        }
     };
 
     const send = async (raw, { mode } = {}) => {
@@ -82,5 +119,5 @@ export default function useTutorStream({ courseSlug, lesson, moduleTitle } = {})
         });
     };
 
-    return { messages, streaming, send, reset, sessionId };
+    return { messages, streaming, send, reset, sessionId, ratings, rateTurn };
 }

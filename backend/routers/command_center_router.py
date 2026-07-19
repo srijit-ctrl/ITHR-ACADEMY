@@ -437,6 +437,21 @@ async def ai_ops(days: int = 30, _sa: str = Depends(get_current_super_admin)):
         topics[t] = topics.get(t, 0) + 1
     top_topics = sorted(({"topic": k, "sessions": v} for k, v in topics.items()), key=lambda x: -x["sessions"])[:10]
     all_time = await db.chat_sessions.count_documents({})
+
+    # Learner-provided quality ratings (thumbs up / down) — real signal, not heuristics.
+    period_ratings = await db.tutor_ratings.find(
+        {"updated_at": {"$gte": since}},
+        {"_id": 0, "rating": 1, "reason": 1, "updated_at": 1, "session_id": 1, "turn_index": 1},
+    ).to_list(5000)
+    up_count = sum(1 for r in period_ratings if r.get("rating") == "up")
+    down_count = sum(1 for r in period_ratings if r.get("rating") == "down")
+    total_ratings = up_count + down_count
+    satisfaction_pct = round((up_count / total_ratings) * 100, 1) if total_ratings else None
+    coverage_pct = round((total_ratings / total_msgs) * 100, 1) if total_msgs else 0
+    recent_negative = sorted(
+        [r for r in period_ratings if r.get("rating") == "down" and (r.get("reason") or "").strip()],
+        key=lambda r: r.get("updated_at", ""), reverse=True,
+    )[:8]
     return {
         "days": days,
         "summary": {
@@ -445,6 +460,14 @@ async def ai_ops(days: int = 30, _sa: str = Depends(get_current_super_admin)):
             "messages": total_msgs,
             "avg_msgs_per_session": round(total_msgs / total_sessions, 1) if total_sessions else 0,
             "est_tokens": est_tokens, "est_cost_usd": est_cost,
+            "ratings_up": up_count, "ratings_down": down_count,
+            "ratings_total": total_ratings,
+            "satisfaction_pct": satisfaction_pct,
+            "rating_coverage_pct": coverage_pct,
         },
-        "daily": daily_series, "top_topics": top_topics, "generated_at": now_iso(),
+        "daily": daily_series, "top_topics": top_topics,
+        "recent_negative_reasons": [
+            {"reason": r.get("reason", ""), "at": r.get("updated_at", "")} for r in recent_negative
+        ],
+        "generated_at": now_iso(),
     }

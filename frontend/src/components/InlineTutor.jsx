@@ -18,7 +18,7 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
     const [autoplayNext, setAutoplayNext] = useState(false);
     const spokenIdRef = useRef(null);
     const voice = useVoiceIO();
-    const { messages, streaming, send, reset } = useTutorStream({ courseSlug, lesson, moduleTitle });
+    const { messages, streaming, send, reset, ratings, rateTurn } = useTutorStream({ courseSlug, lesson, moduleTitle });
 
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
 
@@ -83,7 +83,7 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
             )}
 
             {(open || messages.length > 0) && (
-                <TutorConversation messages={messages} streaming={streaming} onAction={handleSend} />
+                <TutorConversation messages={messages} streaming={streaming} onAction={handleSend} ratings={ratings} onRate={rateTurn} />
             )}
 
             <div className="mt-4 flex gap-2">

@@ -1,9 +1,11 @@
 """AI Tutor + course generator routes."""
 import json
 import uuid
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from ai_service import generate_course_outline, get_tutor_persona, stream_tutor_response, TUTOR_META_MARKER
 from auth import get_current_user_id
@@ -11,6 +13,13 @@ from core import db, logger, now_iso
 from models import ChatMessage, ChatRequest, ChatSession
 
 router = APIRouter(prefix="/api", tags=["ai"])
+
+
+class TutorRating(BaseModel):
+    session_id: str
+    turn_index: int = Field(ge=0, description="0-based index of the assistant message within its session")
+    rating: Literal["up", "down"]
+    reason: Optional[str] = Field(default=None, max_length=500)
 
 
 @router.post("/ai/tutor")
@@ -113,3 +122,50 @@ async def ai_generate_course_endpoint(payload: dict, user_id: str = Depends(get_
         return {"outline": parsed, "raw": raw}
     except Exception:
         return {"outline": None, "raw": raw, "error": "Could not parse structured JSON — showing raw response."}
+
+
+
+@router.post("/ai/tutor/rate")
+async def rate_tutor_message(payload: TutorRating, user_id: str = Depends(get_current_user_id)):
+    """Record a thumbs-up / thumbs-down rating for one assistant message in a session.
+
+    One rating per (user, session, turn). Re-submitting overwrites the previous value —
+    letting the learner change their mind without polluting analytics.
+    """
+    session = await db.chat_sessions.find_one(
+        {"id": payload.session_id, "user_id": user_id},
+        {"_id": 0, "messages": 1},
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    assistant_msgs = [m for m in (session.get("messages") or []) if m.get("role") == "assistant"]
+    if payload.turn_index >= len(assistant_msgs):
+        raise HTTPException(status_code=400, detail="turn_index out of range")
+
+    key = f"{user_id}|{payload.session_id}|{payload.turn_index}"
+    await db.tutor_ratings.update_one(
+        {"key": key},
+        {"$set": {
+            "key": key,
+            "user_id": user_id,
+            "session_id": payload.session_id,
+            "turn_index": payload.turn_index,
+            "rating": payload.rating,
+            "reason": payload.reason,
+            "updated_at": now_iso(),
+        }, "$setOnInsert": {"created_at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True, "rating": payload.rating}
+
+
+@router.get("/ai/tutor/ratings/{session_id}")
+async def my_session_ratings(session_id: str, user_id: str = Depends(get_current_user_id)):
+    """Ratings the current learner has already submitted for this session — used
+    by the tutor UI to render the correct thumb-up/down state on reload."""
+    docs = await db.tutor_ratings.find(
+        {"user_id": user_id, "session_id": session_id},
+        {"_id": 0, "turn_index": 1, "rating": 1},
+    ).to_list(500)
+    return {"ratings": {str(d["turn_index"]): d["rating"] for d in docs}}

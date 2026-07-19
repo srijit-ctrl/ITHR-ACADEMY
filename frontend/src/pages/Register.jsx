@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { AlertCircle, Loader2, Ticket } from "lucide-react";
+import axios from "axios";
+import { AlertCircle, Loader2, Sparkles, Ticket } from "lucide-react";
 import { toast } from "sonner";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -24,6 +25,13 @@ export default function Register() {
     });
     const [err, setErr] = useState("");
     const [loading, setLoading] = useState(false);
+    const [seats, setSeats] = useState(null);
+
+    useEffect(() => {
+        axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/trust/founding-seats`)
+            .then((r) => setSeats(r.data))
+            .catch(() => {});
+    }, []);
 
     const handle = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -59,6 +67,39 @@ export default function Register() {
                 <div className="overline mb-4">Create your account</div>
                 <h1 className="font-serif text-4xl tracking-tighter leading-none mb-3">Begin your credential.</h1>
                 <p className="text-muted-foreground mb-8">Free forever for the first five modules of any course.</p>
+
+                {seats && seats.remaining > 0 && (
+                    <div
+                        data-testid="register-seat-counter"
+                        className="mb-8 rounded-xl border border-brand/40 bg-gradient-to-br from-brand/5 via-transparent to-brand/5 px-4 py-3.5"
+                    >
+                        <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="w-3.5 h-3.5 text-brand" />
+                            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand font-semibold">
+                                Founding 500 · Live counter
+                            </span>
+                        </div>
+                        <div className="flex items-baseline justify-between mb-2">
+                            <span className="text-xs text-muted-foreground">Seats claimed</span>
+                            <span className="font-mono text-sm" data-testid="register-seat-count">
+                                <b className="text-brand text-base">{seats.claimed}</b>
+                                <span className="text-muted-foreground"> / {seats.total}</span>
+                            </span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden bg-border/60">
+                            <div
+                                className="h-full rounded-full transition-[width] duration-1000 ease-out"
+                                style={{
+                                    width: `${Math.max(2, (seats.claimed / seats.total) * 100)}%`,
+                                    background: "linear-gradient(90deg, #C6A15A, #E4CE9A)",
+                                }}
+                            />
+                        </div>
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                            Only <b className="text-brand">{seats.remaining}</b> free seats left — full course + certificate.
+                        </p>
+                    </div>
+                )}
 
                 <button
                     onClick={googleSignIn}

@@ -1,0 +1,56 @@
+{
+  "summary": "Iteration 51 — validated the three additive features shipped this session: (A) /register founding-500 seat counter, (C) AI tutor thumbs-up/down ratings backend + UI + Super Admin AI Ops surfacing, and (D) LinkedIn certificate share endpoints + Certificate page buttons. Backend suite is 8/8 green. All backend endpoints behave to spec (auth, ownership, out-of-range 400, unknown-cert 404, PNG/HTML content types, OG + Twitter meta, meta-refresh). Frontend renders the seat counter and Certificate share buttons correctly, and the Super Admin AI Ops panel shows the new Learner-ratings block + Latest-thumbs-down-reasons list. FOUND ONE HIGH-PRIORITY INTEGRATION BUG: the tutor thumbs-up/down buttons in the floating TutorDrawer send an off-by-one turn_index because assistantSeen counts the synthetic welcome bubble; every rating POST from the drawer returns 400 turn_index out of range and the buttons cannot persist. Same latent risk in TutorConversation.jsx if any caller ever prepends a welcome. Details + reproduction below.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "TutorDrawer (floating 'Ask Aletheia') + TutorConversation.jsx (shared)",
+        "issue": "Off-by-one turn_index. In both files the assistantSeen counter is incremented for EVERY assistant message and then skipped-if-welcome only for turnIndex assignment (`if (m.role === 'assistant') { assistantSeen += 1; if (m.id !== 'welcome') turnIndex = assistantSeen; }`). Because TutorDrawer seeds a synthetic welcome bubble as message[0], the first REAL assistant reply gets turnIndex=1 and testid 'tutor-rate-up-1'. But the backend session (db.chat_sessions.messages) contains only the real assistant reply at index 0. Result: POST /api/ai/tutor/rate returns 400 {'detail':'turn_index out of range'} for EVERY rating attempted from the drawer. Reproduction: register user, open Ask Aletheia, send any prompt, click thumbs-up on the reply → 400 in devtools + rating never persists across reload. Backend endpoint itself is correct (proven by test_full_rating_flow which drives it directly without a welcome bubble). Fix: only bump assistantSeen for non-welcome assistants, e.g. `if (m.id !== 'welcome') { assistantSeen += 1; turnIndex = assistantSeen; }`. This also makes the emitted testid 'tutor-rate-up-0' match the exact spec in the review request.",
+        "selector": "[data-testid='tutor-rate-up-0'] / [data-testid='tutor-rate-up-1']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Tutor drawer rating persistence",
+        "issue": "Because of the off-by-one above, ratings from the drawer never persist server-side. GET /api/ai/tutor/ratings/{sid} returns {ratings: {}} on reload → thumb never re-highlights. The optimistic-update code in useTutorStream.js rolls the state back on POST failure, but many users may not notice the silent revert.",
+        "affected_selectors": ["[data-testid='tutor-rate-up-1']", "[data-testid='tutor-rate-down-1']", "[data-testid='tutor-rate-bar-1']"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration51_share_ratings_seats.py",
+    "/app/test_reports/pytest/iter51.xml"
+  ],
+  "action_items": [
+    "Fix off-by-one turn_index in TutorDrawer.jsx (~line 160-165) and TutorConversation.jsx (~line 33-40): move `assistantSeen += 1` inside the `if (m.id !== 'welcome')` guard so the first real assistant reply gets turnIndex=0 and testid tutor-rate-up-0 (matching the review spec). This will make drawer ratings actually persist and satisfy the '_0' testid contract.",
+    "After the fix, re-verify that reload restores the highlighted thumb (rateTurn -> POST /ai/tutor/rate 200, GET /ai/tutor/ratings/{sid} returns {'0':'up'}).",
+    "Optional: consider also asserting the 410 revoked-cert path on share-image.png in a future test — currently untested because SAMPLE-ITHR-2026-001 is intentionally never revoked. Code path exists in share_router.py L195-196."
+  ],
+  "critical_code_review_comments": [
+    "share_router.py — correctly excludes _id via {_id: 0} on both find_one calls, returns proper 404/410, uses image/png content-type + LinkedIn-recommended 1200x630 dims. Good font fallback chain so a missing GreatVibes TTF does not 500 the endpoint.",
+    "share_router.py — landing page uses os.environ PUBLIC_APP_URL to build absolute og:image URL. On this preview env PUBLIC_APP_URL=https://learn.ithr.online, so the og:image resolves to the PROD hostname, not the preview backend. Scrapers hitting the preview landing will fetch the prod image URL. Consider falling back to the request's host when PUBLIC_APP_URL is unset OR using request base_url so preview and prod both work — small UX/SEO nit, not a blocker.",
+    "tutor_router.py rate_tutor_message — good UPSERT keyed on user|session|turn so re-submissions overwrite instead of duplicating; validates ownership (404) and turn range (400) correctly. Reason field capped at 500 chars via Pydantic.",
+    "command_center_router.py ai_ops — satisfaction_pct correctly returns None (surfaces as '—' in UI) when total_ratings==0. recent_negative_reasons capped at 8 to keep payload small. rating_coverage_pct uses total_msgs as denominator, which is fine but includes user messages too — if the intent is 'of assistant turns', denominator should be assistant-only. Non-blocking.",
+    "TutorDrawer.jsx + TutorConversation.jsx — see HIGH priority bug above (assistantSeen off-by-one).",
+    "Register.jsx seat counter — good: hides when remaining<=0 via the outer `seats.remaining > 0` guard; progress bar clamps min 2% width so it is visible even at claimed=0. useEffect runs once with empty deps — fine, no polling needed since backend caches 60s.",
+    "Certificate.jsx — new buttons all wired correctly. The lazy-loaded <img> in share-image-preview is a nice touch. shareImageUrl is built via API_BASE which correctly points at the preview backend."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration51_share_ratings_seats.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 pytest — trust seats, tutor rate CRUD + auth + ownership + range, ai-ops payload keys, share-image PNG + 404, share landing HTML + OG + twitter + meta-refresh + 404)",
+    "frontend": "80% — seat counter, Super Admin AI Ops rating blocks, and Certificate share buttons + preview all verified. TutorDrawer rating buttons render but POST fails with 400 (off-by-one bug)."
+  },
+  "test_credentials": "superadmin@ithr.online / (SUPER_ADMIN_PASSWORD from backend/.env). Fresh learners created dynamically: TEST_it51_<uuid>@example.com / TestPass123! for backend suite; TEST_it51ui_<uuid>@example.com / TestPass123! for playwright — both cleaned up (2 UI-created users admin-swept post-run).",
+  "seed_data_creation": "None persisted. Backend tests + UI test each created 1 short-lived learner + 1 chat session (2-4 messages each). Test teardown + a follow-up admin sweep confirmed 0 TEST_it51* users remain.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest suite at /app/backend/tests/test_iteration51_share_ratings_seats.py — 8 tests, ~9s. Login endpoint returns 'token' (NOT 'access_token'); admin users purge via GET /api/admin/users?q=<prefix> then DELETE /api/admin/users/{id}. Super Admin portal is at /admin (not /super-admin). Sample cert SAMPLE-ITHR-2026-001 is a stable happy-path fixture for share-image + share landing. To reproduce the drawer off-by-one bug: register any account -> click 'Ask Aletheia' floating button -> send any prompt -> click thumbs-up -> DevTools Network shows POST /api/ai/tutor/rate = 400 {'detail':'turn_index out of range'}.",
+  "rca of the issue": "Root cause: In both TutorConversation.jsx (~L33-40) and TutorDrawer.jsx (~L160-165), the `assistantSeen` counter is incremented unconditionally for every message with role==='assistant', then a separate check `if (m.id !== 'welcome')` decides whether to assign turnIndex. Because TutorDrawer prepends a synthetic {id:'welcome', role:'assistant'} bubble, assistantSeen is already at 0 when the first real reply arrives — so the real reply gets turnIndex=1. The backend, however, stores only real messages (welcome exists only on the client), so its assistant_msgs array has just one entry at index 0. POST /api/ai/tutor/rate with turn_index=1 correctly raises HTTPException(400, 'turn_index out of range'). Mitigation (single-line): move `assistantSeen += 1` into the same block that skips the welcome bubble, so both counter and testid indices skip synthetic messages together. After the fix, testids will be tutor-rate-*-0 (matches the review spec verbatim) and ratings will persist across reload."
+}

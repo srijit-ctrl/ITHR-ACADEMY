@@ -18,7 +18,7 @@ export default function CertificateTutor({ certificate }) {
     const [autoplayNext, setAutoplayNext] = useState(false);
     const spokenIdRef = useRef(null);
     const voice = useVoiceIO();
-    const { messages, streaming, send } = useTutorStream({
+    const { messages, streaming, send, ratings, rateTurn } = useTutorStream({
         courseSlug: certificate.course_slug,
         lesson: { id: certificate.course_id, title: certificate.course_title },
         moduleTitle: `Certified in ${certificate.course_title}`,
@@ -89,7 +89,7 @@ export default function CertificateTutor({ certificate }) {
                         ))}
                     </div>
                 ) : (
-                    <TutorConversation messages={messages} streaming={streaming} />
+                    <TutorConversation messages={messages} streaming={streaming} ratings={ratings} onRate={rateTurn} />
                 )}
 
                 <div className="mt-4 flex gap-2">

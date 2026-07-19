@@ -14,7 +14,7 @@ from routers import (
     admin_dashboard_router, admin_router, assessment_router, auth_router, catalog_router, checkout_router,
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, password_reset_router, paths_router,
-    recommendation_router, trust_router, tutor_router, voice_router, podcast_router,
+    recommendation_router, share_router, trust_router, tutor_router, voice_router, podcast_router,
     admin_control_router, traffic_router, video_quiz_router, referral_router, security_router, command_center_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
@@ -286,6 +286,7 @@ for r in (
     digest_router.router,
     demo_router.router,
     trust_router.router,
+    share_router.router,
     video_quiz_router.router,
     referral_router.router,
     security_router.router,

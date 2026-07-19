@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, API_BASE } from "@/lib/api";
-import { ShieldCheck, Share2, Download, Loader2, Linkedin, Copy, Check } from "lucide-react";
+import { ShieldCheck, Share2, Download, Loader2, Linkedin, Copy, Check, Image as ImageIcon } from "lucide-react";
 import CertificateTutor from "@/components/CertificateTutor";
 
 export default function Certificate() {
@@ -23,8 +23,11 @@ export default function Certificate() {
 
     const issued = new Date(cert.issued_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
     const shareUrl = `${window.location.origin}/verify/${cert.certificate_id}`;
+    const shareLandingUrl = `${API_BASE}/share/certificate/${cert.certificate_id}`;
+    const shareImageUrl = `${API_BASE}/certificates/${cert.certificate_id}/share-image.png`;
     const qrUrl = `${API_BASE}/certificates/${cert.certificate_id}/qr.svg`;
     const linkedInUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(cert.course_title)}&organizationName=${encodeURIComponent("ITHR Technologies")}&issueYear=${new Date(cert.issued_at).getFullYear()}&issueMonth=${new Date(cert.issued_at).getMonth() + 1}&certUrl=${encodeURIComponent(shareUrl)}&certId=${encodeURIComponent(cert.certificate_id)}`;
+    const linkedInFeedShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareLandingUrl)}`;
 
     const copyLink = async () => {
         await navigator.clipboard.writeText(shareUrl);
@@ -100,7 +103,24 @@ export default function Certificate() {
                         data-testid="share-linkedin"
                         className="btn-primary"
                     >
-                        <Linkedin className="w-4 h-4" /> Add to LinkedIn
+                        <Linkedin className="w-4 h-4" /> Add to LinkedIn profile
+                    </a>
+                    <a
+                        href={linkedInFeedShareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid="share-linkedin-feed"
+                        className="btn-outline"
+                    >
+                        <Linkedin className="w-4 h-4" /> Share on LinkedIn feed
+                    </a>
+                    <a
+                        href={shareImageUrl}
+                        download={`ITHR-${cert.certificate_id}-share.png`}
+                        data-testid="download-share-image"
+                        className="btn-outline"
+                    >
+                        <ImageIcon className="w-4 h-4" /> Download share image
                     </a>
                     <a
                         href={`${API_BASE}/certificates/${cert.certificate_id}/pdf`}
@@ -127,6 +147,21 @@ export default function Certificate() {
                         <Share2 className="w-4 h-4" /> Download QR
                     </a>
                     <Link to="/dashboard" data-testid="cert-back-dashboard" className="btn-outline">Back to dashboard</Link>
+                </div>
+
+                <div className="mt-8 mx-auto max-w-3xl border border-border rounded-lg overflow-hidden bg-surface-alt/20" data-testid="share-image-preview">
+                    <div className="px-4 py-2.5 border-b border-border flex items-center gap-2">
+                        <ImageIcon className="w-3.5 h-3.5 text-brand" />
+                        <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                            LinkedIn / Twitter share preview
+                        </div>
+                    </div>
+                    <img
+                        src={shareImageUrl}
+                        alt="Shareable branded credential card"
+                        className="w-full h-auto block"
+                        loading="lazy"
+                    />
                 </div>
 
                 <div className="mt-10 text-center text-xs text-muted-foreground max-w-2xl mx-auto">

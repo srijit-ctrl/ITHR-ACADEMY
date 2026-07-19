@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, streamTutor } from "@/lib/api";
 import { splitTutorMeta, TUTOR_META_MARKER } from "@/components/tutor/tutorMeta";
-import { TutorMetaExtras } from "@/components/tutor/TutorConversation";
+import { TutorMetaExtras, TutorRateBar } from "@/components/tutor/TutorConversation";
 import { GraduationCap, Loader2, MessageCircle, Send, X } from "lucide-react";
 
 /**
@@ -16,6 +16,7 @@ export default function TutorDrawer({ courseSlug, onClose }) {
     const [streaming, setStreaming] = useState(false);
     const [sessionId, setSessionId] = useState(null);
     const [quizMode, setQuizMode] = useState(false);
+    const [ratings, setRatings] = useState({});
     const scrollRef = useRef(null);
 
     useEffect(() => {
@@ -24,6 +25,30 @@ export default function TutorDrawer({ courseSlug, onClose }) {
             .catch(() => {});
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [courseSlug]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        let cancelled = false;
+        api.get(`/ai/tutor/ratings/${sessionId}`)
+            .then((r) => { if (!cancelled) setRatings(r.data?.ratings || {}); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [sessionId]);
+
+    const rateTurn = async (turnIndex, rating, reason) => {
+        if (!sessionId) return;
+        const prev = ratings[turnIndex];
+        setRatings((r) => ({ ...r, [turnIndex]: rating }));
+        try {
+            await api.post("/ai/tutor/rate", { session_id: sessionId, turn_index: turnIndex, rating, reason: reason || null });
+        } catch {
+            setRatings((r) => {
+                const copy = { ...r };
+                if (prev) copy[turnIndex] = prev; else delete copy[turnIndex];
+                return copy;
+            });
+        }
+    };
 
     useEffect(() => {
         setMessages([{
@@ -131,26 +156,43 @@ export default function TutorDrawer({ courseSlug, onClose }) {
             </div>
 
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-                {messages.map((m, i) => (
-                    <div key={m.id || `msg-${i}`}>
-                        <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                            <div
-                                className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed rounded-sm whitespace-pre-wrap ${
-                                    m.role === "user"
-                                        ? "bg-foreground text-background"
-                                        : "bg-surface-alt border border-border text-foreground"
-                                }`}
-                            >
-                                {m.content || (streaming && i === lastIdx ? (
-                                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                                ) : "")}
+                {(() => {
+                    let assistantSeen = -1;
+                    return messages.map((m, i) => {
+                        let turnIndex = null;
+                        if (m.role === "assistant") {
+                            assistantSeen += 1;
+                            if (m.id !== "welcome") turnIndex = assistantSeen;
+                        }
+                        return (
+                            <div key={m.id || `msg-${i}`}>
+                                <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                                    <div
+                                        className={`max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed rounded-sm whitespace-pre-wrap ${
+                                            m.role === "user"
+                                                ? "bg-foreground text-background"
+                                                : "bg-surface-alt border border-border text-foreground"
+                                        }`}
+                                    >
+                                        {m.content || (streaming && i === lastIdx ? (
+                                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                        ) : "")}
+                                    </div>
+                                </div>
+                                {m.role === "assistant" && i === lastIdx && !streaming && m.meta && (
+                                    <TutorMetaExtras meta={m.meta} onAction={(a) => send(a)} />
+                                )}
+                                {m.role === "assistant" && turnIndex !== null && m.content && !(streaming && i === lastIdx) && (
+                                    <TutorRateBar
+                                        turnIndex={turnIndex}
+                                        current={ratings[turnIndex]}
+                                        onRate={rateTurn}
+                                    />
+                                )}
                             </div>
-                        </div>
-                        {m.role === "assistant" && i === lastIdx && !streaming && m.meta && (
-                            <TutorMetaExtras meta={m.meta} onAction={(a) => send(a)} />
-                        )}
-                    </div>
-                ))}
+                        );
+                    });
+                })()}
             </div>
 
             <div className="border-t border-border p-3 bg-surface">

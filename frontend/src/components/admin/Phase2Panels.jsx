@@ -207,11 +207,13 @@ export function AiOpsPanel() {
     if (!data) return <Loading />;
     const s = data.summary;
     const maxDaily = Math.max(...data.daily.map((d) => d.sessions), 1);
+    const satisfaction = s.satisfaction_pct == null ? "—" : `${s.satisfaction_pct}%`;
     const cards = [
         ["Conversations (period)", s.sessions], ["All-time conversations", s.all_time_sessions],
         ["Active AI users", s.active_users], ["Messages", s.messages],
         ["Avg msgs / convo", s.avg_msgs_per_session],
-        ["Est. tokens*", s.est_tokens.toLocaleString()], ["Est. cost (USD)*", `$${s.est_cost_usd}`],
+        ["Satisfaction", satisfaction],
+        ["Est. cost (USD)*", `$${s.est_cost_usd}`],
     ];
     return (
         <div data-testid="ai-ops">
@@ -230,7 +232,63 @@ export function AiOpsPanel() {
                     </div>
                 ))}
             </div>
-            <div className="text-[10px] text-muted-foreground mb-8">* Token &amp; cost figures are heuristic estimates (chars ÷ 4, blended $6 / 1M tokens) — not billing data.</div>
+            <div className="text-[10px] text-muted-foreground mb-8">
+                * Cost figure is a heuristic estimate (~$6 / 1M tokens on {s.est_tokens.toLocaleString()} est. tokens) — not billing data.
+                Satisfaction reflects actual learner thumbs (up ÷ (up + down)); coverage is {s.rating_coverage_pct}% of messages rated.
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div className="card-flat rounded-lg p-5" data-testid="aiops-ratings-block">
+                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-3">Learner ratings</div>
+                    <div className="flex items-baseline gap-6">
+                        <div>
+                            <div className="font-serif text-2xl leading-none text-brand" data-testid="aiops-ratings-up">
+                                ▲ {s.ratings_up}
+                            </div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground mt-1.5">Thumbs up</div>
+                        </div>
+                        <div>
+                            <div className="font-serif text-2xl leading-none text-destructive" data-testid="aiops-ratings-down">
+                                ▼ {s.ratings_down}
+                            </div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground mt-1.5">Thumbs down</div>
+                        </div>
+                        <div>
+                            <div className="font-serif text-2xl leading-none">
+                                {s.ratings_total}
+                            </div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground mt-1.5">Total rated</div>
+                        </div>
+                    </div>
+                    {s.ratings_total > 0 && (
+                        <div className="mt-4 h-1.5 rounded-full overflow-hidden bg-border/60">
+                            <div
+                                className="h-full"
+                                style={{
+                                    width: `${(s.ratings_up / s.ratings_total) * 100}%`,
+                                    background: "linear-gradient(90deg, #C6A15A, #E4CE9A)",
+                                }}
+                            />
+                        </div>
+                    )}
+                </div>
+                <div className="card-flat rounded-lg p-5 lg:col-span-2" data-testid="aiops-negative-reasons">
+                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-3">
+                        Latest thumbs-down reasons ({(data.recent_negative_reasons || []).length})
+                    </div>
+                    {(data.recent_negative_reasons || []).length === 0 ? (
+                        <div className="text-xs text-muted-foreground italic">No negative feedback with reasons in this period.</div>
+                    ) : (
+                        <ul className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                            {data.recent_negative_reasons.map((r, i) => (
+                                <li key={i} className="text-xs border-l-2 border-destructive/60 pl-3 py-0.5">
+                                    <div className="text-foreground">{r.reason}</div>
+                                    <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{(r.at || "").slice(0, 16).replace("T", " ")}</div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="card-flat rounded-lg p-5">
                     <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-4">Conversations per day</div>
