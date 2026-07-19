@@ -12,6 +12,29 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 55 · Agent OS Sprint 1 — Feb 2026
+- Sprint 0 pre-flight: user chose "proceed on your design, I'll reconcile" — Python/FastAPI + MongoDB re-scope of the spec's Node/Postgres assumption. Deviations logged in `agent_os/__init__.py` docstring.
+- **7-pod inventory registered** in `agent_pods` collection (`pod_a_prospecting`, `pod_b_outreach`, `pod_c_followup`, `pod_d_proposal`, `pod_e_content`, `pod_f_slack_ops`, `pod_g_reporting`) with per-pod `mcp_scopes`. **Only Pod A has a handler in Sprint 1** (per spec §11 exit criteria — one pod wired end-to-end).
+- **Orchestrator skeleton** (`agent_os/orchestrator.py`): kill-switch check (global + per-pod), run-lifecycle audit emit, `_PodContext` handed to every pod handler (`ctx.mcp()`, `ctx.require_approval()`, `ctx.db`), catches `ApprovalRequired` / `ScopeViolation` / `GuardViolation` cleanly.
+- **Approval queue engine** (`agent_os/approvals.py`): `submit / find_decision / require_approval / decide`, idempotency-keyed. `find_decision` uses `(pod_id, action, idempotency_key)` so re-dispatched runs correctly re-use prior human decisions instead of re-queueing.
+- **DB-guard** (`agent_os/db_guard.py`): pods import `AgentDb`, not `core.db`; any write into `agent_pods` / `agent_audit_log` / `agent_approval_queue` / `superadmin_roles` / `users` from a guarded collection raises `GuardViolation` and audit-logs a `guard.write.blocked` event. Mongo-side equivalent of the spec's §4.5 DB-grant rule.
+- **MCP registry** (`agent_os/mcp_registry.py`): `mcp_call(pod_id, connector, op, payload)` reads the pod's declared scope from `agent_pods.mcp_scopes` and hard-raises `ScopeViolation` on any out-of-scope call. Sprint 1 stubs: `ApolloStub`, `HubspotStub` — deterministic fixtures, zero live traffic.
+- **Pod A · Prospecting** end-to-end: Apollo search → per-prospect approval queue → HubSpot create_contact. On first dispatch, run parks in `waiting_approval` with N queued approvals. After super admin approves via `POST /api/admin/agent-os/approvals/{id}/decide`, re-dispatch completes with `contacts_created=N`.
+- **Router** (`routers/agent_os_router.py`): 7 super-admin-only endpoints — list pods, toggle enabled, dispatch, list runs, list approvals, decide, audit query, global kill-switch.
+- **Audit log** append-only, unique indexes on `(pod_id, action, idempotency_key)`, complete event trail from `approval.requested` → `approval.approved` → `pod.run.started` → `mcp.call.attempted` → `mcp.call.executed` → `pod.run.completed`.
+- **Sprint 1 exit criteria demo**: dispatch → waiting_approval (2 approvals queued) → approve both → re-dispatch → completed with `contacts_created: 2` and full audit trail. Evidence: curl transcript in this iteration's summary.
+- **Testing**: 8/8 Sprint 1 tests green (approval-gate boundary, kill-switch, disabled-pod, audit trail, scope violation, state-agnostic re-dispatch). Full regression: **57/57 tests green across iter 51–55.**
+- Files: `backend/agent_os/{__init__, models, audit, approvals, db_guard, mcp_registry, orchestrator, pods/__init__}.py`, `backend/routers/agent_os_router.py`, `backend/server.py` (bootstrap hook + router mount), `backend/tests/test_agent_os_sprint1.py`.
+
+**Deviations from spec (logged for reconciliation):**
+1. Stack: Python/FastAPI + MongoDB instead of Node/TS + Postgres. Every collection maps 1:1 to a table the spec would have called for (`agent_pods` ↔ `pods`, `agent_approval_queue` ↔ `approval_queue`, `agent_audit_log` ↔ `audit_log`).
+2. DB-grant equivalent: the `AgentDb` write-guard wrapper is application-layer, not connection-layer. Sprint 4 (RBAC hardening) should replace this with a separate MongoDB connection user scoped away from protected collections.
+3. Pod A queues all approvals in one pass rather than halting on first — documented in the handler as a UX improvement over strict spec-halt semantics.
+4. Sprint 1 shipped without an Approval Queue UI — the spec's Sprint 2 deliverable. All operations available via API; UI panel lands next sprint.
+5. MCP connectors are stubs. No live HubSpot/Apollo traffic. Real clients replace stub instances in `mcp_registry._CONNECTORS` in Sprint 3.
+
+
+
 ### Iteration 54 — Feb 2026 · Twilio WhatsApp Integration
 - **Twilio v9.10.9 Python SDK** wired in; credentials in `backend/.env` under `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_SENDER` (`whatsapp:+13612788411` sandbox); API-key pair support optional; 5 content-template SIDs stubbed as env vars (`TWILIO_CONTENT_SID_NEW_COURSE`, `_ENROLLMENT_STALE`, `_DEADLINE`, `_CERTIFICATE_ISSUED`, `_CE_RENEWAL`) — one-line swap once Meta approves each.
 - **Data model**: `UserPublic` extended with `whatsapp_number`, `whatsapp_opt_in`, `whatsapp_opt_in_source`, `whatsapp_opt_in_timestamp` (all default null/false — Meta-compliant, never pre-checked). New `WhatsAppOptInPayload`. New `whatsapp_message_log` collection storing `user_id`, `template_sid`, `content_variables`, `twilio_message_sid`, `status`, `error_code`, timestamps — required for delivery-status callbacks and audit.

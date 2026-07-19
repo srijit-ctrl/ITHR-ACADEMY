@@ -11,7 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from core import db, logger, mongo_client, now_iso
 from routers import (
-    admin_dashboard_router, admin_router, assessment_router, auth_router, catalog_router, checkout_router,
+    admin_dashboard_router, admin_router, agent_os_router, assessment_router, auth_router, catalog_router, checkout_router,
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, password_reset_router, paths_router,
     recommendation_router, share_router, trust_router, tutor_router, voice_router, podcast_router,
@@ -290,6 +290,7 @@ for r in (
     share_router.router,
     whatsapp_router.router,
     whatsapp_router.admin_router,
+    agent_os_router.router,
     video_quiz_router.router,
     referral_router.router,
     security_router.router,
@@ -375,6 +376,16 @@ async def on_startup():
         except Exception:
             logger.exception("Sample certificate seed failed (non-fatal)")
         logger.info("Background seeding complete.")
+
+        # Agent OS bootstrap — registers pod handlers + creates indexes.
+        # Registration is a side-effect of the import (see agent_os.pods).
+        try:
+            import agent_os.pods  # noqa: F401 — registers pod handlers
+            from agent_os.orchestrator import bootstrap as _agent_bootstrap
+            await _agent_bootstrap()
+            logger.info("Agent OS bootstrap complete.")
+        except Exception:
+            logger.exception("Agent OS bootstrap failed (non-fatal)")
 
     _asyncio.create_task(_background_seed())
     logger.info("Backend started; seeding scheduled in background.")
