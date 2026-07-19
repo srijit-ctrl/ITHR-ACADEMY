@@ -12,6 +12,17 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 51 — Feb 2026 · Founding Seats CTA · Tutor Feedback Loop · LinkedIn Share
+- **Register page seat counter**: `/register` now surfaces the same live founding-500 counter as the floating flasher (progress bar + "Only N free seats left") — reads `/api/trust/founding-seats`, auto-hides when the cohort is full.
+- **AI Tutor thumbs-up / thumbs-down**: every completed non-welcome assistant reply in the InlineTutor, CertificateTutor, and floating TutorDrawer gets rate buttons. Backend: `POST /api/ai/tutor/rate` (ownership + turn-range checked, upserts to allow changes) and `GET /api/ai/tutor/ratings/{session_id}` (hydrates state on reload). Optional 500-char free-text reason on thumbs-down.
+- **Super Admin AI Ops now shows real satisfaction**: KPI card replaces the "est. tokens" tile with `satisfaction_pct` (up ÷ (up + down)); new "Learner ratings" block (thumbs-up / thumbs-down / total + proportion bar) and "Latest thumbs-down reasons" list surface the last 8 free-text complaints. Rating coverage % shown as caption.
+- **LinkedIn / social share for credentials**: new backend endpoints `GET /api/certificates/{id}/share-image.png` (PIL-rendered 1200×630 branded card) and `GET /api/share/certificate/{id}` (public HTML landing with OG + Twitter Card meta + meta-refresh to `/verify/{id}`). Certificate page adds three buttons: "Add to LinkedIn profile" (existing), **"Share on LinkedIn feed"** (uses share-offsite intent + the new landing URL so previews render the branded image), and **"Download share image"** — plus an inline `share-image-preview` block so learners see what will appear on the feed.
+- Files touched: `backend/routers/share_router.py` (new), `backend/routers/tutor_router.py`, `backend/routers/command_center_router.py`, `backend/server.py`, `frontend/src/pages/Register.jsx`, `frontend/src/pages/Certificate.jsx`, `frontend/src/components/tutor/{useTutorStream.js,TutorConversation.jsx,TutorDrawer.jsx}`, `frontend/src/components/InlineTutor.jsx`, `frontend/src/components/CertificateTutor.jsx`, `frontend/src/components/admin/Phase2Panels.jsx`.
+- Testing: pytest suite `tests/test_iteration51_share_ratings_seats.py` 8/8 green. Playwright smoke: register → drawer → send prompt → thumbs-up persisted (rating survives reload, testid `tutor-rate-up-0`).
+- Post-testing fix: corrected off-by-one on `assistantSeen` counter in `TutorDrawer.jsx` and `TutorConversation.jsx` — the synthetic welcome bubble was inflating `turn_index` and causing the backend to reject the first rating. Fix moves the increment inside the `id !== 'welcome'` guard.
+
+
+
 ### Iteration 1 — MVP Core
 - Backend (FastAPI + MongoDB), JWT + bcrypt + Emergent Google OAuth
 - 1 full course + 22 catalog stubs, enrollment, quiz, certificates, AI Tutor

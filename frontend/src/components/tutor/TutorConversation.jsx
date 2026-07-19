@@ -34,10 +34,9 @@ export default function TutorConversation({ messages, streaming, onAction, ratin
                 let assistantSeen = -1;
                 return messages.map((m, i) => {
                     let turnIndex = null;
-                    if (m.role === "assistant") {
+                    if (m.role === "assistant" && m.id !== "welcome") {
                         assistantSeen += 1;
-                        // Skip the synthetic welcome bubble for rating purposes.
-                        if (m.id !== "welcome") turnIndex = assistantSeen;
+                        turnIndex = assistantSeen;
                     }
                     return (
                         <div key={m.id || `msg-${i}`}>
