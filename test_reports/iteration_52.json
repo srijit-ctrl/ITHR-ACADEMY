@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 52 — validated the onboarding email drip + referral leaderboard features shipped this session. Backend suite is 21/21 GREEN. All endpoints behave to spec: (1) POST /api/admin/drips/onboarding/run — super-admin gated, dry-run returns correct shape (dry_run, generated_at, first_course_nudge{eligible,sent,skipped_already_sent,errors,dry_run_samples}, referral_invite{...}); role exclusion works (superadmin@ithr.online never appears in samples); drip_send_log has the unique (user_id, stage) index; end-to-end idempotency confirmed by backdating a fresh @example.com learner 3 days and running non-dry TWICE — second run skips via drip_send_log (exactly 1 row after 2 runs). Both new email helpers (send_first_course_nudge_email, send_referral_invite_email) return bool without raising even when Resend can't deliver. (2) GET /api/referrals/leaderboard — public masked list works (sort converted DESC, signups DESC), rows shape correct, unauth callers get NO viewer_* fields, signed-in 0-signup callers get viewer_rank=null + viewer_stats.signups=0 + masked name (verified 'Alice Ma' -> 'Alice M.'). Limit bounds enforced (0/51 -> 422). (3) GET /api/admin/referrals/leaderboard — super-admin only, unmasked rows include user_id/full_name/email/organization/referral_code; limit clamped to [1,100] rather than 422. (4) Frontend — new leaderboard block renders in dashboard ReferralPanel with all required testids: referral-leaderboard, referral-leaderboard-table, leaderboard-row-{1..5}, referral-leaderboard-you. Rank #1 shows the Crown icon. Zero-signup viewer sees exact spec text: 'Refer your first professional to appear on this leaderboard.' No frontend or backend blockers found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/referrals/leaderboard",
+        "issue": "5 orphan referral_signups rows exist in the DB whose referrer_id no longer points to any user (leftover from previous test iterations). Aggregation happily returns them and _mask_name('') -> 'Anonymous', so the public leaderboard shows 5 rows of 'Anonymous — 1 — 1'. Not a bug in this session's code (masking handles it correctly) but a data-hygiene nit — the aggregation could optionally filter to referrer_ids that resolve to a live user. Non-blocking."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration52_drip_leaderboard.py",
+    "/app/test_reports/pytest/iter52.xml"
+  ],
+  "action_items": [
+    "Optional: extend _aggregate_leaderboard() to skip orphan referrer_ids (either filter users first, or drop rows where by_id lookup misses) so the public board doesn't advertise 5 dead 'Anonymous' entries. Non-blocking.",
+    "Optional: add a follow-up periodic cleanup that prunes referral_signups whose referrer no longer exists — same root cause as above."
+  ],
+  "critical_code_review_comments": [
+    "onboarding_drip.py — clean design. _ensure_indexes() runs on every call, so a missing index self-heals. Correct role exclusion via role: {$nin: ['super_admin', 'admin']} on BOTH stage candidate queries. Try/except around each Resend send + record-first-then-count means even a failing send is logged, preventing infinite retries. Bounded .to_list(500) per stage to cap blast radius. Fully idempotent.",
+    "onboarding_drip.py — share_url is built as `{base}/register?ref={code}` when base is set, else just the raw code. On this preview env PUBLIC_APP_URL points at the PROD host (learn.ithr.online), so drip emails from the preview backend will actually link to prod. Same pattern as the certificate share landing — consistent, but worth noting.",
+    "referral_router.py _mask_name — handles empty/one-word/multi-word cleanly. Uses last-name INITIAL only (not full last name), so PII exposure is minimal. Anonymous fallback for empty strings is correct.",
+    "referral_router.py _aggregate_leaderboard — good use of $cond in $sum for the converted count. Sort tiebreaker uses _id ASC which is deterministic (per spec: 'user_id ASC as final tiebreak'). Row shape includes full user record fields — the /leaderboard endpoint then only exposes the masked subset, while build_full_leaderboard() exposes the full row. Clean separation.",
+    "referral_router.py viewer_rank — the 'better' aggregation correctly ranks by (converted DESC, signups DESC) using $or match — matches the sort key. When me_signups==0 the viewer_rank is short-circuited to None but viewer_stats is still populated. Matches spec verbatim.",
+    "admin_router.py /drips/onboarding/run — properly gated with get_current_super_admin (returns 401 unauth / 403 non-admin). Passes share_base via PUBLIC_APP_URL || FRONTEND_URL — sensible fallback chain.",
+    "admin_router.py /referrals/leaderboard — reuses build_full_leaderboard() from referral_router so masked + unmasked paths can't drift. limit is clamped server-side (1..100) instead of 422 — inconsistent with the public endpoint which raises 422 for out-of-range limits; consider aligning the two (both should either clamp OR both 422). Non-blocking.",
+    "ReferralPanel.jsx — leaderboard block only renders when leaderboard.rows.length > 0, which is a nice guard (no empty table on a green-field DB). BUT this means if a signed-in user is the ONLY referrer in the DB, the block hides itself before they ever appear on it. Cosmetic — will resolve itself once the DB has real referrer data. Crown on rank 1 rendered via lucide-react Crown component; 'You' marker uses row.name equality which correctly matches masked-vs-masked."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration52_drip_leaderboard.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (21/21 pytest — mask helper unit tests, public leaderboard shape+sort+limit+viewer rank, admin unmasked path + auth, drip dry-run + role exclusion + unique index, drip real-send idempotency with 3-day-backdated fresh learner, both new email helpers non-raising)",
+    "frontend": "100% — leaderboard block renders on /dashboard with all required data-testids (referral-leaderboard, referral-leaderboard-table, leaderboard-row-1..5, referral-leaderboard-you). Rank #1 has the Crown SVG. Zero-signup viewer hint matches spec verbatim."
+  },
+  "test_credentials": "superadmin@ithr.online (SUPER_ADMIN_PASSWORD from backend/.env). Fresh learners: TEST_it52_<uuid>@example.com / TestPass123! for backend suite, TEST_it52ui_<uuid>@example.com for UI — all swept post-run (0 leftovers verified).",
+  "seed_data_creation": "None persisted. Backend suite creates 4 short-lived @example.com learners (cleaned up by TestZZCleanup). UI test created 1 learner (fc796167) and admin-swept it manually via 200-status DELETE.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest at /app/backend/tests/test_iteration52_drip_leaderboard.py — 21 tests, ~4s. Uses sync pymongo (not motor) for cross-test DB pokes because motor's client caches the event loop and breaks under pytest-xdist's multiple asyncio.run() calls. Login returns 'token' (not 'access_token'). Admin user search: GET /api/admin/users?q=<prefix>. Emails are lowercased on register — use case-insensitive comparison when checking drip_send_log rows. Preview PUBLIC_APP_URL points at learn.ithr.online (prod), so drip email links + certificate share pages emit prod URLs. The public /leaderboard endpoint currently shows 5 orphan 'Anonymous' rows because their referrer_id no longer resolves — masking handles this fine but the underlying data could be cleaned.",
+  "rca of the issue": "N/A — no issues detected in this iteration. Two test failures during initial run were TEST-INFRA issues (motor async client + multiple asyncio.run() calls == 'Event loop is closed'; email casing in DB is lowercase while python-side var kept mixed case). Both fixed by switching DB helpers to sync pymongo and comparing emails case-insensitively — no production-code changes were needed."
+}

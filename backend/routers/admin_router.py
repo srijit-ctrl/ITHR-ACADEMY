@@ -443,6 +443,40 @@ async def run_impressions_digest_endpoint(
     return await run_impressions_digest(dry_run=dry_run, window_days=window_days)
 
 
+@router.post("/drips/onboarding/run")
+async def run_onboarding_drip_endpoint(
+    dry_run: bool = False,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Manually run the onboarding email drip.
+
+    Two stages in one pass:
+      1. Day-2 first-course nudge  — for users with 0 enrollments after 48h
+      2. Day-5 referral invite     — for users with ≥1 enrollment + 0 referral
+                                     signups after 120h
+
+    Idempotent — a user who has already received a given stage is never
+    contacted again. Safe to schedule daily.
+    """
+    import os
+    from onboarding_drip import run_onboarding_drip
+    share_base = (os.environ.get("PUBLIC_APP_URL") or os.environ.get("FRONTEND_URL") or "").rstrip("/")
+    return await run_onboarding_drip(dry_run=dry_run, share_base=share_base)
+
+
+@router.get("/referrals/leaderboard")
+async def admin_referral_leaderboard(
+    limit: int = 25,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Unmasked referral leaderboard for the Super Admin panel — includes
+    real name, email, org, and personal code so the ops team can reach out
+    to top champions directly."""
+    from routers.referral_router import build_full_leaderboard
+    limit = max(1, min(100, limit))
+    return await build_full_leaderboard(limit)
+
+
 # ---- AI course-content generation status ---------------------------------
 @router.get("/courses/content-status")
 async def courses_content_status(_super_admin_id: str = Depends(get_current_super_admin)):

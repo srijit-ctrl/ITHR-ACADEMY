@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Copy, Gift, Users, Loader2, Check, Linkedin, MessageCircle } from "lucide-react";
+import { Copy, Gift, Users, Loader2, Check, Linkedin, MessageCircle, Trophy, Crown } from "lucide-react";
 import useFlags from "@/hooks/useFlags";
 import { toast } from "sonner";
 
@@ -10,10 +10,18 @@ export const ReferralPanel = () => {
     const [courses, setCourses] = useState([]);
     const [pick, setPick] = useState("");
     const [redeeming, setRedeeming] = useState(false);
+    const [leaderboard, setLeaderboard] = useState(null);
 
     const load = () => api.get("/referrals/me").then((r) => setData(r.data)).catch(() => {});
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => {
+        if (!isEnabled("referrals")) return;
+        api.get("/referrals/leaderboard?limit=10")
+            .then((r) => setLeaderboard(r.data))
+            .catch(() => {});
+    }, [isEnabled]);
 
     useEffect(() => {
         if (data?.rewards_available > 0 && courses.length === 0) {
@@ -132,6 +140,75 @@ export const ReferralPanel = () => {
                     )}
                 </div>
             </div>
+
+            {leaderboard && leaderboard.rows.length > 0 && (
+                <div className="card-flat p-6 md:p-7 mt-5" data-testid="referral-leaderboard">
+                    <div className="flex items-baseline justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Trophy className="w-4 h-4 text-brand" />
+                            <h3 className="font-serif text-xl tracking-tight">Founding referrers · Leaderboard</h3>
+                        </div>
+                        <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                            {leaderboard.totals.referrers} referrers · {leaderboard.totals.converted} conversions
+                        </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm" data-testid="referral-leaderboard-table">
+                            <thead>
+                                <tr className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground border-b border-border">
+                                    <th className="text-left py-2 pr-4 w-14">Rank</th>
+                                    <th className="text-left py-2 pr-4">Referrer</th>
+                                    <th className="text-left py-2 pr-4 hidden md:table-cell">Organization</th>
+                                    <th className="text-right py-2 pr-4">Signups</th>
+                                    <th className="text-right py-2">Converted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {leaderboard.rows.map((row) => {
+                                    const isMe = leaderboard.viewer_rank === row.rank && (leaderboard.viewer_stats?.name || "") === row.name;
+                                    return (
+                                        <tr
+                                            key={row.rank}
+                                            data-testid={`leaderboard-row-${row.rank}`}
+                                            className={`border-b border-border/40 ${isMe ? "bg-brand/5" : ""}`}
+                                        >
+                                            <td className="py-2.5 pr-4 font-mono text-xs">
+                                                {row.rank === 1 ? (
+                                                    <span className="inline-flex items-center gap-1 text-brand">
+                                                        <Crown className="w-3.5 h-3.5" /> 1
+                                                    </span>
+                                                ) : `#${row.rank}`}
+                                            </td>
+                                            <td className="py-2.5 pr-4">{row.name}{isMe && <span className="ml-2 text-[10px] font-mono uppercase tracking-[0.15em] text-brand">You</span>}</td>
+                                            <td className="py-2.5 pr-4 hidden md:table-cell text-muted-foreground truncate max-w-[220px]">{row.organization || "—"}</td>
+                                            <td className="py-2.5 pr-4 text-right font-mono">{row.signups}</td>
+                                            <td className="py-2.5 text-right font-mono text-brand">{row.converted}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between text-xs" data-testid="referral-leaderboard-you">
+                        {leaderboard.viewer_stats ? (
+                            leaderboard.viewer_rank ? (
+                                <p className="text-muted-foreground">
+                                    You are <b className="text-brand font-mono">#{leaderboard.viewer_rank}</b> with{" "}
+                                    <b className="text-foreground">{leaderboard.viewer_stats.signups}</b> signup{leaderboard.viewer_stats.signups === 1 ? "" : "s"} ·{" "}
+                                    <b className="text-brand">{leaderboard.viewer_stats.converted}</b> converted.
+                                </p>
+                            ) : (
+                                <p className="text-muted-foreground italic">
+                                    Refer your first professional to appear on this leaderboard.
+                                </p>
+                            )
+                        ) : <span />}
+                        <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground/70">
+                            Names masked · public view
+                        </span>
+                    </div>
+                </div>
+            )}
         </section>
     );
 };

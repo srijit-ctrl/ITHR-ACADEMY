@@ -714,3 +714,119 @@ async def send_referral_reward_email(email: str, full_name: str, referred_name: 
         + _TEXT_SIGNOFF
     )
     return await _fire(email, f"Referral reward unlocked — free course #{reward_num} of 5", html, text, tag="referral-reward")
+
+
+# ---- Onboarding drip: Day-2 first-course nudge --------------------------
+
+
+async def send_first_course_nudge_email(email: str, full_name: str) -> bool:
+    """Sent on Day 2 to registered learners who haven't enrolled in any course yet.
+
+    Nudge the learner into their first enrollment (which triggers the first-course
+    bypass code + starts real learning). Warm, low-pressure tone.
+    """
+    catalog_url = f"{FRONTEND_URL}/courses"
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    first = _first(full_name)
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  A couple of days ago you claimed your seat at <b style="color:#16335E;">ITHR Academy</b> — welcome
+  once more. Your account is ready; the next step is choosing where to start.
+</p>
+{_section("Two ways to begin")}
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:18px;">
+  <li><b style="color:#16335E;">Agentic AI Foundations</b> — the vocabulary and mental models every leader needs, in 15 modules.</li>
+  <li><b style="color:#16335E;">An industry track</b> — Banking, Healthcare, Manufacturing, Retail, Government or HR / Talent Ops — tailored to the room you actually work in.</li>
+</ul>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Whichever you pick, <b style="color:#16335E;">Aletheia</b>, your AI tutor, is embedded inside every
+  lesson to answer questions in your context and quiz you when you want to stress-test the material.
+</p>
+{_section("Founding Member perk still active")}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  While the first 500 seats are open, your first full course + credential is free once you enroll —
+  no card required. It is limited to a single course per learner, so choose the one that matters most.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Pick a course and I'll see you inside.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker="ITHR Academy · Choose your first course",
+        heading=f"Ready when you are, {first}.",
+        body_html=body,
+        cta_label="Browse the Catalog",
+        cta_url=catalog_url,
+        footer_note=f"If you'd rather go straight to your dashboard, sign in here: {dash_url}",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        "A couple of days ago you claimed your seat at ITHR Academy. Your account is ready — "
+        "the next step is picking a first course.\n\n"
+        "TWO WAYS TO BEGIN\n"
+        "• Agentic AI Foundations — the vocabulary + mental models every leader needs (15 modules).\n"
+        "• An industry track — Banking, Healthcare, Manufacturing, Retail, Government, or HR.\n\n"
+        "FOUNDING MEMBER PERK\n"
+        "Your first full course + credential is free while the first-500 seats remain open.\n\n"
+        f"Browse the catalog: {catalog_url}\n"
+        f"Dashboard: {dash_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(email, "Your ITHR Academy seat is waiting — pick a course to begin", html, text, tag="drip-first-course-nudge")
+
+
+# ---- Onboarding drip: Day-5 referral invite ------------------------------
+
+
+async def send_referral_invite_email(email: str, full_name: str, referral_code: str, share_url: str) -> bool:
+    """Sent on Day 5 to learners who have started at least one course but haven't
+    yet shared their personal referral code. Positions the ask as "reward the
+    people you'd want in the room with you"."""
+    first = _first(full_name)
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  You're in — and now you have five invitations you can hand out.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 20px 0;">
+  Your <b style="color:#16335E;">personal referral code</b> gives up to five other professionals their
+  first full course free. Each one who enrolls unlocks another complimentary course of your choice —
+  up to five, on us.
+</p>
+{_section("Your code")}
+<div style="background:#F6F8FB;border:1px dashed #16335E;border-radius:6px;padding:14px 18px;margin:0 0 18px 0;text-align:center;">
+  <div style="font-family:monospace;font-size:22px;letter-spacing:0.2em;color:#16335E;font-weight:600;">{_safe(referral_code)}</div>
+</div>
+<p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 20px 0;">
+  Or share this direct link: <a href="{share_url}" style="color:#00A78B;font-weight:600;word-break:break-all;">{share_url}</a>
+</p>
+{_section("Who should you invite?")}
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:18px;">
+  <li>The two colleagues you already trust with hard problems.</li>
+  <li>Anyone reporting into you who has been asking "where do I start with AI?"</li>
+  <li>A peer at another company you swap notes with — they'll thank you.</li>
+</ul>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Reward the people you'd want in the room with you.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker="ITHR Academy · Five invitations to give",
+        heading=f"{first}, five people can join — free — on you.",
+        body_html=body,
+        cta_label="Manage My Referrals",
+        cta_url=dash_url,
+        footer_note="You can copy your code, share it on LinkedIn, or send it via WhatsApp from your dashboard's Refer & Earn panel.",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        "You're in — and now you have five invitations you can hand out.\n\n"
+        f"Your personal referral code: {referral_code}\n"
+        f"Direct link: {share_url}\n\n"
+        "Each of the first five people who enrolls with your code gets their first course free — "
+        "and unlocks another complimentary course of your choice for you.\n\n"
+        f"Manage referrals: {dash_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(email, "5 invitations to give — your ITHR Academy referral code", html, text, tag="drip-referral-invite")
+
