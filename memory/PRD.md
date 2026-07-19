@@ -1116,3 +1116,8 @@ exam_pass_rate, mock_revenue_total, llm_key_health (green|red)
 - New `components/InauguralFlasher.jsx` rendered at top of Landing: navy/gold animated banner (gold shimmer sweep, pulsing badge) advertising "First full course + certification FREE for first 500 joiners + up to 5 referral bonus courses", CTA → /register, dismissible via localStorage (`ithr_inaugural_flasher_dismissed_v1`). Verified via localhost screenshot + dismiss persistence test.
 - Prod email verdict: preview sends fine (Resend key valid, DKIM+SPF verified for ithr.online; only inbound Receiving MX failed — doesn't affect sending). Tested prod directly: signup on https://ithr.online succeeded but NO email appeared in Resend log → production pod is missing RESEND_API_KEY. Root cause chain: earlier deploys shipped without .env (gitignore bug). backend/.env + frontend/.env are now committed (commit 80ea49b). User must REDEPLOY after that commit; if still failing, RESEND_API_KEY must be set in the deployment's env config / Emergent Support.
 - NOTE: external preview URL intermittently serves a stale "asleep" CDN snapshot (old logo + "wake servers" banner) — use localhost:3000 for UI verification.
+
+## 2026-07-17 — Deployment readiness cycle
+- Fixed recurring blocker: `.env` ignore patterns (.env/.env.*/*.env) had crept back into .gitignore via an auto-commit — removed; backend/.env & frontend/.env tracked again.
+- Deployment agent re-scan: PASS (no blockers).
+- Testing agent smoke regression: 7/7 pass (login, catalog, founding-seats counter, register + welcome email, assessment session, health). Reusable suite: backend/tests/test_deploy_readiness.py.
