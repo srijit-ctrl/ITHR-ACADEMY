@@ -2,9 +2,27 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
+import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2, Bell, Check } from "lucide-react";
 import { CourseIntroHero } from "@/components/CourseIntro";
 import CoursePreviewButton from "@/components/CoursePreviewButton";
+import { toast } from "sonner";
+
+/** Human-readable tier structure derived from the course's own modules,
+ *  never hardcoded. Modules carry a `level` (1=Free, 2=Premium, 3=Certification).
+ *  Falls back to "N modules" for coming-soon courses that don't yet have
+ *  the full 3-tier ladder in place. */
+function tierBreakdown(modules) {
+    const counts = { 1: 0, 2: 0, 3: 0 };
+    (modules || []).forEach((m) => {
+        const lvl = Number(m.level) || 1;
+        if (counts[lvl] != null) counts[lvl] += 1;
+    });
+    const tiersPresent = Object.values(counts).filter((n) => n > 0).length;
+    const total = (modules || []).length;
+    if (!total) return null;
+    if (tiersPresent >= 2) return `${total} module${total === 1 ? "" : "s"} across ${tiersPresent} tier${tiersPresent === 1 ? "" : "s"}`;
+    return `${total} module${total === 1 ? "" : "s"}`;
+}
 
 export default function CourseDetail() {
     const { slug } = useParams();
@@ -14,6 +32,8 @@ export default function CourseDetail() {
     const [loading, setLoading] = useState(true);
     const [enrolled, setEnrolled] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
+    const [waitlisted, setWaitlisted] = useState(false);
+    const [joiningWaitlist, setJoiningWaitlist] = useState(false);
 
     useEffect(() => {
         api.get(`/courses/${slug}`).then((r) => { setCourse(r.data); setLoading(false); }).catch(() => setLoading(false));
@@ -37,11 +57,28 @@ export default function CourseDetail() {
         } finally { setEnrolling(false); }
     };
 
+    const handleWaitlist = async () => {
+        if (!user) { navigate("/login", { state: { from: `/courses/${slug}` } }); return; }
+        setJoiningWaitlist(true);
+        try {
+            const r = await api.post(`/courses/${slug}/waitlist`);
+            setWaitlisted(true);
+            toast.success(r.data.already_joined ? "You're already on this waitlist." : "You're on the list — we'll email you when it launches.");
+        } catch (err) {
+            toast.error(err.response?.data?.detail || "Couldn't join the waitlist. Try again in a moment.");
+        } finally {
+            setJoiningWaitlist(false);
+        }
+    };
+
     if (loading) return <div className="container-page py-24"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
     if (!course) return <div className="container-page py-24 text-center">Course not found. <Link to="/courses" className="text-brand underline">Back to catalog</Link></div>;
 
-    const hasFull = course.modules && course.modules.length > 0;
+    const isComingSoon = course.status === "coming_soon";
+    const hasFull = !isComingSoon && course.modules && course.modules.length > 0;
     const firstLesson = hasFull && course.modules[0]?.lessons?.[0];
+    const tierText = tierBreakdown(course.modules);
+    const totalLessons = (course.modules || []).reduce((n, m) => n + (m.lessons?.length || 0), 0);
 
     return (
         <div>
@@ -58,43 +95,80 @@ export default function CourseDetail() {
                 <div className="relative container-page py-16 md:py-24 grid grid-cols-1 lg:grid-cols-12 gap-10">
                     <div className="lg:col-span-8">
                         <div className="flex flex-wrap items-center gap-3 mb-6">
+                            {isComingSoon && (
+                                <span
+                                    data-testid="course-coming-soon-badge"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-brand bg-brand/10 text-brand text-[10px] font-mono uppercase tracking-[0.15em]"
+                                >
+                                    <Bell className="w-3 h-3" /> Coming soon
+                                </span>
+                            )}
                             <span className="badge-crimson">{course.category}</span>
                             <span className="badge-mono">{course.difficulty}</span>
                             {course.industries?.slice(0, 3).map((ind) => <span key={ind} className="badge-mono">{ind}</span>)}
                         </div>
                         <h1 className="font-serif text-4xl md:text-6xl tracking-tighter leading-[1.02] mb-4">{course.title}</h1>
                         <p className="text-xl text-muted-foreground italic mb-6">{course.subtitle}</p>
-                        <div className="mb-8">
-                            <CoursePreviewButton course={course} variant="pill" />
-                        </div>
+                        {!isComingSoon && (
+                            <div className="mb-8">
+                                <CoursePreviewButton course={course} variant="pill" />
+                            </div>
+                        )}
                         <p className="text-base leading-relaxed max-w-3xl mb-8">{course.description}</p>
 
                         <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground border-t border-border pt-6">
                             <span className="flex items-center gap-2"><Clock className="w-4 h-4" /><b className="text-foreground">{course.duration_hours}h</b> total</span>
-                            <span className="flex items-center gap-2"><BookOpen className="w-4 h-4" />{course.modules?.length || 15} modules</span>
-                            <span className="flex items-center gap-2" data-testid="course-detail-freshness">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-brand bg-brand/5 text-brand text-[10px] font-mono uppercase tracking-[0.15em]">
-                                    <span className="w-1.5 h-1.5 bg-brand rounded-full animate-pulse" />
-                                    Freshness {course.freshness_score ?? 100}
+                            <span className="flex items-center gap-2"><BookOpen className="w-4 h-4" />{course.modules?.length || 0} modules</span>
+                            {!isComingSoon && (
+                                <span className="flex items-center gap-2" data-testid="course-detail-freshness">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-brand bg-brand/5 text-brand text-[10px] font-mono uppercase tracking-[0.15em]">
+                                        <span className="w-1.5 h-1.5 bg-brand rounded-full animate-pulse" />
+                                        Freshness {course.freshness_score ?? 100}
+                                    </span>
+                                    <span className="text-xs">
+                                        {course.days_since_review === 0
+                                            ? "Refreshed today"
+                                            : course.days_since_review == null || course.days_since_review > 500
+                                            ? "New"
+                                            : `Refreshed ${course.days_since_review}d ago`}
+                                    </span>
                                 </span>
-                                <span className="text-xs">
-                                    {course.days_since_review === 0
-                                        ? "Refreshed today"
-                                        : course.days_since_review == null || course.days_since_review > 500
-                                        ? "New"
-                                        : `Refreshed ${course.days_since_review}d ago`}
-                                </span>
-                            </span>
+                            )}
                         </div>
                     </div>
 
                     <aside className="lg:col-span-4">
-                        <div className="card-flat p-8 sticky top-24">
-                            <div className="overline mb-3">Certification Track</div>
-                            <div className="font-serif text-2xl leading-tight mb-1">ITHR Academy Editorial Team</div>
-                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-6">Course authored & reviewed by ITHR</div>
+                        <div className="card-flat p-8 sticky top-24" data-testid={`course-sidebar-${course.status || "published"}`}>
+                            {isComingSoon ? (
+                                <>
+                                    <div className="overline mb-3">Waitlist</div>
+                                    <div className="font-serif text-2xl leading-tight mb-1">Not yet enrollable</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-6">Curriculum in preparation · Editorial team</div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="overline mb-3">Certification Track</div>
+                                    <div className="font-serif text-2xl leading-tight mb-1">ITHR Academy Editorial Team</div>
+                                    <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-6">Course authored &amp; reviewed by ITHR</div>
+                                </>
+                            )}
 
-                            {enrolled ? (
+                            {isComingSoon ? (
+                                <button
+                                    onClick={handleWaitlist}
+                                    disabled={joiningWaitlist || waitlisted}
+                                    data-testid="waitlist-button"
+                                    className="btn-primary w-full mb-3"
+                                >
+                                    {waitlisted ? (
+                                        <><Check className="w-4 h-4" /> On the list</>
+                                    ) : joiningWaitlist ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <><Bell className="w-4 h-4" /> Notify me when live</>
+                                    )}
+                                </button>
+                            ) : enrolled ? (
                                 <Link to={firstLesson ? `/learn/${slug}/${course.modules[0].id}/${firstLesson.id}` : "/dashboard"} data-testid="continue-learning" className="btn-primary w-full mb-3">
                                     Continue learning <ArrowRight className="w-4 h-4" />
                                 </Link>
@@ -105,7 +179,7 @@ export default function CourseDetail() {
                                     data-testid="enroll-button"
                                     className="btn-primary w-full mb-3"
                                 >
-                                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : (hasFull ? "Enroll — Modules 1-5 free" : "Notify me when live")}
+                                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enroll — Modules 1-5 free"}
                                 </button>
                             )}
                             {hasFull && course.quiz?.length > 0 && enrolled && (
@@ -115,10 +189,35 @@ export default function CourseDetail() {
                             )}
 
                             <div className="mt-8 space-y-3 text-sm">
-                                <div className="flex items-start gap-3"><CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>15 modules across 3 tiers</span></div>
-                                <div className="flex items-start gap-3"><CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Hands-on labs & capstone project</span></div>
-                                <div className="flex items-start gap-3"><CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Verified digital credential upon passing</span></div>
-                                <div className="flex items-start gap-3"><CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" /><span>Personal AI tutor throughout</span></div>
+                                {tierText && (
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" />
+                                        <span data-testid="course-sidebar-modules">{tierText}</span>
+                                    </div>
+                                )}
+                                {!isComingSoon && totalLessons > 0 && (
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" />
+                                        <span>{totalLessons} lessons · Hands-on labs</span>
+                                    </div>
+                                )}
+                                {!isComingSoon && (
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" />
+                                        <span>Verified digital credential upon passing</span>
+                                    </div>
+                                )}
+                                {!isComingSoon && (
+                                    <div className="flex items-start gap-3">
+                                        <CheckCircle2 className="w-4 h-4 text-brand mt-0.5 shrink-0" />
+                                        <span>Personal AI tutor throughout</span>
+                                    </div>
+                                )}
+                                {isComingSoon && (
+                                    <p className="text-xs text-muted-foreground leading-relaxed" data-testid="course-sidebar-coming-soon-copy">
+                                        We publish curriculum only when it clears our editorial review. Join the waitlist and we'll email you the moment this course goes live — no enrollment or payment is accepted until then.
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </aside>
@@ -130,18 +229,20 @@ export default function CourseDetail() {
                 <div className="lg:col-span-5">
                     <div className="overline mb-4 fine-rule pl-4">What you'll master</div>
                     <h2 className="font-serif text-3xl tracking-tight mb-6">Learning objectives</h2>
-                    <ul className="space-y-4">
-                        {(course.learning_objectives?.length ? course.learning_objectives : [
-                            "Deep understanding of the course subject and its enterprise applications",
-                            "Practical skills through labs and exercises",
-                            "Ability to articulate business impact to executive stakeholders",
-                        ]).map((o, i) => (
-                            <li key={`objective-${i}-${o.slice(0, 24)}`} className="flex gap-4">
-                                <span className="font-mono text-xs text-brand pt-1">{String(i + 1).padStart(2, "0")}</span>
-                                <span className="text-base">{o}</span>
-                            </li>
-                        ))}
-                    </ul>
+                    {course.learning_objectives?.length > 0 ? (
+                        <ul className="space-y-4" data-testid="course-objectives">
+                            {course.learning_objectives.map((o, i) => (
+                                <li key={`objective-${i}-${o.slice(0, 24)}`} className="flex gap-4">
+                                    <span className="font-mono text-xs text-brand pt-1">{String(i + 1).padStart(2, "0")}</span>
+                                    <span className="text-base">{o}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-muted-foreground leading-relaxed" data-testid="course-objectives-empty">
+                            Detailed learning objectives will be published when this course launches. Join the waitlist to receive the full syllabus the day it becomes available.
+                        </p>
+                    )}
 
                     {course.skills_gained?.length > 0 && (
                         <>
@@ -155,7 +256,9 @@ export default function CourseDetail() {
 
                 <div className="lg:col-span-7">
                     <div className="overline mb-4 fine-rule pl-4">Curriculum</div>
-                    <h2 className="font-serif text-3xl tracking-tight mb-6">{course.modules?.length || 15}-module program</h2>
+                    <h2 className="font-serif text-3xl tracking-tight mb-6">
+                        {course.modules?.length ? `${course.modules.length}-module program` : "Curriculum coming soon"}
+                    </h2>
 
                     {hasFull ? (
                         <div className="space-y-2">
@@ -185,12 +288,14 @@ export default function CourseDetail() {
                             ))}
                         </div>
                     ) : (
-                        <div className="card-flat p-8">
+                        <div className="card-flat p-8" data-testid="course-curriculum-placeholder">
                             <div className="flex items-start gap-4">
                                 <Lock className="w-5 h-5 text-muted-foreground mt-1 shrink-0" />
                                 <div>
                                     <p className="font-serif text-lg mb-2">Full curriculum in preparation</p>
-                                    <p className="text-sm text-muted-foreground">This course follows the standard 15-module structure: Modules 1–5 free (Fundamentals), 6–10 Premium (Applied), 11–15 Certification (Advanced + Capstone). Full lesson content publishes soon. Enroll to secure early access.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        This course is being written now by the ITHR editorial team. Join the waitlist and we'll notify you the moment the full syllabus, hands-on labs, and certification exam are live. No enrollment is accepted until publication.
+                                    </p>
                                 </div>
                             </div>
                         </div>

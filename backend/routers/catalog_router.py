@@ -13,6 +13,34 @@ from seed_data import CATEGORIES, CERTIFICATION_PATHS, INDUSTRIES
 router = APIRouter(prefix="/api", tags=["catalog"])
 
 
+# Marker present on every stub description created by the seed. Used as the
+# authoritative fallback to derive publication status when the DB row itself
+# does not carry an explicit `status` field yet.
+_STUB_DESC_MARKER = "Full curriculum in preparation"
+
+
+def derive_status(doc: dict) -> str:
+    """Return `published` or `coming_soon` for a course document.
+
+    A course is *published* only when it has real editorial content:
+      * an explicit non-empty `learning_objectives` list, AND
+      * at least 10 modules (published catalogue standard is 15).
+
+    Everything else — including the 17 stub courses seeded with 4 empty
+    modules and the "Full curriculum in preparation" boilerplate — is
+    `coming_soon`. If the DB row already carries an explicit `status`
+    (set by an editor or a migration) that value wins.
+    """
+    if doc.get("status") in ("published", "coming_soon"):
+        return doc["status"]
+    has_objectives = bool(doc.get("learning_objectives") or [])
+    module_count = len(doc.get("modules") or [])
+    desc = doc.get("description") or ""
+    if not has_objectives or module_count < 10 or _STUB_DESC_MARKER in desc:
+        return "coming_soon"
+    return "published"
+
+
 @cached(ttl_seconds=180, key_prefix="catalog_courses")
 async def _cached_course_docs(query_key: str, query: dict) -> list[dict]:
     """Cached fetch of course docs matching a filter.
@@ -75,6 +103,7 @@ async def list_courses(
             enrolled_count=d.get("enrolled_count", 0), rating=d.get("rating", 4.7),
             module_count=len(d.get("modules", [])),
             has_full_content=d.get("has_full_content", False),
+            status=derive_status(d),
             last_reviewed_at=d.get("last_reviewed_at"),
             freshness_score=score, days_since_review=days,
         ))
@@ -89,6 +118,7 @@ async def get_course(slug: str):
     score, days = compute_freshness(doc)
     doc["freshness_score"] = score
     doc["days_since_review"] = days
+    doc["status"] = derive_status(doc)
     return Course(**doc)
 
 
@@ -191,6 +221,13 @@ async def enroll(slug: str, user_id: str = Depends(get_current_user_id)):
     course = await db.courses.find_one({"slug": slug}, {"_id": 0})
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+    # Refuse enrollment for courses that are not yet published — we must not
+    # charge (or later credential) a learner against a stub.
+    if derive_status(course) != "published":
+        raise HTTPException(
+            status_code=409,
+            detail="This course isn't published yet. Join the waitlist and we'll email you the moment it launches.",
+        )
     existing = await db.enrollments.find_one({"user_id": user_id, "course_id": course["id"]})
     if existing:
         return {"enrollment_id": existing["id"], "already_enrolled": True}
@@ -283,3 +320,33 @@ async def complete_lesson(payload: LessonCompleteRequest, user_id: str = Depends
     )
     await db.users.update_one({"id": user_id}, {"$inc": {"xp": 20}})
     return {"progress_pct": round(progress_pct, 1), "completed_lessons": len(completed_lessons), "total_lessons": total_lessons}
+
+
+
+@router.post("/courses/{slug}/waitlist")
+async def join_waitlist(slug: str, user_id: str = Depends(get_current_user_id)):
+    """Register the learner's interest in a not-yet-published course.
+
+    Idempotent — a returning learner just gets `already_joined: true` back.
+    Only accepts entries for `coming_soon` courses so the endpoint can't be
+    abused to shadow-flag published titles.
+    """
+    course = await db.courses.find_one({"slug": slug}, {"_id": 0, "id": 1, "title": 1, "description": 1, "learning_objectives": 1, "modules": 1, "status": 1})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if derive_status(course) == "published":
+        raise HTTPException(status_code=400, detail="This course is already live — enroll directly.")
+
+    existing = await db.course_waitlist.find_one({"user_id": user_id, "course_id": course["id"]})
+    if existing:
+        return {"already_joined": True, "joined_at": existing.get("joined_at")}
+
+    entry = {
+        "user_id": user_id,
+        "course_id": course["id"],
+        "course_slug": slug,
+        "course_title": course["title"],
+        "joined_at": now_iso(),
+    }
+    await db.course_waitlist.insert_one(entry)
+    return {"already_joined": False, "joined_at": entry["joined_at"]}

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BookOpen, Radio } from "lucide-react";
+import { BookOpen, Radio, Bell } from "lucide-react";
 import { CourseIntroButton } from "./CourseIntro";
 import CoursePreviewButton from "./CoursePreviewButton";
 
@@ -22,40 +22,55 @@ function freshnessLabel(days) {
 
 export default function CourseCard({ course, testIdPrefix = "course" }) {
     const score = course.freshness_score ?? 100;
+    const isComingSoon = course.status === "coming_soon";
     return (
         <Link
             to={`/courses/${course.slug}`}
             data-testid={`${testIdPrefix}-card-${course.slug}`}
+            data-course-status={course.status || "published"}
             className="card-sharp group flex flex-col overflow-hidden"
         >
             <div className="aspect-[16/10] relative overflow-hidden bg-surface-alt">
                 <img
                     src={course.thumbnail_url}
                     alt={course.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ${isComingSoon ? "opacity-70" : ""}`}
                     loading="lazy"
                 />
-                {/* 10-sec intro play button — visible on hover; click doesn't propagate to the outer Link. */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <CourseIntroButton course={course} />
+                {/* 10-sec intro play button — hidden for coming-soon courses (no intro to play). */}
+                {!isComingSoon && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <CourseIntroButton course={course} />
+                        </div>
                     </div>
-                </div>
+                )}
                 <div className="absolute top-3 left-3 flex gap-1.5 max-w-[48%]">
                     <span className="badge-mono bg-background/95 backdrop-blur truncate">{course.category}</span>
                 </div>
                 <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
-                    {course.has_full_content && (
-                        <span className="badge-mono bg-background/95 backdrop-blur border-brand text-brand">Full curriculum</span>
+                    {isComingSoon ? (
+                        <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.15em] border border-brand text-brand bg-background/95 backdrop-blur shadow-sm"
+                            data-testid={`coming-soon-badge-${course.slug}`}
+                        >
+                            <Bell className="w-2.5 h-2.5" /> Coming soon
+                        </span>
+                    ) : (
+                        <>
+                            {course.has_full_content && (
+                                <span className="badge-mono bg-background/95 backdrop-blur border-brand text-brand">Full curriculum</span>
+                            )}
+                            <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-mono uppercase tracking-[0.15em] border ${freshnessColor(score)} bg-background shadow-sm`}
+                                data-testid={`freshness-badge-${course.slug}`}
+                                title={freshnessLabel(course.days_since_review)}
+                            >
+                                <Radio className="w-2.5 h-2.5" />
+                                {score}
+                            </span>
+                        </>
                     )}
-                    <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-none text-[10px] font-mono uppercase tracking-[0.15em] border ${freshnessColor(score)} bg-background shadow-sm`}
-                        data-testid={`freshness-badge-${course.slug}`}
-                        title={freshnessLabel(course.days_since_review)}
-                    >
-                        <Radio className="w-2.5 h-2.5" />
-                        {score}
-                    </span>
                 </div>
             </div>
 
@@ -74,11 +89,15 @@ export default function CourseCard({ course, testIdPrefix = "course" }) {
 
                 <div className="mt-5 pt-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{course.module_count || 15} modules</span>
+                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />{course.module_count || 0} modules</span>
                         <span className="opacity-30">·</span>
                         <span>{course.duration_hours}h</span>
                     </div>
-                    <CoursePreviewButton course={course} />
+                    {isComingSoon ? (
+                        <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-brand">Notify me</span>
+                    ) : (
+                        <CoursePreviewButton course={course} />
+                    )}
                 </div>
             </div>
         </Link>

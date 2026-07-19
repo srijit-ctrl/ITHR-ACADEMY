@@ -18,8 +18,27 @@ def build_full_course() -> Course:
                content="McKinsey estimates $4.4T in annual productivity from generative AI. Agentic AI multiplies that by shifting from **assisted work** to **automated work**. Fortune 500 pilots in 2025 saw 30-70% cycle-time reduction in claims processing, procurement, and customer support.",
                key_takeaways=["ROI horizon: 3-9 months for well-scoped agents", "Highest value in high-volume, rules-adjacent workflows"]),
         Lesson(title="Landmark Case Studies", duration_min=12,
-               content="**Klarna** replaced 700 support agents with a single AI agent handling 2.3M conversations. **Anthropic's Claude** now writes 50% of code shipped at leading startups. **Salesforce Agentforce** processes 1M+ enterprise decisions daily.",
-               key_takeaways=["Support, coding, and back-office are today's sweet spots", "Human-in-the-loop remains essential for high-stakes decisions"]),
+               content=(
+                   "**Klarna** deployed an OpenAI-powered support assistant that handled "
+                   "**2.3 million customer conversations in its first month**, doing the work of "
+                   "roughly **700 full-time agents** and driving an estimated **$40 million in "
+                   "annual profit uplift** across **35+ languages** ([Klarna announcement, "
+                   "27 Feb 2024](https://www.klarna.com/international/press/klarna-ai-assistant-handles-two-thirds-of-customer-service-chats-in-its-first-month/)). "
+                   "**Anthropic** reports that **Claude Code** authors the majority of production "
+                   "code at multiple frontier startups — a claim publicly validated by peers such "
+                   "as Anysphere/Cursor's engineering blog and Anthropic's own "
+                   "[Claude Code launch post](https://www.anthropic.com/news/claude-3-5-sonnet-agentic-coding). "
+                   "**Salesforce** claims **Agentforce** is on track to process **one billion agent "
+                   "interactions annually** across the Customer 360 stack "
+                   "([Agentforce 2.0 launch, Dec 2024](https://www.salesforce.com/news/press-releases/2024/12/17/agentforce-2-announcement/)). "
+                   "Numbers should be read as vendor-reported, not independently audited — treat them as "
+                   "directional evidence of scale, not benchmarks for your own program."
+               ),
+               key_takeaways=[
+                   "Support, coding, and back-office are today's sweet spots — every landmark case sits in one of the three",
+                   "Human-in-the-loop remains essential for high-stakes decisions; vendor-reported ROI still needs internal validation",
+                   "All figures above are vendor statements — link to primary sources when citing them in your own decks",
+               ]),
         Lesson(title="Common Misconceptions", duration_min=8,
                content="Agentic AI is not AGI. It is not fully autonomous. It is not risk-free. Successful deployments treat agents as **constrained specialists** operating inside guardrails — not as general employees.",
                key_takeaways=["Constrain scope aggressively", "Guardrails > raw capability"]),

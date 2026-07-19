@@ -24,11 +24,11 @@ export default function Certifications() {
                 <div className="relative container-page py-20 md:py-24 text-center max-w-3xl mx-auto z-10">
                     <span className="section-kicker">Certification Ladder</span>
                     <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none mb-6">
-                        Six tiers.<br />
+                        Eight tiers.<br />
                         One <span className="italic text-brand">global standard</span>.
                     </h1>
                     <p className="text-lg text-muted-foreground leading-relaxed">
-                        Our certifications are designed as a reference credential for agentic AI competence &mdash; publicly verifiable, structured across six tiers, and issued by a named UAE consulting firm that stands behind every award.
+                        Our certifications are designed as a reference credential for agentic AI competence &mdash; publicly verifiable, structured across eight tiers, and issued by a named UAE consulting firm that stands behind every award.
                     </p>
                     <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
                         <Link

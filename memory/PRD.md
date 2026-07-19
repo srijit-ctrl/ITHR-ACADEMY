@@ -12,6 +12,24 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 53 — Feb 2026 · Content Audit · Coming-Soon Gate · Citations
+- **Publication gate (`status` field)**: every course now returns `status: "published" | "coming_soon"` derived at read-time from real data quality (non-empty `learning_objectives` + ≥10 modules + no "Full curriculum in preparation" marker). Result: 11 published courses, 17 correctly labelled `coming_soon`.
+- **Enrollment refused on stubs**: `POST /api/courses/{slug}/enroll` returns **409** for any `coming_soon` course with a helpful "join the waitlist" message. New `POST /api/courses/{slug}/waitlist` endpoint (idempotent, records interest in `course_waitlist`).
+- **CourseDetail.jsx** rewritten to:
+  - Show "Coming soon" hero badge + "Notify me when live" CTA + "Not yet enrollable" sidebar for `coming_soon` courses.
+  - Hide "Verified digital credential", "Certification Track" branding, freshness score, and preview button on stubs.
+  - Use dynamic `{modules.length} module(s) across {tiers} tier(s)` instead of hardcoded "15 modules across 3 tiers".
+  - Drop the placeholder-objectives fallback ("Deep understanding of the course subject…"). Coming-soon courses now render a plain "Detailed learning objectives will be published when this course launches" message.
+- **CourseCard.jsx**: paints a "Coming soon" chip in place of the freshness score for stub cards, dims the hero image, hides the intro-play button, and swaps the preview button for "NOTIFY ME".
+- **Marketing copy**: "Six tiers" → **"Eight tiers"** on `Certifications.jsx` (hero + body) and `Landing.jsx` (hero + ladder heading) to match the 8-tier API.
+- **Landmark Case Studies lesson** (Agentic AI Foundations Module 1) — Klarna / Anthropic / Salesforce claims now carry primary-source URLs (Klarna 2024 press release, Anthropic Claude 3.5 launch, Salesforce Agentforce 2.0 press release) and a "vendor-reported, not independently audited" editorial caveat. Updated in both `seed_data.py` AND `assets/generated_courses/content_overrides.json` (runtime override was the actually-served copy).
+- **Assessment mechanism** — confirmed real graded exam exists at `/quiz/:slug` frontend + `POST /api/courses/{slug}/assessment/session` backend. No new exam system built; entry point in the UI is enrollment-gated, which is why the auditor missed it.
+- **Uncited stat sweep**: 39 additional numeric-vs-named-vendor claims flagged for SME review (top hotspots documented in `/app/CONTENT_AUDIT_ITER53.md`). Not fixing blind — SME needs to confirm each is a real press-release figure, a hypothetical teaching example, or apocryphal.
+- Files touched: `backend/models.py`, `backend/routers/catalog_router.py`, `backend/seed_data.py`, `backend/assets/generated_courses/content_overrides.json`, `frontend/src/pages/{CourseDetail.jsx, Certifications.jsx, Landing.jsx}`, `frontend/src/components/CourseCard.jsx`. New file: `backend/tests/test_iteration53_content_audit.py`.
+- Testing: pytest 37/37 green across iter 51+52+53. Playwright verified: coming-soon page shows "Coming soon" badge, "Not yet enrollable", "4 modules across 3 tiers", no Enroll button, no "Verified digital credential" text, no placeholder objectives; catalog shows 17 stub chips; `/certifications` reads "Eight tiers".
+
+
+
 ### Iteration 52 — Feb 2026 · Onboarding Email Drip · Referral Leaderboard
 - **Onboarding drip** (2 new stages atop the existing Welcome email):
   - Day-2 first-course nudge (`send_first_course_nudge_email`) for learners with 0 enrollments after 48h.

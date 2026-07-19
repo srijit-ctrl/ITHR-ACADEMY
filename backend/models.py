@@ -109,6 +109,10 @@ class Course(BaseModel):
     skills_gained: List[str] = []
     business_value: str = ""
     is_certification_track: bool = True
+    # Publication gate — "published" courses accept real enrollments and are
+    # certifiable; "coming_soon" courses render a waitlist CTA, hide the
+    # credential claim, and MUST NOT be enrolled or charged.
+    status: Literal["published", "coming_soon"] = "published"
     modules: List[Module] = []
     quiz: List[QuizQuestion] = []
     passing_score: int = 65
@@ -136,6 +140,7 @@ class CourseSummary(BaseModel):
     rating: float
     module_count: int
     has_full_content: bool = False
+    status: Literal["published", "coming_soon"] = "published"
     last_reviewed_at: Optional[str] = None
     freshness_score: int = 100
     days_since_review: int = 0

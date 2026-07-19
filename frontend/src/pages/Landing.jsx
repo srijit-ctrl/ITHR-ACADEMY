@@ -58,7 +58,7 @@ export default function Landing() {
                             Where the world&apos;s workforce learns to <span className="italic text-brand">command</span> AI.
                         </h1>
                         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10">
-                            The <span className="text-foreground font-semibold">ITHR Academy</span> is a credentialing platform for enterprise workforces &mdash; six tiers, twenty industries, one standard, refreshed continuously.
+                            The <span className="text-foreground font-semibold">ITHR Academy</span> is a credentialing platform for enterprise workforces &mdash; eight tiers, twenty industries, one standard, refreshed continuously.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
                             <Link to="/courses" data-testid="hero-browse-catalog" className="btn-primary text-base">
@@ -179,7 +179,7 @@ export default function Landing() {
                         <div className="md:col-span-6">
                             <span className="section-kicker">The Certification Ladder</span>
                             <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">
-                                Six tiers.<br />
+                                Eight tiers.<br />
                                 From analyst to <span className="italic text-brand">CAIO</span>.
                             </h2>
                         </div>
