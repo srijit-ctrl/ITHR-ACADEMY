@@ -12,6 +12,28 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 57 · Email Campaign System (Resend) — Feb 2026
+- **Three new automated lifecycle triggers** live in `email_service.py` + orchestrated by `campaign_service.py`:
+  - `send_module_completion_email` — fires idempotently when every lesson in a module is complete. Chained from `catalog_router.complete_lesson` via `asyncio.create_task` (non-blocking). Shows progress bar, module N of M, next-up module preview.
+  - `send_module_5_offer_email` — fires exactly once when the 5th module of any course completes. Copy: **"Unlock the next 10 modules FREE — only for the first 500 users"**. When the recipient's `founding_member_seq` ≤ 500 the message also surfaces their #N of 500 badge; non-founders get the offer without the badge.
+  - `send_reengagement_email` — sweep-driven; picks up learners registered ≥ 7 days ago with zero enrolment activity and zero lesson completions in the last 7 days. 30-day per-user cooldown enforced by `email_trigger_log`.
+- **Manual Super-Admin campaign composer** (`EmailCampaignsPanel.jsx`) — subject / body / optional CTA button, live recipient count with 300ms debounce, sample-email preview, QA test-send to any address (no campaign log entry), and a typed-"SEND" confirmation gate before dispatch. Basic v1 segmentation: `all_learners` / `role` / `by_course` (targets enrolled learners of the picked course) / `founding_only`. Campaign history table sorted newest-first shows subject, filter, sent-by, delivered/total counts. All UI wired via `data-testid` for automation.
+- **New `campaign_service.py` module** exposes:
+  - `ensure_indexes()` — unique index on `email_trigger_log (user_id, trigger_key)`, plus supporting indexes on `email_campaigns.sent_at` and `email_send_log (campaign_id, recipient_email)`.
+  - `trigger_module_completion(user_id, course, module_id)` — idempotent per (user, course, module); chains to `_maybe_trigger_module_5_offer` when `module_index_1based == 5`.
+  - `run_reengagement_sweep(dry_run)` — batch cap 500, per-user 30-day cooldown, week-bucket trigger_key so a user can be re-nudged monthly at most.
+  - `preview_campaign_recipients(filter)` / `dispatch_manual_campaign(...)` / `list_campaign_history(limit)`.
+- **New router `routers/campaigns_router.py`** — 5 super-admin endpoints: `POST /api/admin/campaigns/preview`, `/send`, `/test-send`, `POST /api/admin/campaigns/reengagement/run`, `GET /api/admin/campaigns/history`.
+- **Data model** — three new collections:
+  - `email_campaigns` {id, subject, body_markdown, cta_label, cta_url, filter, sent_by, sent_by_email, sent_at, total_recipients, delivered_count, failed_count, status: sent/partial/failed/in_progress}
+  - `email_send_log` {campaign_id, user_id, recipient_email, delivered, sent_at}
+  - `email_trigger_log` {user_id, trigger_key, email, sent, sent_at} — unique index on (user_id, trigger_key)
+- **Cross-cutting fix (found by testing agent)** — sonner `<Toaster />` was **never mounted anywhere in the app**; every `toast.success` / `toast.error` call across Register/Dashboard/PathDetail/WhatsApp/campaigns was a silent no-op. Fixed by importing `Toaster` from `sonner` and mounting `<Toaster position="top-right" richColors closeButton />` in `App.js`.
+- **Testing**: 18/18 new pytest cases in `tests/test_iteration57_email_campaigns.py` (auth guards, preview shape + role/course narrowing, test-send does-not-log-campaign guarantee, dispatch happy path, empty-audience 400, short-body 400, history round-trip, reengagement dry-run shape + super_admin exclusion, unique-index verification, module-completion trigger idempotency). Frontend Playwright acceptance: 100% (composer renders, debounced recipient counts, test-send toast, typed SEND confirmation dispatches, history row appears, reengagement dry-run toast). Full regression suite: **65/65 green** across iter 51 / 52 / 54 / 57 / Agent OS Sprint 1.
+- Files: `backend/email_service.py` (+4 templates), `backend/campaign_service.py` (new), `backend/routers/campaigns_router.py` (new), `backend/routers/catalog_router.py` (+trigger dispatch on module completion), `backend/server.py` (router mount), `frontend/src/components/admin/EmailCampaignsPanel.jsx` (new), `frontend/src/pages/SuperAdminPortal.jsx` (+campaigns tab), `frontend/src/App.js` (mounted `<Toaster/>`). Tests: `backend/tests/test_iteration57_email_campaigns.py` (18 cases).
+
+
+
 ### Iteration 56 · Gemini Chat Models — Feb 2026
 - **Multi-model chat now live**: `ai_service.py` gains a `CHAT_MODELS` registry mapping learner-facing keys to (provider, model_id) tuples. Emergent LLM key drives all providers — no new API key.
 - Supported models: `claude-sonnet-4.5` (default), `claude-sonnet-4.6`, `gemini-3.5-flash`, `gemini-3.1-pro`, `gemini-3-flash`.
