@@ -48,6 +48,10 @@ class UserPublic(BaseModel):
     signup_discount_code: Optional[str] = None
     founding_course_id: Optional[str] = None
     founding_cert_used: bool = False
+    # Founding-module-5 engagement milestone (first 500 learners to reach module 5)
+    founding_module5_seq: Optional[int] = None
+    founding_module5_reached_at: Optional[str] = None
+    founding_module5_course_id: Optional[str] = None
     # Referral payment bypass (first 500 redemptions are marked Paid)
     payment_status: Optional[str] = None
     paid_via_referral: bool = False

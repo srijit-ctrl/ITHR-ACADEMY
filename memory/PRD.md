@@ -12,6 +12,43 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 58 · Student Progress Tracking Agent — Feb 2026
+- **New `module_events` collection** — explicit audit stream, one row per {user_id, course_id, module_id, kind ∈ ("started", "completed")}. Unique compound index makes both events idempotent so duplicate lesson-completions never duplicate the audit row. Complements the existing per-lesson `enrollments.completed_lessons` / `progress_pct` state which already updates in real time.
+- **`progress_tracker.py`** (new service module) — 5 helpers with fire-and-forget dispatch semantics that never block the lesson-complete write:
+  - `record_module_started(user_id, course_id, module_id)` — idempotent.
+  - `record_module_completed(user_id, course_id, module_id)` — idempotent.
+  - `mark_course_completed(user_id, course)` — flips `enrollment.completed = True` + `completed_at` + `progress_pct=100.0` when all modules of a course are done; also queues the "ready for your credential" email and a super-admin `course_completed` activity event.
+  - `summarize_course_progress(user_id, course, enrollment)` — deep per-course read model (per-module `started_at` / `completed_at` timestamps).
+  - `summarize_all_enrollments(user_id)` — every enrollment for a user + skips orphaned rows (course was deleted).
+- **`catalog_router.complete_lesson`** now wires four side effects (all `asyncio.create_task`, all idempotent):
+  1. `record_module_started` on first lesson of any module.
+  2. `record_module_completed` when every lesson in a module lands.
+  3. Existing iter-57 email-trigger chain (module-complete + module-5 offer email).
+  4. **NEW**: `mark_module5_milestone_if_eligible` allocates `founding_module5_seq` on module 5 (see below).
+  5. `mark_course_completed` when all course modules are done.
+- **New "founding module-5" engagement milestone** (distinct from the signup founding cohort):
+  - `founding_member.mark_module5_milestone_if_eligible(user_id, course_id)` allocates the first 500 slots to learners who actually reach module 5, not just register.
+  - New fields on `users`: `founding_module5_seq` (1..500), `founding_module5_reached_at`, `founding_module5_course_id`.
+  - Idempotent — repeated module-5 completions never re-allocate.
+  - Public counter endpoint `GET /api/progress/founding-module5` returns `{cap:500, claimed, remaining}` for a marketing-site ticker.
+  - Surfaced on `UserPublic` so the frontend can render the badge.
+- **`progress_router.py`** — 5 endpoints on `/api/progress/*`:
+  - `GET /me` — every enrolment, each with per-module timestamps + roll-up totals (courses, completed, in_progress, not_started, overall_progress_pct).
+  - `GET /me/{course_slug}` — deep progress for one course (400 when not enrolled, 404 for unknown slug).
+  - `POST /module/start` — explicit "I've opened this module" signal from the frontend; idempotent (returns `already_started: true` on the second call).
+  - `GET /module-events` — caller's own audit log, paginated, newest first (max 200).
+  - `GET /founding-module5` — public counter (no auth).
+- **New email template `send_ready_for_certificate_email`** — fires when all modules of a course complete. Positions the assessment as the credential gate (not a bypass — actual certificate minting still happens on assessment pass in `assessment_router:202`, preserving credential integrity).
+- **Data model additions**:
+  - `module_events` collection — unique index on `(user_id, course_id, module_id, kind)`, secondary index on `(user_id, created_at desc)`.
+  - `users` — 3 new nullable fields for the module-5 milestone.
+  - No breaking change to `enrollments` — `completed`, `completed_at`, `progress_pct` already existed; this iteration just guarantees they're populated by lesson completion (previously only assessment pass flipped `completed=true`).
+- **Verified end-to-end via real HTTP flow** (curl transcript): fresh learner → enroll → complete modules 1-5 → module_events has 10 rows (5 started + 5 completed with distinct timestamps) → `founding_module5_seq=1` allocated → public counter reads `1/500` claimed → complete remaining modules → `enrollment.completed=true` + `completed_at` recorded → `/progress/me` totals shows `completed: 1, overall_progress_pct: 100.0`.
+- **Testing**: `tests/test_iteration58_progress_tracker.py` — **15/15 pytest cases green** covering public counter, auth guards, empty-state responses, 404/400 error paths, full-flow event recording, module-events audit endpoint, module-5 seq allocation, module-5 idempotency (re-submitting module-5 lessons doesn't re-allocate), all-modules-complete flipping `enrollment.completed=true`, `/progress/me` roll-up aggregates, explicit module-start endpoint + idempotency. Solo runs of iter-57 (18/18) + iter-58 (15/15) both clean.
+- Files: `backend/progress_tracker.py` (new, 218 LOC), `backend/routers/progress_router.py` (new, 108 LOC), `backend/founding_member.py` (+81 LOC — module5 milestone + stats), `backend/email_service.py` (+`send_ready_for_certificate_email`), `backend/routers/catalog_router.py` (+45 LOC — module_started tracking + all-modules-done branch + milestone dispatch), `backend/core.py` (+3 fields on UserPublic), `backend/models.py` (+3 UserPublic fields), `backend/server.py` (+progress_router mount). Tests: `backend/tests/test_iteration58_progress_tracker.py` (15 cases).
+
+
+
 ### Iteration 57.1 · Auth Router + Purge Script Refactor — Feb 2026
 - **`routers/auth_router.py`** — extracted 5 new module-level helpers to eliminate the duplication and dense logic flagged in previous iterations:
   - `_issue_session(response, doc, request?)` — DRY'd the `create_access_token + _set_refresh_cookie + schedule_login_tracking` triplet that had accumulated in `register` / `login` / `mfa_verify_login` / `refresh` / `google_callback`. Optional `request` parameter — login-tracking is only scheduled when a request context is passed (so `register` and `refresh` skip it, matching prior behaviour).

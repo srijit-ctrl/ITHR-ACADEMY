@@ -305,17 +305,25 @@ async def complete_lesson(payload: LessonCompleteRequest, user_id: str = Depends
 
     completed_modules = set(enrollment.get("completed_modules", []))
     newly_completed_module_id = None
+    module_started_id = None
     for m in course.get("modules", []):
         lesson_ids = {l["id"] for l in m.get("lessons", [])}
+        completed_in_module = lesson_ids & completed_lessons
+        # First lesson of a module just landed → track module-start event.
+        if payload.lesson_id in lesson_ids and len(completed_in_module) == 1 and m["id"] not in completed_modules:
+            module_started_id = m["id"]
         if lesson_ids and lesson_ids.issubset(completed_lessons) and m["id"] not in completed_modules:
             completed_modules.add(m["id"])
-            # Track only the first newly-completed module in this call — the
-            # frontend only sends one lesson at a time, so at most one module
-            # can flip to done per request.
             if newly_completed_module_id is None:
                 newly_completed_module_id = m["id"]
         elif lesson_ids and lesson_ids.issubset(completed_lessons):
             completed_modules.add(m["id"])
+
+    all_modules_done = (
+        len(completed_modules) > 0
+        and len(completed_modules) == len(course.get("modules", []))
+        and not enrollment.get("completed")
+    )
 
     await db.enrollments.update_one(
         {"user_id": user_id, "course_id": payload.course_id},
@@ -328,16 +336,48 @@ async def complete_lesson(payload: LessonCompleteRequest, user_id: str = Depends
     )
     await db.users.update_one({"id": user_id}, {"$inc": {"xp": 20}})
 
-    # Fire module-completion email trigger (idempotent, non-blocking).
+    # ---- Fire-and-forget progress-tracker + milestone side effects -------
+    import asyncio
+
+    from progress_tracker import (
+        mark_course_completed,
+        record_module_completed,
+        record_module_started,
+    )
+
+    # module_started event (idempotent — only inserts if none exists yet)
+    if module_started_id:
+        asyncio.create_task(record_module_started(user_id, payload.course_id, module_started_id))
+
     if newly_completed_module_id:
+        # 1) module_completed event
+        asyncio.create_task(record_module_completed(user_id, payload.course_id, newly_completed_module_id))
+
+        # 2) Existing iter-57 email trigger (module-complete + module-5 offer chain)
         try:
             from campaign_service import trigger_module_completion
-            import asyncio
             asyncio.create_task(
                 trigger_module_completion(user_id, course, newly_completed_module_id)
             )
         except Exception:
             logger.exception("[catalog] module-completion trigger dispatch failed")
+
+        # 3) Module-5 founding-cohort milestone (first 500 to REACH module 5)
+        try:
+            module_ids = [m["id"] for m in course.get("modules", [])]
+            if newly_completed_module_id in module_ids:
+                idx_1based = module_ids.index(newly_completed_module_id) + 1
+                if idx_1based == 5:
+                    from founding_member import mark_module5_milestone_if_eligible
+                    asyncio.create_task(
+                        mark_module5_milestone_if_eligible(user_id, payload.course_id)
+                    )
+        except Exception:
+            logger.exception("[catalog] module-5 milestone dispatch failed")
+
+    # 4) All modules complete → mark enrollment complete + fire "ready for cert"
+    if all_modules_done:
+        asyncio.create_task(mark_course_completed(user_id, course))
 
     return {"progress_pct": round(progress_pct, 1), "completed_lessons": len(completed_lessons), "total_lessons": total_lessons}
 

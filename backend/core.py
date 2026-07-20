@@ -92,6 +92,10 @@ def user_to_public(doc: dict) -> dict:
         "signup_discount_code": doc.get("signup_discount_code"),
         "founding_course_id": doc.get("founding_course_id"),
         "founding_cert_used": doc.get("founding_cert_used", False),
+        # Founding-module-5 engagement milestone (distinct from signup cohort).
+        "founding_module5_seq": doc.get("founding_module5_seq"),
+        "founding_module5_reached_at": doc.get("founding_module5_reached_at"),
+        "founding_module5_course_id": doc.get("founding_module5_course_id"),
         # Referral payment bypass (first 500 redemptions are marked Paid).
         "payment_status": doc.get("payment_status"),
         "paid_via_referral": doc.get("paid_via_referral", False),

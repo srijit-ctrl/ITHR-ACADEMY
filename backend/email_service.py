@@ -1088,3 +1088,65 @@ async def send_manual_campaign_email(
     text_paragraphs = "\n\n".join(paragraphs)
     text = f"Hello {first},\n\n{text_paragraphs}" + _TEXT_SIGNOFF
     return await _fire(email, subject, html, text, tag="manual-campaign")
+
+
+# ---- All modules complete → ready for certificate ------------------------
+
+
+async def send_ready_for_certificate_email(
+    email: str, full_name: str, course_title: str, course_slug: str
+) -> bool:
+    """Fired when a learner completes every module of a course.
+
+    Positions the assessment as the final gate to earning a verifiable
+    credential — the learning is done, the credential requires a passing
+    assessment score.
+    """
+    first = _first(full_name)
+    assessment_url = f"{FRONTEND_URL}/quiz/{course_slug}"
+    course_url = f"{FRONTEND_URL}/courses/{course_slug}"
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Every module of <b style="color:#16335E;">{_safe(course_title)}</b> is complete. That's the
+  learning half done — the credential half is a single sitting away.
+</p>
+{_section("What's next · Sit the certification exam")}
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:18px;">
+  <li>Roughly <b>25 questions</b>, drawn from the full course bank, shuffled per attempt.</li>
+  <li>Pass mark <b>70%</b>. Attempt as many times as you need — no cap.</li>
+  <li>On pass, your credential is minted immediately with a public verification page.</li>
+</ul>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Your credential is publicly verifiable, LinkedIn-shareable, and includes a QR code
+  that resolves to your live ITHR Academy verification record.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Finish strong.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker="ITHR Academy · Course complete",
+        heading=f"Ready for your credential, {first}.",
+        body_html=body,
+        cta_label="Take the Certification Exam",
+        cta_url=assessment_url,
+        footer_note=f"Prefer to revisit a module first? Your course home: {course_url}",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        f"You've completed every module of \"{course_title}\". The learning half is done — "
+        "the credential half is a single sitting away.\n\n"
+        "WHAT'S NEXT · SIT THE CERTIFICATION EXAM\n"
+        "• ~25 questions from the full course bank, shuffled per attempt.\n"
+        "• Pass mark 70%. Attempt as many times as you need.\n"
+        "• On pass, your credential is minted immediately with a public verify page.\n\n"
+        f"Take the exam: {assessment_url}\n"
+        f"Course home: {course_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(
+        email,
+        f"You've finished {course_title} — earn your credential",
+        html, text, tag="ready-for-certificate",
+    )
+
