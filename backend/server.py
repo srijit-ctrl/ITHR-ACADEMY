@@ -15,6 +15,7 @@ from routers import (
     catalog_router, checkout_router,
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     leads_router, mentor_router, passport_router, password_reset_router, paths_router, progress_router,
+    pulsedesk_router,
     recommendation_router, share_router, trust_router, tutor_router, voice_router, podcast_router,
     admin_control_router, traffic_router, video_quiz_router, referral_router, security_router, command_center_router,
     whatsapp_router,
@@ -289,6 +290,8 @@ for r in (
     leads_router.router,
     leads_router.admin_router,
     progress_router.router,
+    pulsedesk_router.router,
+    pulsedesk_router.admin_router,
     digest_router.router,
     demo_router.router,
     trust_router.router,
@@ -391,6 +394,14 @@ async def on_startup():
             logger.info("Agent OS bootstrap complete.")
         except Exception:
             logger.exception("Agent OS bootstrap failed (non-fatal)")
+
+        # PulseDesk conversational widget — provision default ITHR tenant so
+        # the embedded <script> can start working immediately.
+        try:
+            from pulsedesk_service import ensure_ithr_tenant
+            await ensure_ithr_tenant()
+        except Exception:
+            logger.exception("PulseDesk tenant bootstrap failed (non-fatal)")
 
     _asyncio.create_task(_background_seed())
     logger.info("Backend started; seeding scheduled in background.")

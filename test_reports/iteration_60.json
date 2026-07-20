@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 60 — PulseDesk conversational widget. Backend pytest 19/19 passed. Frontend: bubble renders on all 6 major routes (/, /courses, /pricing, /hr-suite, /enterprise, /login), panel opens on click, AI greeting from 'Aletheia' loads, message send via button + Enter both work, AI replies are ITHR-grounded (mention courses, credentials, HR, agentic AI), callback flow captures phone number + writes to Mongo + appends system message, voice toggle opacity flips 0.5<->1, page-context awareness works (AI reply on /courses/agentic-ai-foundations references 'Agentic AI Foundations for the Enterprise'), and conversation persists across page reloads via localStorage visitor_id.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Homepage (and any page with the launch-offer promo banner)", "issues": ["The 'Inaugural Launch Offer' promotional banner in the bottom-right visually overlaps with the chat bubble at the same corner. Both sit at bottom:24px, right:24px — the bubble is clickable (higher z-index 999999) but the medal icon is partially hidden. Consider left-aligning one of them or dismissing the promo when the widget panel opens."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iteration60_pulsedesk.py", "/app/test_reports/pytest/iteration60_pulsedesk.xml"],
+  "action_items": [
+    "IMPORTANT: The <script src='/api/pulsedesk/widget.js'...> tag in public/index.html was NOT being served until I restarted the frontend supervisor process. CRA/craco does not hot-reload changes to public/index.html — it caches the served HTML in memory. When main-agent edits public/index.html in the future, they MUST run `sudo supervisorctl restart frontend` for the change to reach visitors. This is a one-time action needed only when public/index.html is touched.",
+    "Consider repositioning the launch-offer promo banner (or the chat bubble) so they do not overlap in the bottom-right corner. Both currently occupy bottom:24px, right:24px."
+  ],
+  "critical_code_review_comments": [
+    "pulsedesk_router.py L131 — `visitor_message` handler mutates `visitor_meta={'url': request.headers.get('referer','')}` on every call. If the visitor previously registered richer visitor_meta on /visitor/join it will be overwritten to `{url:...}` on the next /visitor/message. Consider merging instead of replacing, or only setting visitor_meta on first-time conversation creation.",
+    "widget.js L14 — `document.currentScript` is null when the script is loaded async and executed after DOMContentLoaded on some browsers (especially when injected dynamically). Consider hardening by falling back to `document.querySelector('[data-testid=\"pulsedesk-loader\"]')` if `currentScript` is null.",
+    "Widget script uses `async` attribute in index.html — this is fine for the current CRA-served HTML (no dynamic re-injection on client navigation), but worth documenting because SPA route changes will NOT re-run the widget script (this is correct — the widget is idempotent by design, injected once on first HTML load)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% (all 10 UI flows verified: render on 6 routes, panel open, greeting, send-by-button, send-by-Enter, AI-grounded reply, callback + Mongo write, voice toggle, page-context awareness, persistence across reload)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (from /app/memory/test_credentials.md, sourced via SUPER_ADMIN_PASSWORD env)",
+  "seed_data_creation": "5 pulsedesk_callback_requests rows exist in Mongo (created by pytest fixtures + one from UI callback test with phone +971 50 999 8888). Several pulsedesk_conversations + pulsedesk_messages rows created by tests. Prefix `v_pytest_it60_...` used for pytest visitor IDs.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "PulseDesk widget is fully functional. Widget script at /api/pulsedesk/widget.js (200, application/javascript, 15,186 bytes). Bubble data-testid='pulsedesk-bubble', panel 'pulsedesk-panel', input 'pulsedesk-input', send 'pulsedesk-send', callback 'pulsedesk-callback', voice toggle 'pulsedesk-voice-toggle'. Note: if public/index.html is ever edited, MUST restart frontend supervisor to serve the new HTML (CRA dev server caches public/index.html on boot).",
+  "rca of the issue": "Initial testing found the widget bubble was missing from ALL routes. Root cause: CRA/craco's development server caches public/index.html contents in memory when it starts — subsequent edits to that file (like the <script src='/api/pulsedesk/widget.js'> tag main-agent added) are NOT hot-reloaded. Verified by curl of the root URL which returned HTML without the script tag. Mitigation: ran `sudo supervisorctl restart frontend`; after restart the served HTML contained the script tag, the widget injected on every route, and all 10 UI flows passed. Main-agent's earlier verification succeeded because they had freshly restarted frontend after their edit; the state was lost by the time the testing agent arrived (likely due to an unrelated hot-reload of App.js which does not re-read public/index.html)."
+}
