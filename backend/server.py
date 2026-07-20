@@ -11,7 +11,8 @@ from starlette.middleware.cors import CORSMiddleware
 
 from core import db, logger, mongo_client, now_iso
 from routers import (
-    admin_dashboard_router, admin_router, agent_os_router, assessment_router, auth_router, catalog_router, checkout_router,
+    admin_dashboard_router, admin_router, agent_os_router, assessment_router, auth_router, campaigns_router,
+    catalog_router, checkout_router,
     dashboard_router, demo_router, digest_router, enterprise_router, intelligence_router,
     mentor_router, passport_router, password_reset_router, paths_router,
     recommendation_router, share_router, trust_router, tutor_router, voice_router, podcast_router,
@@ -284,6 +285,7 @@ for r in (
     enterprise_router.router,
     admin_router.router,
     admin_dashboard_router.router,
+    campaigns_router.router,
     digest_router.router,
     demo_router.router,
     trust_router.router,

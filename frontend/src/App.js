@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { Toaster } from "sonner";
 import { API_BASE } from "@/lib/api";
 import "@/App.css";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -130,6 +131,7 @@ function App() {
                     <AppShell />
                 </AuthProvider>
             </BrowserRouter>
+            <Toaster position="top-right" richColors closeButton />
         </div>
     );
 }

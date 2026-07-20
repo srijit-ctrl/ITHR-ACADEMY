@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 57 (Email Campaign System) tested end-to-end. Backend: 18/18 pytest cases pass (auth guards, preview shape, test-send, dispatch happy-path, empty-audience rejection, short-body rejection, history, reengagement dry-run, unique-index + module-completion idempotency). Frontend: campaigns panel renders under /admin?tab=campaigns with all data-testids present, recipient count debounce works (all_learners=120, role=120, by_course=0), test-send returns delivered=true, dispatch modal + typed SEND confirmation dispatches successfully, history row appears (3/120 delivered · 117 failed — expected since preview learners use @example.com which Resend rejects), reengagement dry-run fires. Found one cross-cutting bug: <Toaster /> from sonner was never mounted anywhere in App.js — ALL toast.success/toast.error calls app-wide (Dashboard, Register, PathDetail, campaigns, WhatsApp, etc.) were silently no-op. Applied trivial fix: added `import { Toaster } from 'sonner'` and mounted `<Toaster position='top-right' richColors closeButton />` at the top of the App component. Verified after fix — success toast now visible in the top-right on test-send.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/admin/campaigns/send", "issue": "In this preview DB most learners use @example.com — a real dispatch shows 3 delivered / 117 failed. Not a product bug (Resend correctly rejects fake domains) but worth noting that dispatched history rows will look 'partial' during QA."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "App.js / global", "issue": "<Toaster /> from sonner was NOT mounted — every toast.success/toast.error call in the entire app was a silent no-op. FIXED by adding <Toaster position='top-right' richColors closeButton /> in App.js. Verified: success toast now visible after test-send.", "selector": "[data-sonner-toaster]", "priority": "HIGH (now RESOLVED)"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/admin?tab=campaigns", "issues": ["Campaign history row currently shows delivered/total counts nicely, but the 'partial · no CTA' status line runs together without space (`partial·no CTA` visually) — cosmetic only, low priority."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration57_email_campaigns.py",
+    "/app/test_reports/pytest/iter57.xml"
+  ],
+  "action_items": [
+    "None blocking. iter57 feature is fully working end-to-end after the Toaster mount fix.",
+    "Optional: main agent may want to verify the <Toaster /> mount fits the design system (currently richColors, top-right). If a shadcn theme wrapper is preferred, /app/frontend/src/components/ui/sonner.jsx already exports a themed Toaster — could be swapped in.",
+    "Optional: seed a few real @ithr.online-like test emails so QA dispatch history rows show 100% delivered instead of the current 3/120."
+  ],
+  "critical_code_review_comments": [
+    "campaign_service.py cleanly separates automated triggers (unique-key idempotency in email_trigger_log) from manual campaigns (email_campaigns + email_send_log) — good boundaries.",
+    "Every Super-Admin endpoint uses get_current_super_admin dep — auth surface is uniform.",
+    "dispatch_manual_campaign wraps each per-recipient send in try/except so a single Resend failure never aborts the batch — solid.",
+    "Backend correctly excludes super_admin/admin roles from every audience and never leaks them into sample_emails (verified by test).",
+    "One cross-cutting hardening suggestion: the sonner Toaster mount fix I applied should ideally have been in the initial platform bootstrap. The whole app was running without user-visible feedback for weeks — recommend a lightweight integration test that asserts document.querySelectorAll('[data-sonner-toaster]').length > 0."
+  ],
+  "updated_files": [
+    "/app/frontend/src/App.js  (mounted <Toaster/> from sonner)",
+    "/app/backend/tests/test_iteration57_email_campaigns.py  (tightened parallel-worker race in test_test_send_does_not_log_campaign by filtering count by unique subject)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (all UI acceptance criteria pass after Toaster mount)"},
+  "test_credentials": "Super Admin: superadmin@ithr.online / Dubai_deram2026 (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "TestManualDispatch::test_dispatch_and_history_roundtrip creates a TEST_it57_* learner and one campaign row + send_log entries, then cleans them up at the end of the test. The TestTriggerIdempotency test creates + cleans a synthetic learner. One real preview-DB campaign was dispatched during frontend testing (subject 'Iter57 UI dispatch smoke') that remains in email_campaigns — main agent can leave it as history or delete manually.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The sonner <Toaster/> mount in App.js is the fix that unblocked all UI toast assertions across the app — remember this when testing any feature that relies on toast feedback (Register, Dashboard, PathDetail, etc.). All 18 iter57 pytest cases pass with pytest-xdist parallel workers after the subject-filter tightening. Iter57 introduces three new Mongo collections (email_campaigns, email_send_log, email_trigger_log with unique (user_id, trigger_key) index) — ensure_indexes() is called on every campaign endpoint invocation so indexes exist idempotently.",
+  "rca_of_the_issue": "**Toaster no-op RCA**: sonner's `toast()` API is a fire-and-forget event dispatcher — without a `<Toaster />` component mounted somewhere in the React tree, there is no listener to render notifications. The initial App.js scaffolding never imported/mounted it, so every toast.success/toast.error across the codebase was silent. Reproduction: mount the app, dispatch any toast, inspect DOM — `document.querySelectorAll('[data-sonner-toaster]').length === 0`. Fix: `import { Toaster } from 'sonner'` in App.js and render `<Toaster position='top-right' richColors closeButton />` alongside the BrowserRouter. Verified: toast now renders in the top-right corner (see screenshot iter57_toast_verify.png)."
+}

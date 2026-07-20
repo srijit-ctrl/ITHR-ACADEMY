@@ -830,3 +830,261 @@ async def send_referral_invite_email(email: str, full_name: str, referral_code: 
     )
     return await _fire(email, "5 invitations to give — your ITHR Academy referral code", html, text, tag="drip-referral-invite")
 
+
+# ---- Automated campaigns (Iteration 57) ---------------------------------
+#
+# Three new lifecycle triggers driven by Resend + logged via `email_trigger_log`.
+#   1. Module-completion nudge  — fires after any full module completes on any course.
+#   2. Module-5 offer           — fires exactly once when the 5th module of a course
+#                                  completes.  Positions the "unlock 10 more modules
+#                                  free — first 500 users" perk.
+#   3. 7-day re-engagement       — sweep-driven; identifies learners inactive ≥ 7 days
+#                                  (no enrolments touched, no lesson completions).
+
+
+async def send_module_completion_email(
+    email: str,
+    full_name: str,
+    course_title: str,
+    course_slug: str,
+    module_title: str,
+    module_index: int,
+    total_modules: int,
+    next_module_title: str | None,
+) -> bool:
+    """Fired when a learner finishes every lesson in a module.
+
+    Keeps the momentum going — congratulates on progress, previews the next
+    module, and links straight to the course dashboard.
+    """
+    first = _first(full_name)
+    course_url = f"{FRONTEND_URL}/courses/{course_slug}"
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    completion_pct = round((module_index / total_modules) * 100) if total_modules else 0
+    next_block = ""
+    if next_module_title:
+        next_block = f"""
+{_section("Up next")}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Your next module is <b style="color:#16335E;">{_safe(next_module_title)}</b>. Aletheia will pick up
+  right where you left off — click Continue below and we'll drop you into the first lesson.
+</p>
+"""
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Nicely done — you just finished <b style="color:#16335E;">{_safe(module_title)}</b>
+  in <b style="color:#16335E;">{_safe(course_title)}</b>. That's <b style="color:#00A78B;">{module_index} of {total_modules}</b>
+  modules complete (~{completion_pct}% of the course).
+</p>
+<div style="background:#F6F8FB;border-radius:6px;padding:14px 18px;margin:0 0 16px 0;">
+  <div style="height:8px;background:#E5E9F0;border-radius:999px;overflow:hidden;">
+    <div style="height:100%;width:{completion_pct}%;background:linear-gradient(90deg,#00A78B,#2E7FC1);"></div>
+  </div>
+  <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;margin-top:8px;text-align:right;">
+    {completion_pct}% complete
+  </div>
+</div>
+{next_block}
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Keep the streak alive.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker=f"Module {module_index} of {total_modules} · Complete",
+        heading=f"Module complete — {module_index}/{total_modules}",
+        body_html=body,
+        cta_label="Continue Course",
+        cta_url=course_url,
+        footer_note=f"Not ready right now? Your progress is saved. Come back any time via your dashboard: {dash_url}",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        f"You just finished \"{module_title}\" in \"{course_title}\". "
+        f"That's {module_index} of {total_modules} modules ({completion_pct}%).\n\n"
+        + (f"Up next: {next_module_title}\n\n" if next_module_title else "")
+        + f"Continue: {course_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(
+        email,
+        f"Module {module_index} complete — {module_index}/{total_modules} in {course_title}",
+        html, text, tag="module-complete",
+    )
+
+
+async def send_module_5_offer_email(
+    email: str,
+    full_name: str,
+    course_title: str,
+    course_slug: str,
+    seq_position: int | None = None,
+) -> bool:
+    """Sent once, on completion of the 5th module of any course.
+
+    Positions the founding-cohort perk: "Unlock the next 10 modules free —
+    only for the first 500 users." If `seq_position` is provided we surface
+    it so the recipient sees they are still inside the cohort.
+    """
+    first = _first(full_name)
+    course_url = f"{FRONTEND_URL}/courses/{course_slug}"
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    seq_line = ""
+    if seq_position and seq_position <= 500:
+        seq_line = (
+            f'<p style="font-size:13px;line-height:1.5;color:#6b7280;margin:0 0 12px 0;">'
+            f'You are Founding Member <b style="color:#16335E;">#{seq_position} of 500</b> — '
+            'the offer below is reserved for the founding cohort.</p>'
+        )
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Five modules down — that's the halfway line on <b style="color:#16335E;">{_safe(course_title)}</b>.
+  The pattern-matching should be starting to click. This is the point at which most learners
+  drop off. We want you to stay.
+</p>
+{seq_line}
+{_section("Founding offer · Unlock the next 10 modules free")}
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  For the <b style="color:#00A78B;">first 500 Founding Members</b>, the remaining 10 modules of this
+  course — plus its full certification — are complimentary. No card required. No promotional code
+  to enter. It is applied to your account the moment you click Continue.
+</p>
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:18px;">
+  <li>Complete the remaining 10 modules at your pace.</li>
+  <li>Sit the certification exam whenever you feel ready.</li>
+  <li>Earn a publicly verifiable digital credential (LinkedIn-ready).</li>
+</ul>
+<p style="font-size:13px;line-height:1.6;color:#6b7280;margin:0 0 12px 0;">
+  This offer is limited to the founding cohort and applies to a single course per learner —
+  claim it while your seat is active.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">You are 5 modules from a credential.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker="Founding cohort perk · Unlock 10 modules free",
+        heading="You're halfway. Let's finish.",
+        body_html=body,
+        cta_label="Unlock the Next 10 Modules",
+        cta_url=course_url,
+        footer_note=f"Manage your enrolments from your dashboard: {dash_url}",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        f"You just finished 5 modules of \"{course_title}\" — halfway there.\n\n"
+        "FOUNDING OFFER — UNLOCK THE NEXT 10 MODULES FREE\n"
+        "For the first 500 Founding Members, the remaining 10 modules of this course, plus its full "
+        "certification, are complimentary. No card required.\n\n"
+        + (f"You are Founding Member #{seq_position} of 500.\n\n" if seq_position and seq_position <= 500 else "")
+        + f"Continue: {course_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(
+        email,
+        f"Halfway there — unlock the next 10 modules of {course_title} free",
+        html, text, tag="module-5-offer",
+    )
+
+
+async def send_reengagement_email(email: str, full_name: str, days_inactive: int) -> bool:
+    """Sent on the 7-day dormancy sweep to learners who have not touched a lesson.
+
+    Warm, low-pressure re-entry. Highlights AI tutor + industry tracks
+    without shaming the absence.
+    """
+    first = _first(full_name)
+    dash_url = f"{FRONTEND_URL}/dashboard"
+    catalog_url = f"{FRONTEND_URL}/courses"
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  It's been a little while — {days_inactive} days since you last dropped into the Academy.
+  Life gets busy; that's OK. The good news: nothing you started is lost — every lesson, every
+  completed module, every rating is exactly where you left it.
+</p>
+{_section("Three ways to restart in under 5 minutes")}
+<ul style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:18px;">
+  <li><b style="color:#16335E;">Ask Aletheia to recap</b> — one message on the dashboard tutor, and she'll summarise where you left off.</li>
+  <li><b style="color:#16335E;">Pick the shortest lesson</b> — most next-lessons in-flight are &lt; 10 minutes.</li>
+  <li><b style="color:#16335E;">Try a different track</b> — Banking, Healthcare, Manufacturing, Retail, Government, or HR — pattern-switch the momentum back on.</li>
+</ul>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  If nothing above resonates, hit reply and tell us what's blocking — we read every response.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">See you inside.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker="ITHR Academy · Come back and finish",
+        heading=f"Your seat is still yours, {first}.",
+        body_html=body,
+        cta_label="Resume My Learning",
+        cta_url=dash_url,
+        footer_note=f"Browse the full catalog: {catalog_url}",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        f"It's been {days_inactive} days since you last dropped in. Nothing you started is lost.\n\n"
+        "THREE WAYS TO RESTART IN UNDER 5 MINUTES\n"
+        "• Ask Aletheia (AI tutor) to recap where you left off.\n"
+        "• Pick the shortest lesson — most next-up lessons are < 10 minutes.\n"
+        "• Try a different track — Banking, Healthcare, Manufacturing, Retail, Government, or HR.\n\n"
+        f"Resume: {dash_url}\n"
+        f"Catalog: {catalog_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(
+        email,
+        f"Your Academy seat is still yours, {first} — 3 ways to restart",
+        html, text, tag="reengagement-7d",
+    )
+
+
+# ---- Manual campaign shell (custom body from Super Admin composer) -------
+
+
+async def send_manual_campaign_email(
+    email: str,
+    full_name: str,
+    subject: str,
+    body_markdown: str,
+    cta_label: str | None,
+    cta_url: str | None,
+) -> bool:
+    """Deliver a Super-Admin-composed campaign to a single recipient.
+
+    `body_markdown` accepts plain paragraphs separated by blank lines — we wrap
+    each paragraph in <p> tags so admins can compose in a simple textarea
+    without knowing HTML. Optional CTA button is rendered only when both
+    `cta_label` and `cta_url` are supplied.
+    """
+    first = _first(full_name)
+    paragraphs = [p.strip() for p in (body_markdown or "").split("\n\n") if p.strip()]
+    body_html = "".join(
+        f'<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 14px 0;">{_safe(p).replace(chr(10), "<br/>")}</p>'
+        for p in paragraphs
+    )
+    body_html = f'<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>' + body_html + _signoff()
+
+    if cta_label and cta_url:
+        html = _wrap(
+            kicker="ITHR Academy",
+            heading=_safe(subject),
+            body_html=body_html,
+            cta_label=_safe(cta_label),
+            cta_url=cta_url,
+            footer_note="You are receiving this email because you have an account at ITHR Academy.",
+        )
+    else:
+        # Reuse _wrap but hide the CTA row by pointing it at the dashboard.
+        html = _wrap(
+            kicker="ITHR Academy",
+            heading=_safe(subject),
+            body_html=body_html,
+            cta_label="Open My Dashboard",
+            cta_url=f"{FRONTEND_URL}/dashboard",
+            footer_note="You are receiving this email because you have an account at ITHR Academy.",
+        )
+    text_paragraphs = "\n\n".join(paragraphs)
+    text = f"Hello {first},\n\n{text_paragraphs}" + _TEXT_SIGNOFF
+    return await _fire(email, subject, html, text, tag="manual-campaign")

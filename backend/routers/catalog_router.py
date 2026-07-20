@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user_id
-from core import compute_freshness, db, now_iso
+from core import compute_freshness, db, logger, now_iso
 from core_cache import cached
 from models import Course, CourseSummary, Enrollment, LessonCompleteRequest
 from seed_data import CATEGORIES, CERTIFICATION_PATHS, INDUSTRIES
@@ -304,9 +304,17 @@ async def complete_lesson(payload: LessonCompleteRequest, user_id: str = Depends
     progress_pct = (len(completed_lessons) / total_lessons * 100) if total_lessons else 0.0
 
     completed_modules = set(enrollment.get("completed_modules", []))
+    newly_completed_module_id = None
     for m in course.get("modules", []):
         lesson_ids = {l["id"] for l in m.get("lessons", [])}
-        if lesson_ids and lesson_ids.issubset(completed_lessons):
+        if lesson_ids and lesson_ids.issubset(completed_lessons) and m["id"] not in completed_modules:
+            completed_modules.add(m["id"])
+            # Track only the first newly-completed module in this call — the
+            # frontend only sends one lesson at a time, so at most one module
+            # can flip to done per request.
+            if newly_completed_module_id is None:
+                newly_completed_module_id = m["id"]
+        elif lesson_ids and lesson_ids.issubset(completed_lessons):
             completed_modules.add(m["id"])
 
     await db.enrollments.update_one(
@@ -319,6 +327,18 @@ async def complete_lesson(payload: LessonCompleteRequest, user_id: str = Depends
         }},
     )
     await db.users.update_one({"id": user_id}, {"$inc": {"xp": 20}})
+
+    # Fire module-completion email trigger (idempotent, non-blocking).
+    if newly_completed_module_id:
+        try:
+            from campaign_service import trigger_module_completion
+            import asyncio
+            asyncio.create_task(
+                trigger_module_completion(user_id, course, newly_completed_module_id)
+            )
+        except Exception:
+            logger.exception("[catalog] module-completion trigger dispatch failed")
+
     return {"progress_pct": round(progress_pct, 1), "completed_lessons": len(completed_lessons), "total_lessons": total_lessons}
 
 
