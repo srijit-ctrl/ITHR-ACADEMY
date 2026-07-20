@@ -229,6 +229,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     course_context: Optional[str] = None  # course id for context
     mode: Optional[str] = None  # "quiz" activates in-chat quiz mode
+    model_key: Optional[str] = None  # e.g. "claude-sonnet-4.5", "gemini-3.5-flash"
 
 
 class ChatSession(BaseModel):

@@ -12,6 +12,18 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 56 · Gemini Chat Models — Feb 2026
+- **Multi-model chat now live**: `ai_service.py` gains a `CHAT_MODELS` registry mapping learner-facing keys to (provider, model_id) tuples. Emergent LLM key drives all providers — no new API key.
+- Supported models: `claude-sonnet-4.5` (default), `claude-sonnet-4.6`, `gemini-3.5-flash`, `gemini-3.1-pro`, `gemini-3-flash`.
+- New `resolve_model(model_key)` helper — gracefully falls back to the default on unknown keys so stale clients never break.
+- **`ChatRequest.model_key`** propagates through `POST /api/ai/tutor` streaming endpoint; the `done` event now carries `model` for the frontend to display and for AI Ops accounting.
+- **New public endpoint `GET /api/ai/models`** — returns the model list + default so the UI selector self-populates. Public read; the key is a label, not a secret.
+- **Frontend**: `useTutorStream` hook loads `/ai/models`, persists per-browser choice in `localStorage`, exposes `modelKey / setModelKey / availableModels`. Compact `<select>` model picker in `InlineTutor.jsx` next to the send button (data-testid `tutor-model-picker`) — only rendered when >1 model available.
+- **Verified end-to-end** (curl transcript in iteration summary): Gemini 3.5 Flash correctly returns a 15-word agentic-AI definition with the same `@@META@@` structured envelope Claude produces (suggested actions, knowledge-check flag). Claude 4.5 regression clean. 57/57 pytest still green.
+- Files: `backend/ai_service.py`, `backend/models.py`, `backend/routers/tutor_router.py`, `frontend/src/lib/api.js`, `frontend/src/components/tutor/useTutorStream.js`, `frontend/src/components/InlineTutor.jsx`.
+
+
+
 ### Iteration 55 · Agent OS Sprint 1 — Feb 2026
 - Sprint 0 pre-flight: user chose "proceed on your design, I'll reconcile" — Python/FastAPI + MongoDB re-scope of the spec's Node/Postgres assumption. Deviations logged in `agent_os/__init__.py` docstring.
 - **7-pod inventory registered** in `agent_pods` collection (`pod_a_prospecting`, `pod_b_outreach`, `pod_c_followup`, `pod_d_proposal`, `pod_e_content`, `pod_f_slack_ops`, `pod_g_reporting`) with per-pod `mcp_scopes`. **Only Pod A has a handler in Sprint 1** (per spec §11 exit criteria — one pod wired end-to-end).

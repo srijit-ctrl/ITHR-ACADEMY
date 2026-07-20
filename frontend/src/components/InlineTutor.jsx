@@ -18,7 +18,7 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
     const [autoplayNext, setAutoplayNext] = useState(false);
     const spokenIdRef = useRef(null);
     const voice = useVoiceIO();
-    const { messages, streaming, send, reset, ratings, rateTurn } = useTutorStream({ courseSlug, lesson, moduleTitle });
+    const { messages, streaming, send, reset, ratings, rateTurn, modelKey, setModelKey, availableModels } = useTutorStream({ courseSlug, lesson, moduleTitle });
 
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
 
@@ -86,7 +86,7 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
                 <TutorConversation messages={messages} streaming={streaming} onAction={handleSend} ratings={ratings} onRate={rateTurn} />
             )}
 
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
                 <input
                     type="text"
                     value={input}
@@ -96,8 +96,22 @@ export default function InlineTutor({ courseSlug, lesson, moduleTitle }) {
                     placeholder={`Ask about "${lesson?.title || "this lesson"}"… or tap the mic`}
                     disabled={streaming}
                     data-testid="inline-tutor-input"
-                    className="flex-1 bg-surface-alt border border-border rounded-sm px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+                    className="flex-1 min-w-[200px] bg-surface-alt border border-border rounded-sm px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
                 />
+                {availableModels?.models?.length > 1 && (
+                    <select
+                        value={modelKey || availableModels.default}
+                        onChange={(e) => setModelKey(e.target.value)}
+                        disabled={streaming}
+                        data-testid="tutor-model-picker"
+                        aria-label="Tutor model"
+                        className="bg-surface-alt border border-border rounded-sm px-2.5 py-2.5 text-xs font-mono focus:outline-none focus:border-brand"
+                    >
+                        {availableModels.models.map((m) => (
+                            <option key={m.key} value={m.key}>{m.label}</option>
+                        ))}
+                    </select>
+                )}
                 <button
                     onClick={() => handleSend()}
                     disabled={streaming || !input.trim()}

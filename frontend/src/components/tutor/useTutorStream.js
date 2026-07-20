@@ -11,12 +11,30 @@ import { splitTutorMeta, TUTOR_META_MARKER } from "@/components/tutor/tutorMeta"
  * Also owns per-turn thumbs-up / thumbs-down ratings so learner feedback can
  * be surfaced in the Super Admin AI Ops panel.
  */
+const MODEL_STORAGE_KEY = "ithr.tutor.model";
+
 export default function useTutorStream({ courseSlug, lesson, moduleTitle } = {}) {
     const [messages, setMessages] = useState([]);
     const [sessionId, setSessionId] = useState(null);
     const [streaming, setStreaming] = useState(false);
     // Map of turn_index (0-based, assistant-only) -> "up" | "down"
     const [ratings, setRatings] = useState({});
+    // Model selector — persisted per-browser so a learner who prefers
+    // Gemini Flash for speed keeps that choice across sessions.
+    const [modelKey, _setModelKey] = useState(() => {
+        try { return window.localStorage.getItem(MODEL_STORAGE_KEY) || ""; } catch { return ""; }
+    });
+    const setModelKey = (k) => {
+        try { window.localStorage.setItem(MODEL_STORAGE_KEY, k || ""); } catch { /* noop */ }
+        _setModelKey(k || "");
+    };
+    const [availableModels, setAvailableModels] = useState({ models: [], default: "" });
+
+    useEffect(() => {
+        api.get("/ai/models")
+            .then((r) => setAvailableModels(r.data || { models: [], default: "" }))
+            .catch(() => {});
+    }, []);
 
     // Reset transient state when the user moves to a different lesson
     useEffect(() => {
@@ -85,6 +103,7 @@ export default function useTutorStream({ courseSlug, lesson, moduleTitle } = {})
             sessionId,
             courseContext: courseSlug,
             mode,
+            modelKey: modelKey || null,
             onDelta: (delta) => {
                 setMessages((m) => {
                     const copy = [...m];
@@ -119,5 +138,5 @@ export default function useTutorStream({ courseSlug, lesson, moduleTitle } = {})
         });
     };
 
-    return { messages, streaming, send, reset, sessionId, ratings, rateTurn };
+    return { messages, streaming, send, reset, sessionId, ratings, rateTurn, modelKey, setModelKey, availableModels };
 }

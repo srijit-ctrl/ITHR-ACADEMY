@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from ai_service import generate_course_outline, get_tutor_persona, stream_tutor_response, TUTOR_META_MARKER
+from ai_service import CHAT_MODELS, DEFAULT_TUTOR_MODEL, generate_course_outline, get_tutor_persona, resolve_model, stream_tutor_response, TUTOR_META_MARKER
 from auth import get_current_user_id
 from core import db, logger, now_iso
 from models import ChatMessage, ChatRequest, ChatSession
@@ -46,6 +46,7 @@ async def ai_tutor(payload: ChatRequest, user_id: str = Depends(get_current_user
             async for chunk in stream_tutor_response(
                 session_id=session_id, user_message=payload.message,
                 course=course, history=history, mode=payload.mode,
+                model_key=payload.model_key,
             ):
                 collected.append(chunk)
                 yield f"data: {json.dumps({'delta': chunk})}\n\n"
@@ -72,7 +73,8 @@ async def ai_tutor(payload: ChatRequest, user_id: str = Depends(get_current_user
             )
             await db.chat_sessions.insert_one(new_session.model_dump())
 
-        yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
+        resolved_key, _, _ = resolve_model(payload.model_key)
+        yield f"data: {json.dumps({'done': True, 'session_id': session_id, 'model': resolved_key})}\n\n"
 
     return StreamingResponse(
         event_generator(), media_type="text/event-stream",
@@ -88,6 +90,38 @@ async def tutor_profile(course_slug: str = None, user_id: str = Depends(get_curr
         category = (c or {}).get("category")
     name, style = get_tutor_persona(category)
     return {"name": name, "style": style, "category": category}
+
+
+@router.get("/ai/models")
+async def list_chat_models():
+    """Return the model options the tutor UI can offer. Kept a public
+    read so an unauthenticated visitor previewing the tutor sees the
+    same menu — the model_key is just a label, no secret leaks."""
+    return {
+        "default": DEFAULT_TUTOR_MODEL,
+        "models": [
+            {
+                "key": key,
+                "provider": provider,
+                "model_id": model_id,
+                "label": _label_for(key),
+            }
+            for key, (provider, model_id) in CHAT_MODELS.items()
+        ],
+    }
+
+
+_MODEL_LABELS = {
+    "claude-sonnet-4.5": "Claude Sonnet 4.5 · Balanced",
+    "claude-sonnet-4.6": "Claude Sonnet 4.6 · Balanced+",
+    "gemini-3.5-flash": "Gemini 3.5 Flash · Fastest",
+    "gemini-3.1-pro": "Gemini 3.1 Pro · Highest quality",
+    "gemini-3-flash": "Gemini 3 Flash · Cheapest",
+}
+
+
+def _label_for(key: str) -> str:
+    return _MODEL_LABELS.get(key, key)
 
 
 @router.get("/ai/sessions")

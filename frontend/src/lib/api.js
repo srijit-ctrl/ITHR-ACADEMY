@@ -77,8 +77,8 @@ api.interceptors.response.use(
 );
 
 // SSE streaming helper for AI Tutor
-export async function streamTutor({ message, sessionId, courseContext, mode, onDelta, onDone, onError }) {
-    return _streamSSE("/ai/tutor", { message, session_id: sessionId || null, course_context: courseContext || null, mode: mode || null }, { onDelta, onDone, onError });
+export async function streamTutor({ message, sessionId, courseContext, mode, modelKey, onDelta, onDone, onError }) {
+    return _streamSSE("/ai/tutor", { message, session_id: sessionId || null, course_context: courseContext || null, mode: mode || null, model_key: modelKey || null }, { onDelta, onDone, onError });
 }
 
 // SSE streaming helper for AI Mentor (career coach)

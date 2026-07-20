@@ -107,12 +107,41 @@ def _get_api_key() -> str:
     return key
 
 
-def _build_chat(session_id: str, system_message: str) -> LlmChat:
+# ---- Model registry (Emergent LLM key–compatible chat models) ----
+# Adding a model here + on the frontend selector is a one-line change; the
+# rest of the codebase is provider-agnostic.
+CHAT_MODELS: dict[str, tuple[str, str]] = {
+    "claude-sonnet-4.5": ("anthropic", "claude-sonnet-4-5-20250929"),
+    "claude-sonnet-4.6": ("anthropic", "claude-sonnet-4-6"),
+    "gemini-3.5-flash":  ("gemini", "gemini-3.5-flash"),
+    "gemini-3.1-pro":    ("gemini", "gemini-3.1-pro-preview"),
+    "gemini-3-flash":    ("gemini", "gemini-3-flash-preview"),
+}
+DEFAULT_TUTOR_MODEL = os.environ.get("TUTOR_DEFAULT_MODEL", "claude-sonnet-4.5")
+
+
+def resolve_model(model_key: Optional[str] = None) -> tuple[str, str, str]:
+    """Return ``(model_key, provider, model_id)`` — falls back to the default
+    tutor model when the requested key is missing or unrecognised. Never
+    raises so an old client sending a stale key can still get a response."""
+    key = (model_key or "").strip() or DEFAULT_TUTOR_MODEL
+    if key not in CHAT_MODELS:
+        key = DEFAULT_TUTOR_MODEL
+    provider, model_id = CHAT_MODELS[key]
+    return key, provider, model_id
+
+
+def _build_chat(
+    session_id: str,
+    system_message: str,
+    model_key: Optional[str] = None,
+) -> LlmChat:
+    _, provider, model_id = resolve_model(model_key)
     return LlmChat(
         api_key=_get_api_key(),
         session_id=session_id,
         system_message=system_message,
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+    ).with_model(provider, model_id)
 
 
 async def stream_tutor_response(
@@ -121,6 +150,7 @@ async def stream_tutor_response(
     course: Optional[dict] = None,
     history: Optional[list] = None,
     mode: Optional[str] = None,
+    model_key: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     _, system = build_tutor_system_prompt(course=course, mode=mode)
 
@@ -131,7 +161,7 @@ async def stream_tutor_response(
             turns.append(f"{role}: {msg.get('content', '')[:600]}")
         system += "\n\nRECENT CONVERSATION (for continuity):\n" + "\n".join(turns)
 
-    chat = _build_chat(session_id, system)
+    chat = _build_chat(session_id, system, model_key=model_key)
     async for event in chat.stream_message(UserMessage(text=user_message)):
         if isinstance(event, TextDelta):
             yield event.content
