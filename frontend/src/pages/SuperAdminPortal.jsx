@@ -23,15 +23,16 @@ import { Org360Drawer, User360Drawer } from "@/components/admin/Admin360Panels";
 import { LearningFunnelPanel, AssessmentAnalyticsPanel, CredentialManagerPanel, AiOpsPanel } from "@/components/admin/Phase2Panels";
 import { WhatsAppAdminPanel } from "@/components/admin/WhatsAppAdminPanel";
 import EmailCampaignsPanel from "@/components/admin/EmailCampaignsPanel";
+import EnterpriseLeadsPanel from "@/components/admin/EnterpriseLeadsPanel";
 import "@/styles/superadmin.css";
 
-const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "audit", "videoquiz", "security", "flags", "whatsapp"];
+const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "leads", "audit", "videoquiz", "security", "flags", "whatsapp"];
 
 const NAV = [
     { group: "Overview", items: [
         ["command", "Command Centre"], ["alertcenter", "Alerts"], ["analytics", "Analytics"], ["traffic", "Traffic"],
     ]},
-    { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"]] },
+    { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"], ["leads", "Enterprise leads"]] },
     { group: "Learning & AI", items: [
         ["funnel", "Learning funnel"], ["assessments", "Assessments"], ["credentials", "Credentials"],
         ["aiops", "AI operations"], ["videoquiz", "Video quizzes"], ["sessions", "AI sessions"],
@@ -217,6 +218,8 @@ export default function SuperAdminPortal() {
                 {tab === "emails" && <EmailDispatchPanel />}
 
                 {tab === "campaigns" && <EmailCampaignsPanel />}
+
+                {tab === "leads" && <EnterpriseLeadsPanel />}
 
                 {tab === "audit" && <AuditLogPanel />}
                 </main>

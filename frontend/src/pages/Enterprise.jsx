@@ -1,6 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { Building2, Users, TrendingUp, ShieldCheck, Zap, Award, ArrowRight, Check } from "lucide-react";
 import HeroBlobs from "@/components/HeroBlobs";
+import EnterpriseLeadModal, { EnterpriseLeadForm } from "@/components/enterprise/EnterpriseLeadModal";
 
 const CAPABILITIES = [
     { icon: Users, title: "AI Skills Passport", desc: "A portable, verifiable record of AI competencies for every employee — accepted across the organization." },
@@ -18,8 +20,23 @@ const PLANS = [
 ];
 
 export default function Enterprise() {
+    const [params] = useSearchParams();
+    const initialBundle = useMemo(() => (params.get("bundle") || "generic"), [params]);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalBundle, setModalBundle] = useState(initialBundle);
+    const openLead = (ref) => {
+        setModalBundle(ref || "generic");
+        setModalOpen(true);
+    };
+
     return (
         <div>
+            <EnterpriseLeadModal
+                open={modalOpen}
+                onClose={() => setModalOpen(false)}
+                bundle={modalBundle}
+                sourceUrl={typeof window !== "undefined" ? window.location.href : "/enterprise"}
+            />
             {/* Hero — aiilm blob style */}
             <section className="relative overflow-hidden bg-white">
                 <HeroBlobs variant="warm" />
@@ -33,9 +50,14 @@ export default function Enterprise() {
                             The ITHR Academy Enterprise Tier gives you more than courses. You get an organization-wide capability system &mdash; passports, readiness diagnostics, role-based paths, and dashboards that show where AI fluency sits in your business.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
-                            <a href="mailto:enterprise@ithr.tech" data-testid="enterprise-book-demo" className="btn-primary">
+                            <button
+                                type="button"
+                                onClick={() => openLead(initialBundle)}
+                                data-testid="enterprise-book-demo"
+                                className="btn-primary"
+                            >
                                 Book a demo <ArrowRight className="w-4 h-4" />
-                            </a>
+                            </button>
                             <Link to="/courses" data-testid="enterprise-see-catalog" className="btn-outline">See the catalog</Link>
                         </div>
 
@@ -107,14 +129,34 @@ export default function Enterprise() {
                                         <li key={f} className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 opacity-80" />{f}</li>
                                     ))}
                                 </ul>
-                                <a
-                                    href="mailto:enterprise@ithr.tech"
+                                <button
+                                    type="button"
+                                    onClick={() => openLead("generic")}
+                                    data-testid={`plan-${p.name.toLowerCase()}-cta`}
                                     className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 bg-white/20 backdrop-blur hover:bg-white/30 text-sm font-semibold transition-colors self-start"
                                 >
                                     Contact sales <ArrowRight className="w-3.5 h-3.5" />
-                                </a>
+                                </button>
                             </div>
                         ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* Inline lead form — deep-linked from /hr-suite?bundle= */}
+            <section className="container-page py-24" data-testid="enterprise-inline-lead">
+                <div className="max-w-3xl mx-auto">
+                    <div className="text-center mb-10">
+                        <span className="section-kicker">Talk to us</span>
+                        <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-tight">
+                            Tell us what you&rsquo;re <span className="italic text-brand">building.</span>
+                        </h2>
+                        <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
+                            Send us a note. Someone from the ITHR Academy team replies inside one working day. No auto-responder loop, no drip-marketing follow-ups — just a real conversation.
+                        </p>
+                    </div>
+                    <div className="card-flat p-8">
+                        <EnterpriseLeadForm bundle={initialBundle} sourceUrl={typeof window !== "undefined" ? window.location.href : "/enterprise"} />
                     </div>
                 </div>
             </section>

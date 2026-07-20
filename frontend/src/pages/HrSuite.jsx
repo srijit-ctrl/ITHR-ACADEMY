@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { ArrowRight, Check, Sparkles, Users, Layers, BookOpen, Workflow, Building2 } from "lucide-react";
 import HeroBlobs from "@/components/HeroBlobs";
+import EnterpriseLeadModal from "@/components/enterprise/EnterpriseLeadModal";
 
 /**
  * /hr-suite — Dedicated marketing + pricing page for the HR Transformation
@@ -101,10 +103,21 @@ const HR_TIERS = [
 ];
 
 export default function HrSuite() {
-    const contactHref = (ref) => `/enterprise?bundle=${encodeURIComponent(ref)}`;
+    const [leadOpen, setLeadOpen] = useState(false);
+    const [leadBundle, setLeadBundle] = useState("generic");
+    const openLead = (ref) => {
+        setLeadBundle(ref || "generic");
+        setLeadOpen(true);
+    };
 
     return (
         <div data-testid="hr-suite-page">
+            <EnterpriseLeadModal
+                open={leadOpen}
+                onClose={() => setLeadOpen(false)}
+                bundle={leadBundle}
+                sourceUrl={typeof window !== "undefined" ? window.location.href : "/hr-suite"}
+            />
             {/* Hero */}
             <section className="relative overflow-hidden bg-white">
                 <HeroBlobs variant="cool" />
@@ -141,13 +154,14 @@ export default function HrSuite() {
                             <span className="text-muted-foreground text-sm ml-2">/ year · flat</span>
                         </div>
                         <div className="text-xs text-muted-foreground mb-6">≈ $498 / seat / year — no per-seat maths, no surprises.</div>
-                        <a
-                            href={contactHref("talent-ops-bundle")}
+                        <button
+                            type="button"
+                            onClick={() => openLead("talent-ops-bundle")}
                             data-testid="talent-ops-cta"
                             className="btn-primary w-full justify-center mb-3"
                         >
                             Reserve the bundle <ArrowRight className="w-4 h-4" />
-                        </a>
+                        </button>
                         <Link
                             to="/verify"
                             className="text-xs font-mono uppercase tracking-[0.15em] text-muted-foreground hover:text-brand text-center"
@@ -245,14 +259,15 @@ export default function HrSuite() {
                                 ))}
                             </ul>
 
-                            <a
-                                href={contactHref(t.contactRef)}
+                            <button
+                                type="button"
+                                onClick={() => openLead(t.contactRef)}
                                 data-testid={`${t.testId}-cta`}
                                 className={`w-full justify-center inline-flex items-center gap-2 py-2.5 px-4 rounded-sm text-sm font-medium transition-colors mt-auto ${t.best ? "btn-primary" : "border border-border bg-surface-alt hover:border-brand hover:text-brand"}`}
                             >
                                 {t.price === "Custom" ? "Design my programme" : "Request a quote"}
                                 <ArrowRight className="w-4 h-4" />
-                            </a>
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -264,13 +279,14 @@ export default function HrSuite() {
                     <Building2 className="w-8 h-8 text-brand mx-auto mb-4" />
                     <h3 className="font-serif text-3xl md:text-4xl leading-tight mb-3">Not sure which fits?</h3>
                     <p className="text-muted-foreground max-w-2xl mx-auto mb-6">Talk to our team for a 20-minute HR AI readiness call. We&apos;ll map your headcount, current stack, and target outcomes to the right bundle — no obligation.</p>
-                    <a
-                        href="/enterprise?bundle=hr-consult"
+                    <button
+                        type="button"
+                        onClick={() => openLead("hr-consult")}
                         data-testid="hr-suite-consult-cta"
                         className="btn-primary inline-flex"
                     >
                         Book a readiness call <ArrowRight className="w-4 h-4" />
-                    </a>
+                    </button>
                 </div>
             </section>
         </div>

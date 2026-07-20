@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+from typing import Optional
 
 import resend
 
@@ -1148,5 +1149,78 @@ async def send_ready_for_certificate_email(
         email,
         f"You've finished {course_title} — earn your credential",
         html, text, tag="ready-for-certificate",
+    )
+
+
+
+# ---- Enterprise lead confirmation --------------------------------------
+
+
+BUNDLE_LABELS: dict[str, str] = {
+    "talent-ops-bundle": "Talent Ops Bundle",
+    "hr-starter": "HR Transformation · Starter",
+    "hr-growth": "HR Transformation · Growth",
+    "hr-enterprise": "HR Transformation · Enterprise-HR",
+    "hr-consult": "HR Transformation · Consultation",
+    "generic": "Enterprise consultation",
+}
+
+
+async def send_enterprise_lead_confirmation_email(
+    email: str, full_name: str, bundle: str, company: Optional[str] = None
+) -> bool:
+    """Auto-reply to a lead that just submitted the enterprise intake form.
+
+    Warm, short, sets expectation: "one working day". Never raises.
+    """
+    first = _first(full_name)
+    bundle_label = BUNDLE_LABELS.get(bundle, bundle or "Enterprise consultation")
+    catalog_url = f"{FRONTEND_URL}/courses"
+    hr_url = f"{FRONTEND_URL}/hr-suite"
+    company_line = f" for <b style=\"color:#16335E;\">{_safe(company)}</b>" if company else ""
+    body = f"""\
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px 0;">Hello {first},</p>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  Thank you for reaching out about the <b style="color:#16335E;">{_safe(bundle_label)}</b>{company_line}.
+  Your message is in front of our team and someone will be in touch inside
+  <b style="color:#16335E;">one working day</b>.
+</p>
+{_section("What happens next")}
+<ol style="font-size:14px;line-height:1.8;color:#4b5563;margin:0 0 20px 0;padding-left:22px;">
+  <li>A member of the ITHR Academy team reviews your inquiry.</li>
+  <li>We reply with pricing, a proposed cohort structure, and a 30-minute discovery slot.</li>
+  <li>If it's a fit, we spin up your enterprise workspace inside one week.</li>
+</ol>
+<p style="font-size:15px;line-height:1.6;color:#4b5563;margin:0 0 12px 0;">
+  In the meantime, feel free to browse the <a href="{catalog_url}" style="color:#00A78B;font-weight:600;">full course catalog</a>
+  or revisit the <a href="{hr_url}" style="color:#00A78B;font-weight:600;">HR Transformation Suite</a> details.
+</p>
+<p style="font-size:15px;line-height:1.6;color:#16335E;font-weight:600;margin:16px 0 0 0;">Talk soon.</p>
+{_signoff()}
+"""
+    html = _wrap(
+        kicker=f"ITHR Academy · {bundle_label}",
+        heading="Thanks — we've got your message.",
+        body_html=body,
+        cta_label="Browse the Catalog",
+        cta_url=catalog_url,
+        footer_note=f"Prefer to reach us directly? Reply to this email — it lands in the enterprise inbox.",
+    )
+    text = (
+        f"Hello {first},\n\n"
+        f"Thank you for reaching out about the {bundle_label}. Your message is in front of our team "
+        "and someone will be in touch inside one working day.\n\n"
+        "WHAT HAPPENS NEXT\n"
+        "1. A member of the ITHR Academy team reviews your inquiry.\n"
+        "2. We reply with pricing, a proposed cohort structure, and a 30-minute discovery slot.\n"
+        "3. If it's a fit, we spin up your enterprise workspace inside one week.\n\n"
+        f"Full catalog: {catalog_url}\n"
+        f"HR Transformation Suite: {hr_url}"
+        + _TEXT_SIGNOFF
+    )
+    return await _fire(
+        email,
+        f"We've got your {bundle_label} inquiry — reply within one working day",
+        html, text, tag="enterprise-lead-confirmation",
     )
 
