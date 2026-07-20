@@ -132,10 +132,21 @@ async def visitor_message(payload: VisitorMessagePayload, request: Request):
     tenant = await get_tenant_public(payload.widget_key)
     if not tenant:
         raise HTTPException(status_code=404, detail="unknown widget key")
+    # Fetch existing meta so we can merge (don't clobber richer data captured on /visitor/join)
+    referer = request.headers.get("referer", "")
+    from core import db as _db
+    existing = await _db.pulsedesk_conversations.find_one(
+        {"widget_key": payload.widget_key, "visitor_id": payload.visitor_id},
+        {"_id": 0, "visitor_meta": 1},
+    )
+    merged_meta = {**(existing.get("visitor_meta") if existing else {} or {})}
+    if referer and "url" not in merged_meta:
+        merged_meta["url"] = referer
+
     conv = await get_or_create_conversation(
         widget_key=payload.widget_key,
         visitor_id=payload.visitor_id,
-        visitor_meta={"url": request.headers.get("referer", "")},
+        visitor_meta=merged_meta,
     )
 
     # 1) Persist the visitor message

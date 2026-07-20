@@ -12,6 +12,37 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 60 · PulseDesk Conversational Widget — Feb 2026
+- **What the user uploaded**: `pulsedesk-mvp_1.zip` — a standalone Node.js + Express + Socket.io conversational widget product. User asked to install it on the ITHR site "on all pages". Given the K8s ingress constraint (only `/api/*` → :8001 + rest → :3000), main-agent chose approach (a): keep `widget.js` client UI as-is, rebuild PulseDesk's server-side endpoints natively in FastAPI, reuse the ITHR Emergent LLM key + Mongo persistence. Widget script served by the backend at `/api/pulsedesk/widget.js`.
+- **New `pulsedesk_service.py`** — full server-side data layer:
+  - `ensure_ithr_tenant()` — auto-provisions the default `ithr-academy-live` tenant on backend startup (idempotent, safe across restarts). Wired into `server.py` startup event.
+  - `get_or_create_conversation(widget_key, visitor_id, meta)` — idempotent, one row per (widget, visitor).
+  - `append_message(conv_id, sender_type, text, page_context?, meta?)` — bumps `last_message_at` + `message_count` atomically.
+  - `generate_ai_reply(conversation, user_text, page_context)` — streams from Emergent LLM key via `ai_service._build_chat` with a PulseDesk-specific system prompt (warm, concise, 1-3 paragraphs, ITHR-grounded, refuses off-brand asks). Falls back to a rule-based responder if the LLM call fails so the conversation is never dead.
+  - `record_callback_request(...)` + admin list helpers.
+- **New `routers/pulsedesk_router.py`** — 4 public + 4 admin endpoints:
+  - Public: `GET /api/pulsedesk/widget.js` (serves the client script from `pulsedesk_widget/widget.js` as a static file with 5-min cache), `GET /api/pulsedesk/config/{widget_key}`, `POST /api/pulsedesk/visitor/join`, `POST /api/pulsedesk/visitor/message`, `POST /api/pulsedesk/visitor/callback`.
+  - Admin (super-admin only): `GET /api/admin/pulsedesk/conversations`, `GET /api/admin/pulsedesk/conversations/{id}/messages`, `GET /api/admin/pulsedesk/callbacks`, `GET /api/admin/pulsedesk/default-widget-key` (ops debug).
+  - Validation: page_context ≤ 3000 chars, message ≤ 2000 chars, visitor_id 4-64 chars. `visitor_meta` on `/visitor/message` MERGES with existing meta (no clobber of richer data captured on `/visitor/join`).
+- **Adapted `widget.js`** at `backend/pulsedesk_widget/widget.js` (15KB, ES5-compatible):
+  - HTTP-only (removed Socket.io dependency) — POST to `/visitor/message` gets AI reply in the same response. Cleaner infra story than WebSocket upgrade through K8s ingress.
+  - Preserved from the original PulseDesk MVP: floating bubble, voice mode (Web Speech API for STT + TTS), `[data-pulsedesk-context]` page-context reader (3000-char cap), callback prompt, styling.
+  - Robust `document.currentScript` fallback (uses `data-testid='pulsedesk-loader'` selector if `currentScript` is null — hardening for async-injected loads).
+  - 6 `data-testid` attributes for reliable e2e testing: bubble, panel, messages, input, send, close, callback, voice-toggle, mic.
+- **Widget deployed on all pages** — single `<script src="/api/pulsedesk/widget.js" data-key="ithr-academy-live" async>` tag added to `public/index.html`, so the bubble appears on every route without any React refactor (home, /courses, /pricing, /hr-suite, /enterprise, /login, all course detail pages, admin/portal, etc.).
+- **UX polish**: launch-offer promo (`InauguralFlasher.jsx`) shifted from `sm:bottom-6` → `sm:bottom-24` to sit directly above the chat bubble instead of overlapping it in the bottom-right corner.
+- **Data model** — 4 new Mongo collections:
+  - `pulsedesk_tenants` — {widget_key (unique), name, primary_color, agent_token, ai_greeting, created_at}
+  - `pulsedesk_conversations` — {id, widget_key, visitor_id, visitor_meta, status ∈ (ai, agent, closed), created_at, last_message_at, message_count}. Composite unique index on (widget_key, visitor_id).
+  - `pulsedesk_messages` — {id, conversation_id, sender_type ∈ (visitor, ai, agent, system), text, page_context?, created_at}. Compound index (conversation_id, created_at).
+  - `pulsedesk_callback_requests` — {id, widget_key, visitor_id, conversation_id, phone_number, status, created_at}.
+- **Testing**: `tests/test_iteration60_pulsedesk.py` — **19/19 pytest cases green** (tenant bootstrap, widget.js served with correct content-type + cache header, config public + 404 for unknown key, visitor/join idempotency, AI reply generation with substantive length, history persistence across rejoin, message + page_context length caps, empty-message 422, 5-back-to-back-messages success, callback flow with system message + Mongo write, super-admin auth guards). Full-blown testing_agent Playwright: **100% pass** — widget renders on all 6 tested routes (/, /courses, /pricing, /hr-suite, /enterprise, /login), panel opens on bubble click, AI greeting from "Aletheia" loads, send-by-button + send-by-Enter both work, AI replies are ITHR-grounded (course/credential/HR-specific), callback flow captures phone + persists to Mongo, voice toggle opacity flips, page-context awareness confirmed (AI reply on /courses/agentic-ai-foundations mentions the course by name), conversation persists across page reloads via `localStorage.pulsedesk_visitor_id`.
+- **Operational note** (found by testing agent + already documented in `context_for_next_testing_agent`): CRA/craco caches `public/index.html` in memory on boot. Any future edit to `public/index.html` requires `sudo supervisorctl restart frontend` to reach visitors. This is a one-time action per HTML edit.
+- **Files added**: `backend/pulsedesk_service.py`, `backend/routers/pulsedesk_router.py`, `backend/pulsedesk_widget/widget.js`, `backend/tests/test_iteration60_pulsedesk.py`. **Files modified**: `backend/server.py` (router mounts + `ensure_ithr_tenant` on startup), `frontend/public/index.html` (widget loader script), `frontend/src/components/InauguralFlasher.jsx` (position adjustment to clear the chat bubble).
+- **Multi-tenant readiness**: the tenant model + auto-provisioning is generic. Onboarding a new client is a single `pulsedesk_tenants` insert with a fresh `widget_key` — no code change needed. Original PulseDesk MVP artefacts (Node.js server, admin.html, README) are preserved under `/tmp/pulsedesk/` for reference if the widget is ever spun out as a standalone SaaS product.
+
+
+
 ### Iteration 59 · Slack Webhook + Enterprise Lead Intake — Feb 2026
 - **New `slack_service.py`** — thin fire-and-forget wrapper around Slack Incoming Webhooks. Rich Block Kit payload (attractive card with bundle badge, seat count, mrkdwn contact fields, and a "Reply to lead" mailto: action button). Graceful degradation — when `SLACK_WEBHOOK_URL` is blank the sender logs a warning and returns `False` (never raises). Also exports `slack_configured()` for the admin UI's "webhook not configured" banner and `send_slack_text()` for plain-text one-liner ops alerts.
 - **New public endpoint `POST /api/leads/enterprise`** — captures a lead + persists to `enterprise_leads`, then fires Slack alert + Resend auto-reply in a single fire-and-forget task (either can fail without blocking the DB write, so no lead is ever lost). Rate-limited: 50/hour per IP (corporate-NAT-friendly) + 3/hour per email (abuse guard). Silent throttle returns `{ok:true, lead_id:null, throttled:true}` — no enumeration side-channel. IP hashed via `hashlib.sha256(salt:ip)[:32]` — raw IP never surfaces in the DB row.

@@ -11,7 +11,14 @@
  * "knows" about the courses, credentials, and enterprise offering.
  */
 (function () {
-  var CURRENT_SCRIPT = document.currentScript;
+  // Robust script-tag lookup — `document.currentScript` is null when the
+  // script is dynamically injected or executed after DOMContentLoaded on
+  // some browsers. Fall back to a data-testid marker we control.
+  var CURRENT_SCRIPT = document.currentScript || document.querySelector('script[data-testid="pulsedesk-loader"]');
+  if (!CURRENT_SCRIPT) {
+    console.error("[PulseDesk] Cannot locate widget script tag on the page.");
+    return;
+  }
   var WIDGET_KEY = CURRENT_SCRIPT.getAttribute("data-key");
   var API_BASE = CURRENT_SCRIPT.getAttribute("data-api") || new URL(CURRENT_SCRIPT.src).origin;
 

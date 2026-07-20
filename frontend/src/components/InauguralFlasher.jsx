@@ -29,7 +29,7 @@ export default function InauguralFlasher() {
     return (
         <div
             data-testid="inaugural-flasher"
-            className="fixed z-[70] bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 sm:w-[380px]"
+            className="fixed z-[70] bottom-4 right-4 left-4 sm:left-auto sm:bottom-24 sm:right-6 sm:w-[380px]"
             style={{
                 transition: "opacity 0.6s ease, transform 0.6s cubic-bezier(0.16,1,0.3,1)",
                 opacity: visible ? 1 : 0,
