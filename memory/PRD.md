@@ -12,6 +12,22 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 61 · "Eight tiers" Bug Fix + Popular Questions Analytics — Feb 2026
+- **BUG FIX** (user-reported): homepage and Certifications page said "eight tiers" in three places despite the credential ladder only having 6 tiers. Fixed:
+  - `frontend/src/pages/Landing.jsx` L61 (intro paragraph) + L182 (Certification Ladder H2)
+  - `frontend/src/pages/Certifications.jsx` L27 (H1) + L31 (subhead paragraph)
+  - Verified via grep across `frontend/src` + `backend`: zero remaining occurrences of "eight tiers" or "8 tiers" anywhere in the codebase.
+- **NEW FEATURE — PulseDesk Super-Admin console** at `/admin?tab=pulsedesk` (accessible from the Customers → "Widget conversations" sidebar):
+  - **Popular Questions tab** (`[data-testid="pd-popular-questions"]`) — rule-based intent aggregation over the last N days of `pulsedesk_messages` where `sender_type='visitor'`. Buckets messages into 10 canonical intents (Pricing & seats, Enterprise & bundles, Certificates, Course content, Demo & trial, Assessment & exam, Voice/AI features, Refund & billing, Support & login, Other). Each intent card renders count, unique-visitor count, a bar visualization (relative to the top intent), and up to 3 verbatim italic sample messages.
+  - **Conversations tab** — 2-column drill-in view: newest-first conversation list on the left, full message log on the right with sender_type badges (visitor / ai / system).
+  - **Callback requests tab** — full CRM inbox of phone-callback requests captured through the widget.
+  - Window selector (7 / 30 / 90 days) + refresh button — no auto-poll, on-demand only.
+- **Backend endpoint** `GET /api/admin/pulsedesk/popular-questions?days=&top_n=` — super-admin auth-guarded. Response shape `{days, total_visitor_messages, top_intents: [{intent, count, unique_visitors, samples}]}`. `days` clamped to [1, 90], `top_n` clamped to [1, 50]. **Correctness fix** (from code-review): `unique_visitors` now correctly counts distinct `visitor_id` values (resolved from `conversation_id` via a Mongo lookup) rather than raw conversation_ids — labels now match the data even if a visitor is ever re-provisioned with a new conversation.
+- **Testing**: 8/8 new pytest cases in `tests/test_iteration61_popular_questions.py` (auth guards, shape validation, day/top_n clamping, empty-window empty-bucket, keyword classifier correctness, integration flow: post-visitor-message → appears in bucket). Full iter-60 + iter-61 regression re-run: **27/27 green**. Testing-agent Playwright: **100% pass** — bug-fix strings verified across 6 routes (Landing / Certifications / Courses / Pricing / Enterprise / HR-Suite), admin panel renders with all 3 sub-tabs, window selector reloads, conversations drill-in works, callback flow captures phone to Mongo end-to-end.
+- **Files modified**: `frontend/src/pages/Landing.jsx`, `frontend/src/pages/Certifications.jsx`, `backend/pulsedesk_service.py` (+70 LOC popular_questions + correctness patch), `backend/routers/pulsedesk_router.py` (+endpoint), `frontend/src/pages/SuperAdminPortal.jsx` (+pulsedesk tab). **Files added**: `frontend/src/components/admin/PulseDeskAdminPanel.jsx` (270 LOC, 3 sub-panels), `backend/tests/test_iteration61_popular_questions.py`.
+
+
+
 ### Iteration 60 · PulseDesk Conversational Widget — Feb 2026
 - **What the user uploaded**: `pulsedesk-mvp_1.zip` — a standalone Node.js + Express + Socket.io conversational widget product. User asked to install it on the ITHR site "on all pages". Given the K8s ingress constraint (only `/api/*` → :8001 + rest → :3000), main-agent chose approach (a): keep `widget.js` client UI as-is, rebuild PulseDesk's server-side endpoints natively in FastAPI, reuse the ITHR Emergent LLM key + Mongo persistence. Widget script served by the backend at `/api/pulsedesk/widget.js`.
 - **New `pulsedesk_service.py`** — full server-side data layer:

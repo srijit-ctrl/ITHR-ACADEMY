@@ -364,18 +364,33 @@ async def popular_questions(days: int = 7, top_n: int = 8) -> dict:
                 "intent": intent,
                 "count": 0,
                 "samples": [],
-                "conversation_ids": set(),
+                "visitor_ids": set(),
             }
         b = buckets[intent]
         b["count"] += 1
-        b["conversation_ids"].add(m.get("conversation_id"))
+        b["visitor_ids"].add(m.get("conversation_id"))
         # Keep up to 3 short-ish representative samples per bucket.
         if len(b["samples"]) < 3 and 8 <= len(m.get("text", "")) <= 240:
             b["samples"].append(m["text"])
 
+    # Resolve each unique conversation_id to a visitor_id so the label matches
+    # what the operator sees on-screen. Skips the resolve when the bucket is
+    # empty (protects against a bucket with all messages from anon convs).
+    all_conv_ids: set[str] = set()
+    for b in buckets.values():
+        all_conv_ids |= b["visitor_ids"]
+    conv_to_visitor: dict[str, str] = {}
+    if all_conv_ids:
+        async for c in db[CONVERSATIONS].find(
+            {"id": {"$in": list(all_conv_ids)}},
+            {"_id": 0, "id": 1, "visitor_id": 1},
+        ):
+            conv_to_visitor[c["id"]] = c["visitor_id"]
+
     rows = sorted(buckets.values(), key=lambda x: x["count"], reverse=True)[:top_n]
     for r in rows:
-        r["unique_visitors"] = len(r.pop("conversation_ids"))
+        conv_ids = r.pop("visitor_ids")
+        r["unique_visitors"] = len({conv_to_visitor.get(cid, cid) for cid in conv_ids})
     return {
         "days": days,
         "total_visitor_messages": total,
