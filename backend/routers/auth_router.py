@@ -155,6 +155,58 @@ def _dispatch_signup_side_effects(doc: dict, referral_applied: dict | None) -> N
         logger.exception("Activity-log dispatch failed (non-fatal)")
 
 
+def _issue_session(response: Response, doc: dict, request: Request | None = None) -> str:
+    """Common session-issue path: mint access token, set refresh cookie, and
+    (when a Request object is available) schedule non-blocking login tracking.
+
+    Returns the access token so callers can shape the JSON body as needed.
+    Used by /auth/login, /auth/mfa-verify, /auth/refresh, /auth/google/callback.
+    """
+    access = create_access_token(doc["id"], doc["email"], doc["role"])
+    _set_refresh_cookie(response, doc["id"])
+    if request is not None:
+        from login_tracking import schedule_login_tracking
+        schedule_login_tracking(doc["id"], request)
+    return access
+
+
+async def _check_mfa_required(doc: dict) -> dict | None:
+    """If the account has MFA enabled, return the challenge-token envelope
+    (caller returns it immediately). Otherwise return None so caller continues
+    to normal session issue.
+    """
+    if not doc.get("mfa_enabled"):
+        return None
+    import security_service as sec
+    return {"mfa_required": True, "challenge_token": sec.create_mfa_challenge_token(doc["id"])}
+
+
+def _verify_totp_or_backup(doc: dict, code: str) -> bool:
+    """Verify a TOTP challenge OR fall back to a single-use backup code.
+
+    Backup codes are stored as SHA-256 hashes and marked `used=true` when
+    consumed. Returns True on any successful match. Never raises.
+    """
+    import hashlib
+    import pyotp
+    if pyotp.TOTP(doc["mfa_secret"]).verify(code, valid_window=1):
+        return True
+    code_hash = hashlib.sha256(code.encode()).hexdigest()
+    backups = doc.get("mfa_backup_codes") or []
+    for b in backups:
+        if not b.get("used") and b.get("hash") == code_hash:
+            return True
+    return False
+
+
+async def _consume_backup_code(user_id: str, code_hash: str) -> None:
+    """Mark a single backup code as used (positional-array update)."""
+    await db.users.update_one(
+        {"id": user_id, "mfa_backup_codes.hash": code_hash},
+        {"$set": {"mfa_backup_codes.$.used": True}},
+    )
+
+
 @router.post("/auth/register", response_model=AuthResponse)
 async def register(payload: UserRegister, response: Response):
     personal_referrer = await _validate_registration(payload)
@@ -178,8 +230,7 @@ async def register(payload: UserRegister, response: Response):
     referral_applied = await _apply_signup_perks(doc, payload, personal_referrer)
     _dispatch_signup_side_effects(doc, referral_applied)
 
-    access = create_access_token(user_id, doc["email"], doc["role"])
-    _set_refresh_cookie(response, user_id)
+    access = _issue_session(response, doc)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
 
 
@@ -190,16 +241,12 @@ async def login(payload: UserLogin, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if doc.get("is_suspended"):
         raise HTTPException(status_code=403, detail="This account has been suspended. Contact your administrator.")
-    import security_service as sec
-    if doc.get("mfa_enabled"):
+    mfa_envelope = await _check_mfa_required(doc)
+    if mfa_envelope:
         # Password OK, TOTP pending: issue a 5-min challenge token instead of real tokens.
-        return {"mfa_required": True, "challenge_token": sec.create_mfa_challenge_token(doc["id"])}
-    access = create_access_token(doc["id"], doc["email"], doc["role"])
-    _set_refresh_cookie(response, doc["id"])
-    # Fire-and-forget login tracking (updates last_login_at, login_count,
-    # IP + geo + language). Never blocks the auth response.
-    from login_tracking import schedule_login_tracking
-    schedule_login_tracking(doc["id"], request)
+        return mfa_envelope
+    access = _issue_session(response, doc, request)
+    import security_service as sec
     result = {"token": access, "user": user_to_public(doc)}
     settings = await sec.get_security_settings()
     if sec.mfa_enforcement_covers(settings["mfa_enforcement"], doc.get("role", "learner")):
@@ -215,7 +262,6 @@ class MfaVerifyPayload(BaseModel):
 @router.post("/auth/mfa-verify", response_model=None)
 async def mfa_verify_login(payload: MfaVerifyPayload, request: Request, response: Response):
     import hashlib
-    import pyotp
     import security_service as sec
     try:
         user_id = sec.decode_mfa_challenge_token(payload.challenge_token)
@@ -225,25 +271,13 @@ async def mfa_verify_login(payload: MfaVerifyPayload, request: Request, response
     if not doc or not doc.get("mfa_enabled") or not doc.get("mfa_secret"):
         raise HTTPException(status_code=400, detail="MFA is not configured for this account")
     code = payload.code.strip().upper()
-    ok = pyotp.TOTP(doc["mfa_secret"]).verify(code, valid_window=1)
-    if not ok:
-        # Backup-code fallback (single use)
-        code_hash = hashlib.sha256(code.encode()).hexdigest()
-        backups = doc.get("mfa_backup_codes") or []
-        for b in backups:
-            if not b.get("used") and b.get("hash") == code_hash:
-                await db.users.update_one(
-                    {"id": user_id, "mfa_backup_codes.hash": code_hash},
-                    {"$set": {"mfa_backup_codes.$.used": True}},
-                )
-                ok = True
-                break
-    if not ok:
+    if not _verify_totp_or_backup(doc, code):
         raise HTTPException(status_code=401, detail="Invalid MFA code")
-    access = create_access_token(doc["id"], doc["email"], doc["role"])
-    _set_refresh_cookie(response, doc["id"])
-    from login_tracking import schedule_login_tracking
-    schedule_login_tracking(doc["id"], request)
+    # If a backup code was used, mark it consumed (single-use).
+    import pyotp
+    if not pyotp.TOTP(doc["mfa_secret"]).verify(code, valid_window=1):
+        await _consume_backup_code(user_id, hashlib.sha256(code.encode()).hexdigest())
+    access = _issue_session(response, doc, request)
     return {"token": access, "user": user_to_public(doc)}
 
 
@@ -269,8 +303,7 @@ async def refresh(response: Response, ithr_refresh: str = Cookie(default=None)):
     if doc.get("is_suspended"):
         _clear_refresh_cookie(response)
         raise HTTPException(status_code=403, detail="Account suspended")
-    access = create_access_token(doc["id"], doc["email"], doc["role"])
-    _set_refresh_cookie(response, doc["id"])
+    access = _issue_session(response, doc)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(doc)))
 
 
@@ -288,12 +321,13 @@ async def me(user_id: str = Depends(get_current_user_id)):
     return UserPublic(**user_to_public(doc))
 
 
-@router.post("/auth/google/callback", response_model=AuthResponse)
-async def google_callback(payload: dict, request: Request, response: Response):
-    session_id = payload.get("session_id")
-    if not session_id:
-        raise HTTPException(status_code=400, detail="session_id required")
+async def _exchange_google_session(session_id: str) -> dict:
+    """Exchange an Emergent OAuth session_id for the user's Google profile.
 
+    Raises HTTPException(401) if the exchange fails — the upstream provider
+    error is intentionally NOT surfaced in the response body (side-channel
+    hardening). Full context is captured server-side via `logger.exception`.
+    """
     async with httpx.AsyncClient(timeout=20.0) as client:
         try:
             r = await client.get(
@@ -301,13 +335,19 @@ async def google_callback(payload: dict, request: Request, response: Response):
                 headers={"X-Session-ID": session_id},
             )
             r.raise_for_status()
-            profile = r.json()
+            return r.json()
         except Exception:
             logger.exception("Emergent OAuth exchange failed")
-            # Deliberately generic — do not leak upstream provider details in the
-            # HTTP body. Full context is captured server-side via logger.exception.
             raise HTTPException(status_code=401, detail="OAuth verification failed")
 
+
+async def _upsert_google_user(profile: dict) -> dict:
+    """Find-or-create a user document from a validated Google profile.
+
+    Preserves any pre-existing `full_name` on the DB record (users may have
+    edited it after registering); only fills a name from Google when the DB
+    record has none.
+    """
     email = (profile.get("email") or "").lower()
     if not email:
         raise HTTPException(status_code=400, detail="No email returned by provider")
@@ -321,24 +361,28 @@ async def google_callback(payload: dict, request: Request, response: Response):
                 "full_name": existing.get("full_name") or profile.get("name") or email,
             }},
         )
-        user_doc = await db.users.find_one({"email": email})
-    else:
-        user_id = str(uuid.uuid4())
-        user_doc = {
-            "id": user_id, "email": email, "password_hash": "",
-            "full_name": profile.get("name") or email.split("@")[0],
-            "role": "learner", "organization": None, "title": None,
-            "avatar_url": profile.get("picture"),
-            "xp": 0, "streak_days": 0,
-            "created_at": now_iso(),
-            "auth_provider": "google",
-        }
-        await db.users.insert_one(user_doc)
+        return await db.users.find_one({"email": email})
 
-    access = create_access_token(user_doc["id"], user_doc["email"], user_doc["role"])
-    _set_refresh_cookie(response, user_doc["id"])
-    # Fire-and-forget login tracking so Google sign-ins also appear in
-    # /api/admin/dashboard KPIs (active_7d/active_30d, geo card, language pie).
-    from login_tracking import schedule_login_tracking
-    schedule_login_tracking(user_doc["id"], request)
+    user_id = str(uuid.uuid4())
+    user_doc = {
+        "id": user_id, "email": email, "password_hash": "",
+        "full_name": profile.get("name") or email.split("@")[0],
+        "role": "learner", "organization": None, "title": None,
+        "avatar_url": profile.get("picture"),
+        "xp": 0, "streak_days": 0,
+        "created_at": now_iso(),
+        "auth_provider": "google",
+    }
+    await db.users.insert_one(user_doc)
+    return user_doc
+
+
+@router.post("/auth/google/callback", response_model=AuthResponse)
+async def google_callback(payload: dict, request: Request, response: Response):
+    session_id = payload.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+    profile = await _exchange_google_session(session_id)
+    user_doc = await _upsert_google_user(profile)
+    access = _issue_session(response, user_doc, request)
     return AuthResponse(token=access, user=UserPublic(**user_to_public(user_doc)))

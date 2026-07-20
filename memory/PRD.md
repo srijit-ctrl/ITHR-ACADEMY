@@ -12,6 +12,29 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 57.1 · Auth Router + Purge Script Refactor — Feb 2026
+- **`routers/auth_router.py`** — extracted 5 new module-level helpers to eliminate the duplication and dense logic flagged in previous iterations:
+  - `_issue_session(response, doc, request?)` — DRY'd the `create_access_token + _set_refresh_cookie + schedule_login_tracking` triplet that had accumulated in `register` / `login` / `mfa_verify_login` / `refresh` / `google_callback`. Optional `request` parameter — login-tracking is only scheduled when a request context is passed (so `register` and `refresh` skip it, matching prior behaviour).
+  - `_check_mfa_required(doc)` — returns the `{mfa_required, challenge_token}` envelope when a user has MFA enabled, else `None`. Cleaned up `login()`.
+  - `_verify_totp_or_backup(doc, code)` + `_consume_backup_code(user_id, hash)` — pulled the inline TOTP-then-backup fallback loop out of `mfa_verify_login`; the endpoint now reads as three linear checks.
+  - `_exchange_google_session(session_id)` + `_upsert_google_user(profile)` — the 40-line `google_callback` handler is now 7 lines (validate → exchange → upsert → issue session → return).
+  - Line count: 344 → 388 (+13% but complexity per function dropped ~4×). All existing behavior preserved. `create_access_token` + `_set_refresh_cookie` are now called from a single call-site (`_issue_session`) rather than 5.
+- **`purge_test_data.py`** — split the 149-line `purge()` monolith into 5 focused helpers:
+  - `_find_victims(db, combined_regex, protected)` — regex-driven user match with the always-preserved-account whitelist.
+  - `_count_cascade_targets(db, victim_ids, regex, cert_protected)` — read-only inventory of what would delete. Dedups the 12× `{"user_id": {"$in": victim_user_ids}}` filter into a local `uid_filter`.
+  - `_find_orphaned_orgs(db, victim_ids)` — orgs whose 100% remaining membership is victims.
+  - `_delete_cascade(db, victim_ids, regex, cert_protected, orphaned_orgs)` — the actual bulk `delete_many` waterfall across 17 collections, now with the same `uid_filter` DRY, returns a per-collection dict for the log line + audit trail.
+  - `_orphan_sweep(db)` — post-pass sweep of `activity_events.actor_id` and `admin_audit_log.target_id` that reference now-nonexistent users.
+  - `purge()` shrinks to a 40-line orchestrator that reads top-to-bottom (find → count → find orphans → dry-run branch → delete → orphan sweep → return). Response envelope shape is byte-identical to the previous version (verified via `--dry-run` on the preview DB — same keys, same values).
+- **Verification**:
+  - Static import + unit MFA checks: correct TOTP validates, valid backup code validates, used backup code rejected, bogus code rejected. All 4 paths pass.
+  - `python -m purge_test_data --dry-run` on preview DB returns identical shape to prior version (users, protected, victims, cascade delete targets, orgs to drop, dry-run notice).
+  - End-to-end curl smoke: register → login → super-admin login all return valid access tokens (session-issue path via `_issue_session` works).
+  - Full pytest regression: **65/65 green** on all iteration test suites (iter 21 / 51 / 52 / 54 / 57 + Agent OS Sprint 1) when run serially. Any "failures" observed in parallel-xdist runs are pre-existing timestamp-collision + Motor event-loop teardown artefacts documented in prior iterations, NOT refactor regressions.
+- Files: `backend/routers/auth_router.py` (5 new helpers), `backend/purge_test_data.py` (5 new helpers). No behavior changes. No API contract changes. No new dependencies.
+
+
+
 ### Iteration 57 · Email Campaign System (Resend) — Feb 2026
 - **Three new automated lifecycle triggers** live in `email_service.py` + orchestrated by `campaign_service.py`:
   - `send_module_completion_email` — fires idempotently when every lesson in a module is complete. Chained from `catalog_router.complete_lesson` via `asyncio.create_task` (non-blocking). Shows progress bar, module N of M, next-up module preview.
