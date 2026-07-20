@@ -6,7 +6,7 @@ Public write endpoint:
         - Persists to `enterprise_leads`.
         - Fires Slack webhook alert (fire-and-forget).
         - Fires Resend auto-reply confirmation (fire-and-forget).
-        - Rate-limited: 5 requests/hour per IP AND 3 requests/hour per email.
+        - Rate-limited: 50 requests/hour per IP AND 3 requests/hour per email.
 
 Super-admin read endpoints:
     GET  /api/admin/leads/enterprise?limit=100&status=new

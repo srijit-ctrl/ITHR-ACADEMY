@@ -12,6 +12,36 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 59 · Slack Webhook + Enterprise Lead Intake — Feb 2026
+- **New `slack_service.py`** — thin fire-and-forget wrapper around Slack Incoming Webhooks. Rich Block Kit payload (attractive card with bundle badge, seat count, mrkdwn contact fields, and a "Reply to lead" mailto: action button). Graceful degradation — when `SLACK_WEBHOOK_URL` is blank the sender logs a warning and returns `False` (never raises). Also exports `slack_configured()` for the admin UI's "webhook not configured" banner and `send_slack_text()` for plain-text one-liner ops alerts.
+- **New public endpoint `POST /api/leads/enterprise`** — captures a lead + persists to `enterprise_leads`, then fires Slack alert + Resend auto-reply in a single fire-and-forget task (either can fail without blocking the DB write, so no lead is ever lost). Rate-limited: 50/hour per IP (corporate-NAT-friendly) + 3/hour per email (abuse guard). Silent throttle returns `{ok:true, lead_id:null, throttled:true}` — no enumeration side-channel. IP hashed via `hashlib.sha256(salt:ip)[:32]` — raw IP never surfaces in the DB row.
+- **New super-admin endpoints under `/api/admin/leads/enterprise`**:
+  - `GET ?limit=100&status=<filter>` — list with `slack_configured` boolean so the UI can show the "webhook missing" banner. Strips `ip_hash` and `user_agent` from response.
+  - `POST /{id}/status` — move leads through CRM funnel (new → contacted → qualified → closed_won/lost) with optional `note`. Regex-validated status enum.
+- **New auto-reply email `send_enterprise_lead_confirmation_email`** — warm one-working-day-promise reply with next-step timeline. Uses the shared ITHR wrapper. Bundle-aware subject line and heading.
+- **Reusable frontend `EnterpriseLeadModal` component** in `/app/frontend/src/components/enterprise/EnterpriseLeadModal.jsx`:
+  - Default export: `<EnterpriseLeadModal open onClose bundle sourceUrl />` — the modal shell.
+  - Named export: `<EnterpriseLeadForm bundle sourceUrl onDone />` — inline form variant.
+  - Success state renders in-place (no redirect) with "confirmation email on its way" copy.
+  - Field-level validation, 2000-char message cap counter, sonner-friendly error surface.
+  - All 8 interactive elements carry `data-testid` attributes.
+- **`/hr-suite` wired** — all 5 CTAs (Talent Ops flagship + 3 HR tiers + consult) now open the modal with the correct pre-filled bundle (`talent-ops-bundle` / `hr-starter` / `hr-growth` / `hr-enterprise` / `hr-consult`) instead of the previous no-op `/enterprise?bundle=` deep link.
+- **`/enterprise?bundle=<ref>` deep-linked** — page now reads the query param (via `useSearchParams`) and both the hero "Book a demo" CTA + the 3 plan-card "Contact sales" buttons open the modal. A dedicated **inline lead-form section** ("Tell us what you're building") renders below the plans with the bundle pre-selected — direct visitors don't need to click twice.
+- **Super-admin console — new "Enterprise leads" tab** under the Customers nav group in `/admin?tab=leads`:
+  - Full CRM inbox with newest-first grid layout (contact, company, bundle+seats, received-at, delivery ticks, status dropdown).
+  - Amber banner when `SLACK_WEBHOOK_URL` is blank — tells operators new leads only show up here (no Slack ping).
+  - Green banner when configured — confirms real-time #sales alerts are firing.
+  - Inline status dropdown with color-coded chips (new / contacted / qualified / closed_won / closed_lost) — persists via `POST /{id}/status`.
+  - Status filter + refresh action.
+- **Data model** — new collections:
+  - `enterprise_leads` — {id, name, email, company, role, seats, bundle, message, source_url, ip_hash, user_agent, status, created_at, slack_delivered, confirmation_email_sent, status_updated_at, status_updated_by, last_note}
+  - `lead_intake_rate` — {ip_hash, email, ts} — sweeps hourly, used only for the rate limiter.
+- **Testing**: `tests/test_iteration59_slack_leads.py` — **16/16 pytest cases green** (happy path + PII protection, validation edge cases, per-email silent throttle, Slack graceful degradation, super-admin auth guards, status transitions with 4 status enum values, unknown-lead 404, unauthenticated 401). Full-blown Playwright testing-agent verification: **100% pass** — all 3 browser-driven submits (Talent Ops CTA on /hr-suite, HR-Growth tier CTA, /enterprise inline form) POST successfully to `/api/leads/enterprise`, receive 200 with real lead_id, and land in Mongo with correct bundle. Super-admin panel renders, status dropdown persists to DB. Iteration 57 solo regression: 18/18 clean.
+- **Files added**: `backend/slack_service.py`, `backend/routers/leads_router.py`, `backend/tests/test_iteration59_slack_leads.py`, `frontend/src/components/enterprise/EnterpriseLeadModal.jsx`, `frontend/src/components/admin/EnterpriseLeadsPanel.jsx`. **Files modified**: `backend/email_service.py` (+`send_enterprise_lead_confirmation_email`), `backend/server.py` (+router mounts), `backend/.env` (+`SLACK_WEBHOOK_URL=` placeholder), `frontend/src/pages/HrSuite.jsx` (5 CTAs → modal), `frontend/src/pages/Enterprise.jsx` (bundle query param + modal + inline form section), `frontend/src/pages/SuperAdminPortal.jsx` (+leads tab).
+- **User action required to activate Slack**: paste your Incoming Webhook URL into `SLACK_WEBHOOK_URL` in `/app/backend/.env` and restart backend (`sudo supervisorctl restart backend`). Nothing else needed — all downstream code (auto-tick `slack_delivered=true`, green banner in admin) fires automatically once the URL is set.
+
+
+
 ### Iteration 58 · Student Progress Tracking Agent — Feb 2026
 - **New `module_events` collection** — explicit audit stream, one row per {user_id, course_id, module_id, kind ∈ ("started", "completed")}. Unique compound index makes both events idempotent so duplicate lesson-completions never duplicate the audit row. Complements the existing per-lesson `enrollments.completed_lessons` / `progress_pct` state which already updates in real time.
 - **`progress_tracker.py`** (new service module) — 5 helpers with fire-and-forget dispatch semantics that never block the lesson-complete write:
