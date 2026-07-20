@@ -24,15 +24,16 @@ import { LearningFunnelPanel, AssessmentAnalyticsPanel, CredentialManagerPanel, 
 import { WhatsAppAdminPanel } from "@/components/admin/WhatsAppAdminPanel";
 import EmailCampaignsPanel from "@/components/admin/EmailCampaignsPanel";
 import EnterpriseLeadsPanel from "@/components/admin/EnterpriseLeadsPanel";
+import PulseDeskAdminPanel from "@/components/admin/PulseDeskAdminPanel";
 import "@/styles/superadmin.css";
 
-const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "leads", "audit", "videoquiz", "security", "flags", "whatsapp"];
+const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "leads", "pulsedesk", "audit", "videoquiz", "security", "flags", "whatsapp"];
 
 const NAV = [
     { group: "Overview", items: [
         ["command", "Command Centre"], ["alertcenter", "Alerts"], ["analytics", "Analytics"], ["traffic", "Traffic"],
     ]},
-    { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"], ["leads", "Enterprise leads"]] },
+    { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"], ["leads", "Enterprise leads"], ["pulsedesk", "Widget conversations"]] },
     { group: "Learning & AI", items: [
         ["funnel", "Learning funnel"], ["assessments", "Assessments"], ["credentials", "Credentials"],
         ["aiops", "AI operations"], ["videoquiz", "Video quizzes"], ["sessions", "AI sessions"],
@@ -220,6 +221,8 @@ export default function SuperAdminPortal() {
                 {tab === "campaigns" && <EmailCampaignsPanel />}
 
                 {tab === "leads" && <EnterpriseLeadsPanel />}
+
+                {tab === "pulsedesk" && <PulseDeskAdminPanel />}
 
                 {tab === "audit" && <AuditLogPanel />}
                 </main>

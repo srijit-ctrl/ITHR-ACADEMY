@@ -37,6 +37,7 @@ from pulsedesk_service import (
     list_all_conversations,
     list_callback_requests,
     list_messages,
+    popular_questions,
     record_callback_request,
 )
 
@@ -238,3 +239,16 @@ async def default_widget_key(_super_admin_id: str = Depends(get_current_super_ad
     """Debug helper — returns the bootstrapped ITHR tenant widget key so an
     operator can verify what the embed script is pointing at."""
     return {"widget_key": DEFAULT_TENANT_KEY}
+
+
+@admin_router.get("/popular-questions")
+async def popular_questions_endpoint(
+    days: int = 7,
+    top_n: int = 8,
+    _super_admin_id: str = Depends(get_current_super_admin),
+):
+    """Rule-based intent aggregation over the last N days of visitor
+    messages — powers the 'What visitors ask' tile on the super-admin
+    dashboard. Returns the top intent buckets each with a count, a
+    unique-visitor count, and up to 3 sample verbatim questions."""
+    return await popular_questions(days=days, top_n=top_n)

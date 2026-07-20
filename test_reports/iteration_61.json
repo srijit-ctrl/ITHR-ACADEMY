@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 61 — BUG FIX ('eight tiers' → 'six tiers') + FEATURE (PulseDesk 'Popular questions' super-admin analytics panel with 3 sub-tabs). Backend pytest 8/8 passed (auth guard 2, shape validation 5, integration flow 1). Frontend: all bug-fix strings verified across /, /certifications, /courses, /pricing, /enterprise, /hr-suite — no 'eight tiers' / '8 tiers' remain anywhere. Landing intro reads 'six tiers, twenty industries, one standard'. Landing 'The Certification Ladder' H2 reads 'Six tiers.' Certifications page H1 reads 'Six tiers.' + paragraph 'structured across six tiers'. PulseDesk admin panel renders at /admin?tab=pulsedesk with 3 tabs (Popular questions default, Conversations, Callback requests). Popular Questions loaded 41 visitor messages / 7 days, showed 4 intent buckets with counts + bar visualizations + verbatim italic samples. Window selector 7→30→90 refetches. Refresh button works. Conversations tab: 38 rows, drill-in works. Callback tab: 6 rows with phone / visitor_id / timestamp / status chip. New callback POST '+9715012345678' returns ok:true.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration61_popular_questions.py",
+    "/app/test_reports/pytest/iteration61_popular_questions.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "pulsedesk_service.py L378 — `unique_visitors` counter is actually derived from unique `conversation_id` values, not visitor_ids. In this system every visitor has one conversation per widget_key so the count is usually accurate, but if the schema ever allows multiple conversations per visitor (or a visitor is re-provisioned) the label becomes misleading. Rename the field to `unique_conversations` or aggregate on `visitor_id` for correctness.",
+    "PulseDeskAdminPanel.jsx L83-85 — `maxCount` uses `top_intents[0].count` implicitly via Math.max but if the list is very short and all counts are equal, all bars render 100%. Not a bug, just noting the visualization is relative not absolute.",
+    "Popular Questions tile default `top_n=10` in frontend but backend cap allows 50. Consider surfacing a 'show more' control if operators need to see all intents."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration61_popular_questions.py"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (all UI flows verified: 2 bug-fix pages, 4 spot-check pages, 3-tab admin panel, window selector, refresh, conversations drill-in, callbacks list)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (from /app/memory/test_credentials.md, sourced via SUPER_ADMIN_PASSWORD env)",
+  "seed_data_creation": "1 new callback row created via curl POST at end of test: id=92b3679c-1862-4ecb-9217-bd937c0cf016, phone=+9715012345678, visitor=v_it61_manual_ui. 1 new pulsedesk_messages row seeded via test_new_visitor_message_appears_in_bucket with visitor v_pytest_it61_*.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "PulseDesk admin panel at /admin?tab=pulsedesk fully wired. New endpoint GET /api/admin/pulsedesk/popular-questions?days=&top_n= returns {days, total_visitor_messages, top_intents:[{intent,count,unique_visitors,samples}]}, auth-guarded (401/403 without super-admin JWT), and clamps days∈[1,90] top_n∈[1,50]. Bug 'eight tiers' fully purged — grep -r 'eight tiers\\|8 tiers' /app/frontend/src /app/backend returns zero matches. Landing.jsx L61 intro + L182 h2 + Certifications.jsx L27 h1 + L31 paragraph all read 'six tiers'.",
+  "rca of the issue": "N/A — this iteration was a follow-up implementation. Bug fix was a simple string change verified end-to-end via DOM inspection on 6 routes."
+}

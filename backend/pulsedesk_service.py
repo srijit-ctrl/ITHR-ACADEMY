@@ -311,3 +311,73 @@ async def list_all_conversations(limit: int = 200) -> list[dict]:
 async def list_callback_requests(limit: int = 100) -> list[dict]:
     limit = max(1, min(500, limit))
     return await db[CALLBACKS].find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+
+
+# ---- Popular-questions analytics ------------------------------------------
+#
+# Rule-based intent bucketing over the last N days of visitor messages.
+# Keyword matching intentionally — a full ML classifier is not warranted
+# for a signal loop this coarse, and this stays hermetic + auditable.
+
+_INTENT_RULES: list[tuple[str, list[str]]] = [
+    # (intent_label, keyword_list) — checked in order; first match wins.
+    ("Pricing & seats",       ["price", "pricing", "cost", "how much", "per seat", "quote", "budget", "afford"]),
+    ("Enterprise & bundles",  ["enterprise", "company", "team", "cohort", "org", "bulk", "corporate", "bundle", "hr suite", "talent ops"]),
+    ("Certificates",          ["certif", "credential", "badge", "linkedin", "verify", "verification", "diploma"]),
+    ("Course content",        ["module", "lesson", "syllabus", "curriculum", "content", "cover", "topic", "outline", "course", "courses", "learn"]),
+    ("Demo & trial",          ["demo", "trial", "try", "preview", "sample", "walkthrough", "test drive"]),
+    ("Assessment & exam",     ["quiz", "exam", "test", "assessment", "score", "pass mark"]),
+    ("Voice / AI features",   ["voice", "mic", "aletheia", "tutor", "gemini", "claude", "ai assistant"]),
+    ("Refund & billing",      ["refund", "invoice", "receipt", "billing", "cancel subscription", "money back"]),
+    ("Support & login",       ["password", "login", "sign in", "reset", "account", "help", "bug", "error"]),
+]
+
+
+def _classify_intent(text: str) -> str:
+    t = (text or "").lower()
+    for label, keywords in _INTENT_RULES:
+        for kw in keywords:
+            if kw in t:
+                return label
+    return "Other / uncategorised"
+
+
+async def popular_questions(days: int = 7, top_n: int = 8) -> dict:
+    """Aggregate visitor questions from the last `days` days, bucket them
+    into rule-based intents, and return the top N intents + a representative
+    sample question per bucket."""
+    from datetime import datetime, timedelta, timezone
+    days = max(1, min(90, days))
+    top_n = max(1, min(50, top_n))
+    since_iso = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+    buckets: dict[str, dict] = {}
+    total = 0
+    async for m in db[MESSAGES].find(
+        {"sender_type": "visitor", "created_at": {"$gte": since_iso}},
+        {"_id": 0, "text": 1, "created_at": 1, "conversation_id": 1},
+    ):
+        total += 1
+        intent = _classify_intent(m.get("text", ""))
+        if intent not in buckets:
+            buckets[intent] = {
+                "intent": intent,
+                "count": 0,
+                "samples": [],
+                "conversation_ids": set(),
+            }
+        b = buckets[intent]
+        b["count"] += 1
+        b["conversation_ids"].add(m.get("conversation_id"))
+        # Keep up to 3 short-ish representative samples per bucket.
+        if len(b["samples"]) < 3 and 8 <= len(m.get("text", "")) <= 240:
+            b["samples"].append(m["text"])
+
+    rows = sorted(buckets.values(), key=lambda x: x["count"], reverse=True)[:top_n]
+    for r in rows:
+        r["unique_visitors"] = len(r.pop("conversation_ids"))
+    return {
+        "days": days,
+        "total_visitor_messages": total,
+        "top_intents": rows,
+    }
