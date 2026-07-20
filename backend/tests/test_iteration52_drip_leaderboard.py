@@ -67,7 +67,7 @@ def super_admin_headers(super_admin_token):
 
 def _register(http: httpx.Client, full_name: str = "Iter52 Learner") -> dict:
     email = f"{TEST_PREFIX}{uuid.uuid4().hex[:10]}@example.com"
-    password = "TestPass123!"
+    password = os.environ.get("E2E_TEST_USER_PASSWORD", "TestPass123!")
     r = http.post("/auth/register", json={
         "full_name": full_name,
         "email": email,

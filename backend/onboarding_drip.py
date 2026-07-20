@@ -109,6 +109,50 @@ async def _candidates_referral_invite(older_than_iso: str) -> list[dict]:
     return out
 
 
+async def _process_stage(
+    *,
+    stage: str,
+    candidates: list[dict],
+    dry_run: bool,
+    send_fn,
+) -> dict:
+    """Generic per-stage driver. Applies idempotency guard, dispatches
+    the per-candidate ``send_fn(user_dict) -> awaitable[bool]``, and
+    returns the standard counts contract used by ``run_onboarding_drip``.
+
+    Failures in one send never abort the batch — every candidate is
+    tried independently and errors are counted, matching the design
+    invariant "one bad email must not block the whole cohort".
+    """
+    counts = {"sent": 0, "skipped": 0, "errors": 0, "samples": []}
+    for u in candidates:
+        if await _already_sent(u["id"], stage):
+            counts["skipped"] += 1
+            continue
+        if dry_run:
+            counts["samples"].append(u["email"])
+            continue
+        try:
+            ok = await send_fn(u)
+        except Exception:
+            log.exception(f"[drip/{stage}] send failed for {u['email']}")
+            ok = False
+        await _record_send(u["id"], stage, u["email"], ok)
+        counts["sent" if ok else "errors"] += 1
+    return counts
+
+
+def _stage_result(cands: list[dict], counts: dict) -> dict:
+    """Shape one stage's output for the API response envelope."""
+    return {
+        "eligible": len(cands),
+        "sent": counts["sent"],
+        "skipped_already_sent": counts["skipped"],
+        "errors": counts["errors"],
+        "dry_run_samples": counts["samples"][:10],
+    }
+
+
 async def run_onboarding_drip(
     dry_run: bool = False,
     share_base: Optional[str] = None,
@@ -116,80 +160,45 @@ async def run_onboarding_drip(
     """Drive both drip stages in one pass. Returns per-stage counts.
 
     Callable manually from the Super Admin (`POST /api/admin/drips/onboarding/run`)
-    or from any daily cron. Fully idempotent — a user who already received a
-    stage is silently skipped.
+    or from any daily cron. Fully idempotent — a user who already received
+    a stage is silently skipped. Refactored (Feb 2026) to compose per-stage
+    helpers rather than duplicate the send-with-catch loop inline.
     """
     await _ensure_indexes()
     now_dt = datetime.now(timezone.utc)
     day2_cut = (now_dt - timedelta(hours=DAY_2_MIN_AGE_HOURS)).isoformat()
     day5_cut = (now_dt - timedelta(hours=DAY_5_MIN_AGE_HOURS)).isoformat()
-
-    # ---- Stage: First-course nudge -----------------------------------
-    nudge_cands = await _candidates_first_course_nudge(day2_cut)
-    nudge_sent = 0
-    nudge_skipped = 0
-    nudge_errors = 0
-    nudge_samples: list[str] = []
-    for u in nudge_cands:
-        if await _already_sent(u["id"], STAGE_FIRST_COURSE_NUDGE):
-            nudge_skipped += 1
-            continue
-        if dry_run:
-            nudge_samples.append(u["email"])
-            continue
-        try:
-            ok = await send_first_course_nudge_email(u["email"], u.get("full_name") or "")
-        except Exception:
-            log.exception(f"[drip/nudge] send failed for {u['email']}")
-            ok = False
-        await _record_send(u["id"], STAGE_FIRST_COURSE_NUDGE, u["email"], ok)
-        if ok:
-            nudge_sent += 1
-        else:
-            nudge_errors += 1
-
-    # ---- Stage: Referral invite --------------------------------------
-    invite_cands = await _candidates_referral_invite(day5_cut)
-    invite_sent = 0
-    invite_skipped = 0
-    invite_errors = 0
-    invite_samples: list[str] = []
     base = (share_base or "").rstrip("/")
-    for u in invite_cands:
-        if await _already_sent(u["id"], STAGE_REFERRAL_INVITE):
-            invite_skipped += 1
-            continue
+
+    # Stage 1 — first-course nudge
+    nudge_cands = await _candidates_first_course_nudge(day2_cut)
+
+    async def _send_nudge(u):
+        return await send_first_course_nudge_email(u["email"], u.get("full_name") or "")
+
+    nudge_counts = await _process_stage(
+        stage=STAGE_FIRST_COURSE_NUDGE, candidates=nudge_cands,
+        dry_run=dry_run, send_fn=_send_nudge,
+    )
+
+    # Stage 2 — referral invite (needs per-user code + share URL)
+    invite_cands = await _candidates_referral_invite(day5_cut)
+
+    async def _send_invite(u):
         code = u.get("personal_referral_code") or await ensure_personal_code(u["id"])
         share_url = f"{base}/register?ref={code}" if base else code
-        if dry_run:
-            invite_samples.append(u["email"])
-            continue
-        try:
-            ok = await send_referral_invite_email(u["email"], u.get("full_name") or "", code, share_url)
-        except Exception:
-            log.exception(f"[drip/invite] send failed for {u['email']}")
-            ok = False
-        await _record_send(u["id"], STAGE_REFERRAL_INVITE, u["email"], ok)
-        if ok:
-            invite_sent += 1
-        else:
-            invite_errors += 1
+        return await send_referral_invite_email(
+            u["email"], u.get("full_name") or "", code, share_url,
+        )
+
+    invite_counts = await _process_stage(
+        stage=STAGE_REFERRAL_INVITE, candidates=invite_cands,
+        dry_run=dry_run, send_fn=_send_invite,
+    )
 
     return {
         "dry_run": dry_run,
         "generated_at": now_dt.isoformat(),
-        "first_course_nudge": {
-            "eligible": len(nudge_cands),
-            "sent": nudge_sent,
-            "skipped_already_sent": nudge_skipped,
-            "errors": nudge_errors,
-            "dry_run_samples": nudge_samples[:10],
-        },
-        "referral_invite": {
-            "eligible": len(invite_cands),
-            "sent": invite_sent,
-            "skipped_already_sent": invite_skipped,
-            "errors": invite_errors,
-            "dry_run_samples": invite_samples[:10],
-        },
+        "first_course_nudge": _stage_result(nudge_cands, nudge_counts),
+        "referral_invite": _stage_result(invite_cands, invite_counts),
     }

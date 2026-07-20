@@ -42,7 +42,7 @@ def super_admin_token(http):
 def learner(http):
     """Register a fresh throw-away learner. Cleaned up in teardown at the end of the module."""
     email = f"TEST_it51_{uuid.uuid4().hex[:8]}@example.com"
-    password = "TestPass123!"
+    password = os.environ.get("E2E_TEST_USER_PASSWORD", "TestPass123!")
     r = http.post("/auth/register", json={
         "full_name": "Iter51 Learner",
         "email": email,

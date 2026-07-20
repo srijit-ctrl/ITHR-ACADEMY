@@ -22,7 +22,7 @@ if not API_URL:
 
 def _register(email: str) -> str:
     r = httpx.post(f"{API_URL}/api/auth/register", json={
-        "email": email, "password": "TestPass123!", "full_name": "Iter53 Tester",
+        "email": email, "password": os.environ.get("E2E_TEST_USER_PASSWORD","TestPass123!"), "full_name": "Iter53 Tester",
     }, timeout=15)
     r.raise_for_status()
     return r.json()["token"]

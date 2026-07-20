@@ -23,7 +23,7 @@ def _register(prefix: str = "wa") -> tuple[str, str]:
     email = f"{prefix}-{uuid.uuid4().hex[:8]}@example.com"
     r = httpx.post(
         f"{API_URL}/api/auth/register",
-        json={"email": email, "password": "TestPass123!", "full_name": "WA Regression"},
+        json={"email": email, "password": os.environ.get("E2E_TEST_USER_PASSWORD","TestPass123!"), "full_name": "WA Regression"},
         timeout=15,
     )
     r.raise_for_status()
@@ -33,7 +33,7 @@ def _register(prefix: str = "wa") -> tuple[str, str]:
 def _sa_token() -> str:
     r = httpx.post(
         f"{API_URL}/api/auth/login",
-        json={"email": "superadmin@ithr.online", "password": "Dubai_deram2026"},
+        json={"email": os.environ.get("E2E_SUPER_ADMIN_EMAIL","superadmin@ithr.online"), "password": os.environ.get("E2E_SUPER_ADMIN_PASSWORD","Dubai_deram2026")},
         timeout=15,
     )
     r.raise_for_status()
