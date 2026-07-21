@@ -12,6 +12,23 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 66 · Unified /dashboard + Daily Learning Goal — Feb 2026
+
+- **Tabs merged** — the Learning + Profile split was replaced with a single flowing dashboard. Removed the `.ss-tabs` pill strip, the `?tab=profile` URL sync, the `useSearchParams` machinery, the dead `StatCard` component, and the redundant `/dashboard/stats` fetch. Order now: `SelfServicePortal` (quote hero + identity + 4 stat rings + pick-up + personal details + password) → `FoundingMemberBadge` (if applicable) → quick-links strip (Enterprise · Solon · Passport) → `ReferralPanel` + `WhatsAppOptInPanel` → next-best banner → enrollments grid → certificates → recent activity. Zero content lost; everything is one scroll.
+- **Daily Learning Goal — habit engine** — new card on the profile block:
+  - **Backend** (`me_router.py`) — 2 new endpoints:
+    - `GET /api/me/daily-goal` → `{target_minutes, today{date, minutes, remaining_minutes, pct, hit_goal}, streak_days, week[7], preset_targets:[5,15,30,60]}`.
+    - `PATCH /api/me/daily-goal {target_minutes}` → persists to `users.daily_goal_minutes` (5-180 min, Pydantic-validated).
+    - **Minutes proxy**: derived from `module_events` — `kind=started` → +2 min, `kind=completed` → +8 min. Coarse but honest without instrumenting `<video>` timeupdate.
+    - **Streak logic**: consecutive days hitting target, allowing *today OR yesterday* as tail so learners don't lose streak first thing in the morning.
+  - **Frontend** (`components/profile/DailyGoalCard.jsx`) — 
+    - Mint-tinted `.ss-card` with big center ring (140×140) showing `{today.minutes}/{target} MIN TODAY`, ring color flips to green when goal hit.
+    - Motivating copy that adapts to progress + streak (7 branches: legendary run · nailed today · almost there · halfway · started · streak-alive · start-your-habit).
+    - Streak flame chip with flicker animation, "Goal hit" pill when today is done.
+    - **7-day heatmap**: grid of 7 tiles (Mon-Sun style), color-graded across 5 intensity buckets (0 min → brand teal), today's tile has a `ring-2 ring-brand/40` highlight, minute count printed on each tile.
+    - **Inline target picker**: click "Change target" → 4 preset pills (5 · 15 · 30 · 60 min); current target visually distinguished; X cancels.
+- **Testing** — iteration_66 · **100% pass** (backend 8/8 pytest — default shape, persistence, Pydantic bounds 422×2, minutes math, streak logic; frontend Playwright — full merged-dashboard regression, ring update flow, preset picker with persistence across reload, adaptive copy for 5-min target, streak-chip absence for fresh user, personal-details/password/founding-badge/quick-links/referral/whatsapp/next-best/enrollments all still render).
+
 ### Iteration 65 · Learner Self-Service Portal — Feb 2026
 
 - **Purpose**: Give every learner a single peppy, ITHR-branded home for tracking their journey and managing their own profile without emailing support.
