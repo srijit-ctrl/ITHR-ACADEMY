@@ -1,21 +1,32 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy } from "lucide-react";
+import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy, GraduationCap, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import CredentialImpressions from "@/components/CredentialImpressions";
 import { ReferralPanel } from "@/components/ReferralPanel";
 import { WhatsAppOptInPanel } from "@/components/WhatsAppOptInPanel";
+import SelfServicePortal from "@/components/profile/SelfServicePortal";
 
 export default function Dashboard() {
     const { user } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialTab = searchParams.get("tab") === "profile" ? "profile" : "learning";
+    const [tab, setTab] = useState(initialTab);
     const [stats, setStats] = useState(null);
     const [enrollments, setEnrollments] = useState([]);
     const [certificates, setCertificates] = useState([]);
     const [nextBest, setNextBest] = useState(null);
     const [recs, setRecs] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const switchTab = (t) => {
+        setTab(t);
+        const next = new URLSearchParams(searchParams);
+        if (t === "learning") next.delete("tab"); else next.set("tab", t);
+        setSearchParams(next, { replace: true });
+    };
 
     useEffect(() => {
         Promise.all([
@@ -42,6 +53,27 @@ export default function Dashboard() {
 
     return (
         <div className="container-page py-12">
+            {/* Tab switcher */}
+            <div className="ss-tabs" data-testid="dashboard-tabs">
+                <button
+                    onClick={() => switchTab("learning")}
+                    data-testid="dashboard-tab-learning"
+                    className={`ss-tab ${tab === "learning" ? "active" : ""}`}
+                >
+                    <GraduationCap className="w-4 h-4" /> Learning
+                </button>
+                <button
+                    onClick={() => switchTab("profile")}
+                    data-testid="dashboard-tab-profile"
+                    className={`ss-tab ${tab === "profile" ? "active" : ""}`}
+                >
+                    <UserCog className="w-4 h-4" /> Profile
+                </button>
+            </div>
+
+            {tab === "profile" && <SelfServicePortal />}
+
+            {tab === "learning" && <>
             {/* Header */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-12">
                 <div className="md:col-span-8">
@@ -245,6 +277,7 @@ export default function Dashboard() {
                     </div>
                 </section>
             )}
+            </>}
         </div>
     );
 }
