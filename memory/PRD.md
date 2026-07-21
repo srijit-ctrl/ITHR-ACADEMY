@@ -12,6 +12,39 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 62 · Agent OS Phase 2 — Sprint 2 — Feb 2026
+- **Sprint 2 scope**: Agent Control Center UI (super-admin surface for pod ops) + HubSpot connector layer (outbound REST + inbound HMAC-verified webhook).
+- **New `agent_os/hubspot_connector.py`**: real HubSpot Private App v3 REST client. Operations exposed via `mcp_call(pod_id, "hubspot", op, payload)`:
+  - `create_contact` / `update_contact` / `lookup_contact_by_email` / `update_deal_stage`
+  - **Graceful degradation**: when `HUBSPOT_ACCESS_TOKEN` is blank, delegates to the Sprint-1 `HubspotStub` with a warning log per call. Sprint-1 pod flows continue to work with zero drift.
+  - Reads token at call-time (mid-run env changes pick up on the next call — no restart needed for token add/rotate).
+- **New `agent_os/hubspot_webhooks.py`**: HMAC-SHA256 v3 signature verification (per HubSpot request-validation spec — hash input = `method + uri + raw_body + timestamp`, Base64-encoded, constant-time compare). Uses `X-Forwarded-Proto/Host` to rebuild the exact signed URL (or `HUBSPOT_WEBHOOK_PUBLIC_URL` override when the reverse proxy chain rewrites headers).
+- **Idempotent event replay handling**: new collection `hubspot_webhook_events` with unique index on `dedupe_key = "{portalId}:{subscriptionId}:{eventId}"`. **Sub-fix from testing_agent code-review**: malformed events with any missing field fall back to `"sha256:" + hash(sorted-JSON body)[:32]` — no more silent collision on `unknown:unknown:unknown`. `record_event()` returns `(first_time, dedupe_key)` so `mark_processed()` uses the same string (no re-composition drift).
+- **Public POST `/api/agent-os/webhooks/hubspot`** (mounted on new `public_router` — no super-admin gate; HubSpot authenticates via signature). Response codes:
+  - `503 webhook secret not configured` when `HUBSPOT_WEBHOOK_SECRET` blank (fail-closed with clear error).
+  - `400 missing signature headers` when `x-hubspot-signature-v3` or `x-hubspot-request-timestamp` absent.
+  - `401 bad signature` on HMAC mismatch (audit-logged as `hubspot.webhook.rejected`).
+  - `200 {ok:true, processed:N, duplicates:N}` on valid batch.
+- **Event routing table** (`_dispatch_hubspot_event`):
+  - `contact.creation` → dispatches the `followup` pod with the raw event as input.
+  - `deal.propertyChange` on `dealstage` → dispatches the `proposal` pod.
+  - Other subscription types are audit-logged only until a mapping is added.
+- **Super-admin endpoints (new)**:
+  - `GET /api/admin/agent-os/connectors/status` — `{hubspot: {outbound_configured, webhook_configured}, apollo: {...}}` for the LIVE/STUBBED badges in the UI.
+  - `GET /api/admin/agent-os/webhooks/hubspot/events?limit=` — recent inbound events for the Audit tab.
+- **Frontend `AgentOSControlCenter.jsx`** (`/admin?tab=agentos`) with 4 sub-panels:
+  - **Pods** — grid of the 7 registered pods, each card shows name / MCP scopes / enable-disable toggle / Dispatch button.
+  - **Approvals** — filterable by pending/approved/rejected; per-row approve/reject with optional note (visible in audit log). Idempotent decide.
+  - **Runs** — 2-column drill-in with input / output / error sections, status-coloured badges.
+  - **Audit & Webhooks** — 2-column layout: audit log (with event-type filter input) + recent HubSpot webhooks (portal ID, event ID, property change, outcome).
+  - **Global kill switch** at the top-right, red-tinted when ON. Toast + audit entry per toggle.
+  - **Connector badges** at the top: `HubSpot outbound: LIVE / STUBBED` + `HubSpot webhook: LIVE / NOT CONFIGURED`. Helper text with `HUBSPOT_ACCESS_TOKEN` env instructions renders when either is missing.
+- **Env additions** (all blank placeholders): `HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_WEBHOOK_SECRET`, `HUBSPOT_WEBHOOK_PUBLIC_URL`. Zero code change needed to activate live HubSpot — paste values and restart backend.
+- **Testing**: `tests/test_iteration62_agentos_sprint2.py` — **17 pytest cases green**. Combined with Sprint-1 regression (`test_agent_os_sprint1.py` — 8 tests): **24/24 green**. testing_agent Playwright: **100% pass** — Control Center loads with all 4 tabs, kill switch toggles OFF→ON→OFF with red state + toast, Pods grid renders 7 pods with Dispatch action (successful run created during test), Approvals panel + filter dropdown works, Runs drill-in populates right pane on click (77 runs loaded from prior sessions), Audit panel two-column layout + filter input works.
+- **Files added**: `backend/agent_os/hubspot_connector.py` (120 LOC), `backend/agent_os/hubspot_webhooks.py` (135 LOC), `frontend/src/components/admin/AgentOSControlCenter.jsx` (548 LOC), `backend/tests/test_iteration62_agentos_sprint2.py` (17 cases). **Files modified**: `backend/routers/agent_os_router.py` (+public_router + 3 endpoints), `backend/agent_os/mcp_registry.py` (swap Stub→HubspotConnector at load), `backend/server.py` (mount public_router), `backend/.env` (+3 placeholders), `frontend/src/pages/SuperAdminPortal.jsx` (+agentos tab).
+
+
+
 ### Iteration 61 · "Eight tiers" Bug Fix + Popular Questions Analytics — Feb 2026
 - **BUG FIX** (user-reported): homepage and Certifications page said "eight tiers" in three places despite the credential ladder only having 6 tiers. Fixed:
   - `frontend/src/pages/Landing.jsx` L61 (intro paragraph) + L182 (Certification Ladder H2)

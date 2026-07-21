@@ -247,17 +247,17 @@ async def hubspot_webhook(request: Request):
     processed = 0
     duplicates = 0
     for evt in events_in:
-        first_time = await record_event(evt)
+        first_time, dedupe_key = await record_event(evt)
         if not first_time:
             duplicates += 1
             continue
         try:
             await _dispatch_hubspot_event(evt)
-            await mark_processed(f"{evt.get('portalId')}:{evt.get('subscriptionId')}:{evt.get('eventId')}", "ok")
+            await mark_processed(dedupe_key, "ok")
             processed += 1
         except Exception:
             logger.exception("[hubspot-webhook] event dispatch failed")
-            await mark_processed(f"{evt.get('portalId')}:{evt.get('subscriptionId')}:{evt.get('eventId')}", "error")
+            await mark_processed(dedupe_key, "error")
 
     return {"ok": True, "processed": processed, "duplicates": duplicates}
 

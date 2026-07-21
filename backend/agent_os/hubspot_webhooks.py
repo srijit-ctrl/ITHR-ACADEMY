@@ -95,19 +95,38 @@ async def ensure_indexes() -> None:
     await db[WEBHOOK_EVENTS_COLL].create_index([("processed_at", -1)])
 
 
-async def record_event(evt: dict) -> bool:
-    """Insert-or-skip pattern — returns True when this is the first time
-    we've seen this event (caller should process), False on duplicate."""
-    portal_id = evt.get("portalId") or "unknown"
-    sub_id = evt.get("subscriptionId") or "unknown"
-    event_id = evt.get("eventId") or "unknown"
-    dedupe_key = f"{portal_id}:{sub_id}:{event_id}"
+async def record_event(evt: dict) -> tuple[bool, str]:
+    """Insert-or-skip pattern — returns (first_time, dedupe_key).
+
+    first_time = True on first-ever insert, False on duplicate.
+    dedupe_key = the exact string used (caller should reuse it for
+                 `mark_processed` to avoid re-computing).
+
+    Dedupe key composition:
+        {portalId}:{subscriptionId}:{eventId} when all three fields exist.
+        Falls back to a SHA-256 hash of the sorted-JSON event body when
+        any field is missing — protects against malformed HubSpot retries
+        that would otherwise all collide on "unknown:unknown:unknown" and
+        be silently dropped as duplicates.
+    """
+    import hashlib
+    import json as _json
+    portal_id = evt.get("portalId")
+    sub_id = evt.get("subscriptionId")
+    event_id = evt.get("eventId")
+    if portal_id is not None and sub_id is not None and event_id is not None:
+        dedupe_key = f"{portal_id}:{sub_id}:{event_id}"
+    else:
+        # Malformed/incomplete event — hash the body so each unique payload
+        # still gets its own row.
+        payload = _json.dumps(evt, sort_keys=True, default=str).encode("utf-8")
+        dedupe_key = "sha256:" + hashlib.sha256(payload).hexdigest()[:32]
     try:
         await db[WEBHOOK_EVENTS_COLL].insert_one({
             "dedupe_key": dedupe_key,
-            "portal_id": portal_id,
-            "subscription_id": sub_id,
-            "event_id": event_id,
+            "portal_id": portal_id or "unknown",
+            "subscription_id": sub_id or "unknown",
+            "event_id": event_id or "unknown",
             "subscription_type": evt.get("subscriptionType"),
             "object_id": evt.get("objectId"),
             "property_name": evt.get("propertyName"),
@@ -115,11 +134,11 @@ async def record_event(evt: dict) -> bool:
             "raw": evt,
             "processed_at": None,
         })
-        return True
+        return True, dedupe_key
     except Exception:
         # Duplicate-key on the compound dedupe — already processed
         logger.debug(f"[hubspot-webhook] duplicate event skipped: {dedupe_key}")
-        return False
+        return False, dedupe_key
 
 
 async def mark_processed(dedupe_key: str, outcome: str) -> None:
