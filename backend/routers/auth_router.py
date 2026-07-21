@@ -153,6 +153,17 @@ def _dispatch_signup_side_effects(doc: dict, referral_applied: dict | None) -> N
         ))
     except Exception:
         logger.exception("Activity-log dispatch failed (non-fatal)")
+    try:
+        from routers.admin_automations_router import run_automations_for_trigger
+        _asyncio.create_task(run_automations_for_trigger("user_signup", {
+            "user_id": doc["id"],
+            "email": doc["email"],
+            "full_name": doc.get("full_name") or "",
+            "auth_provider": doc.get("auth_provider") or "password",
+            "referral_seq": (referral_applied or {}).get("seq"),
+        }))
+    except Exception:
+        logger.exception("[auth] user_signup automation dispatch failed")
 
 
 def _issue_session(response: Response, doc: dict, request: Request | None = None) -> str:

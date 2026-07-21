@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from auth import get_current_super_admin
-from core import db, now_iso
+from core import db, now_iso, logger
 
 router = APIRouter(prefix="/api/admin", tags=["command-center"])
 
@@ -180,6 +180,29 @@ async def alerts_center(_sa: str = Depends(get_current_super_admin)):
         out.append({**a, "status": st.get("status", "open"), "acked_by": st.get("acked_by"), "note": st.get("note")})
     order = {"high": 0, "medium": 1, "low": 2}
     out.sort(key=lambda x: order.get(x["severity"], 3))
+
+    # Automation-builder trigger: alert_high_severity.
+    # Fires exactly once per (alert_key, open-cycle) — the marker is cleared
+    # when the alert is resolved, so a re-open fires again.
+    try:
+        from routers.admin_automations_router import run_automations_for_trigger
+        import asyncio as _asyncio
+        for a in out:
+            if a.get("severity") != "high" or a.get("status") == "resolved":
+                continue
+            marker = await db.admin_alert_automation_fired.find_one({"key": a["key"]})
+            if marker:
+                continue
+            await db.admin_alert_automation_fired.insert_one({
+                "key": a["key"], "fired_at": now_iso(), "severity": a["severity"], "title": a.get("title"),
+            })
+            _asyncio.create_task(run_automations_for_trigger("alert_high_severity", {
+                "key": a["key"], "title": a.get("title"), "detail": a.get("detail"),
+                "category": a.get("category"), "severity": a.get("severity"),
+            }))
+    except Exception:
+        logger.exception("[alerts-center] automation dispatch failed")
+
     return {"alerts": out, "generated_at": now_iso()}
 
 
@@ -196,6 +219,8 @@ async def resolve_alert(key: str, payload: dict = None, sa: str = Depends(get_cu
         {"key": key},
         {"$set": {"key": key, "status": "resolved", "acked_by": sa, "resolved_at": now_iso(),
                   "note": (payload or {}).get("note", "")}}, upsert=True)
+    # Clear the automation dedupe marker so a future re-open fires again.
+    await db.admin_alert_automation_fired.delete_one({"key": key})
     return {"ok": True}
 
 

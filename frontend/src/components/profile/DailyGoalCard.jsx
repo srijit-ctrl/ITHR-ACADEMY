@@ -64,7 +64,8 @@ export default function DailyGoalCard() {
                     <button
                         onClick={() => setEditing(true)}
                         data-testid="ss-goal-edit"
-                        className="text-[10px] font-mono uppercase tracking-widest text-brand hover:text-brand-hover flex items-center gap-1"
+                        className="text-[10px] font-mono uppercase tracking-widest font-bold flex items-center gap-1 hover:opacity-80 transition-opacity"
+                        style={{ color: "#0F7A55" }}
                     >
                         <PencilLine className="w-3 h-3" /> Change target
                     </button>

@@ -13,7 +13,7 @@ from __future__ import annotations
 import io
 import random
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import segno
@@ -235,6 +235,19 @@ async def _issue_certificate_if_new(
             await mark_cert_claimed(user_id)
     except Exception:
         pass
+    # Automation-builder trigger: certificate_issued
+    try:
+        from routers.admin_automations_router import run_automations_for_trigger
+        import asyncio as _asyncio
+        _asyncio.create_task(run_automations_for_trigger("certificate_issued", {
+            "user_id": user_id,
+            "course_slug": course.get("slug"),
+            "course_title": course.get("title"),
+            "certificate_id": cert_obj.certificate_id,
+            "score": round(score, 1),
+        }))
+    except Exception:
+        pass
     return cert_obj.model_dump()
 
 
@@ -327,7 +340,6 @@ async def verify_certificate(certificate_id: str, request: Request):
     try:
         import asyncio as _asyncio
         import hashlib
-        from datetime import datetime, timedelta, timezone
         from email_service import send_credential_verification_alert
 
         if certificate_id != "SAMPLE-ITHR-2026-001":
@@ -390,8 +402,6 @@ async def credential_impressions(user_id: str = Depends(get_current_user_id)):
           ]
         }
     """
-    from datetime import datetime, timedelta, timezone
-
     now_dt = datetime.now(timezone.utc)
     since_30d = (now_dt - timedelta(days=30)).isoformat()
     month_start = now_dt.replace(day=1).strftime("%Y-%m-%d")

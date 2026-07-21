@@ -372,6 +372,18 @@ async def complete_lesson(payload: LessonCompleteRequest, user_id: str = Depends
                     asyncio.create_task(
                         mark_module5_milestone_if_eligible(user_id, payload.course_id)
                     )
+                    # Automation-builder trigger: module_5_completed
+                    try:
+                        from routers.admin_automations_router import run_automations_for_trigger
+                        asyncio.create_task(run_automations_for_trigger("module_5_completed", {
+                            "user_id": user_id,
+                            "course_id": payload.course_id,
+                            "course_slug": course.get("slug"),
+                            "course_title": course.get("title"),
+                            "module_id": newly_completed_module_id,
+                        }))
+                    except Exception:
+                        logger.exception("[catalog] module_5_completed automation dispatch failed")
         except Exception:
             logger.exception("[catalog] module-5 milestone dispatch failed")
 

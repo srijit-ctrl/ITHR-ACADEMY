@@ -12,6 +12,17 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 67 · Automation triggers wired end-to-end + UI polish — Feb 2026
+
+- **All 4 remaining automation triggers wired at their event sites** — completing the Automation Builder rules engine. Every trigger fire-and-forgets via `asyncio.create_task(run_automations_for_trigger(...))` so no user-facing latency is added.
+  - **`user_signup`** — hooked into `_dispatch_signup_side_effects()` in `routers/auth_router.py`. Payload: `{user_id, email, full_name, auth_provider, referral_seq}`. Fires for both email/password and Google OAuth registrations.
+  - **`certificate_issued`** — hooked into `_issue_certificate_if_new()` in `routers/assessment_router.py` after the certificate insert + free-cert claim. Payload: `{user_id, course_slug, course_title, certificate_id, score}`.
+  - **`module_5_completed`** — hooked into `routers/catalog_router.py` alongside the existing founding-cohort milestone dispatch (only fires when the completed module is exactly index 5). Payload: `{user_id, course_id, course_slug, course_title, module_id}`.
+  - **`alert_high_severity`** — hooked into `alerts_center()` in `routers/command_center_router.py` with **dedupe logic**: a new `admin_alert_automation_fired` collection tracks fired keys so the automation only fires once per open-cycle, not on every dashboard load. When an admin resolves the alert, the marker is cleared so a future re-open fires again.
+- **Verification**: all 4 triggers fired end-to-end in a direct-invocation test — each rule matched and its `create_audit_entry` action succeeded (`ok=1/1`). Real event-site test: registering a fresh user produced an `auto.user_signup` audit entry with all 5 payload keys correctly resolved from the template.
+- **Cleanup nit**: `routers/assessment_router.py` had 2 dead local `from datetime import …` imports; hoisted to the module-level `from datetime import datetime, timedelta, timezone` so ruff is happy.
+- **UI polish** (`components/profile/DailyGoalCard.jsx`) — "CHANGE TARGET" affordance was hard to read against the mint card background. Swapped from `text-brand` (teal) to inline dark-green `#0F7A55` with `font-weight: 700`. Verified computed style in the browser matches spec.
+
 ### Iteration 66 · Unified /dashboard + Daily Learning Goal — Feb 2026
 
 - **Tabs merged** — the Learning + Profile split was replaced with a single flowing dashboard. Removed the `.ss-tabs` pill strip, the `?tab=profile` URL sync, the `useSearchParams` machinery, the dead `StatCard` component, and the redundant `/dashboard/stats` fetch. Order now: `SelfServicePortal` (quote hero + identity + 4 stat rings + pick-up + personal details + password) → `FoundingMemberBadge` (if applicable) → quick-links strip (Enterprise · Solon · Passport) → `ReferralPanel` + `WhatsAppOptInPanel` → next-best banner → enrollments grid → certificates → recent activity. Zero content lost; everything is one scroll.
