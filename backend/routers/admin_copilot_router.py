@@ -148,8 +148,9 @@ async def copilot_chat(
         system += f"\n\nCurrent super-admin tab: {payload.page_context}"
 
     # Log the query for audit trail
+    query_row_id = uuid.uuid4().hex
     await db.copilot_queries.insert_one({
-        "id": uuid.uuid4().hex,
+        "id": query_row_id,
         "session_id": session_id,
         "actor_id": sa_id,
         "message": payload.message[:2000],
@@ -172,11 +173,10 @@ async def copilot_chat(
             yield _sse("error", {"detail": str(e)[:400]})
             return
         full = "".join(chunks)
-        # Persist assistant reply
+        # Persist assistant reply on the exact row we inserted (id-scoped).
         await db.copilot_queries.update_one(
-            {"session_id": session_id, "actor_id": sa_id, "created_at": {"$exists": True}},
+            {"id": query_row_id},
             {"$set": {"assistant_reply": full[:8000], "replied_at": now_iso()}},
-            upsert=False,
         )
         yield _sse("done", {"session_id": session_id, "length": len(full)})
 

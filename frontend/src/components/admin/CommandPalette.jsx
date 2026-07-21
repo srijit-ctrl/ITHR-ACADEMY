@@ -173,9 +173,14 @@ export default function CommandPalette({ open, onClose, onTabJump }) {
                 </div>
 
                 <div className="max-h-[60vh] overflow-y-auto py-2" data-testid="cmdk-results">
-                    {items.length === 0 && (
+                    {items.length === 0 && q.trim().length >= 2 && (
                         <div className="p-6 text-center text-sm text-muted-foreground" data-testid="cmdk-empty">
-                            {q.trim().length < 2 ? "Start typing to search users, orgs, courses…" : "No matches."}
+                            No matches for &ldquo;{q}&rdquo;.
+                        </div>
+                    )}
+                    {items.length === 0 && q.trim().length < 2 && (
+                        <div className="p-6 text-center text-sm text-muted-foreground" data-testid="cmdk-empty">
+                            Start typing to search users, orgs, courses, campaigns, agent runs…
                         </div>
                     )}
                     {groups.map(([section, secItems]) => (

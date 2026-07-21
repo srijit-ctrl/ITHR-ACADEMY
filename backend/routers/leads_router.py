@@ -185,7 +185,7 @@ async def submit_enterprise_lead(payload: EnterpriseLeadPayload, request: Reques
                 message=f"New lead · {lead_doc['company']} · {bundle}",
                 actor_id=None,
                 actor_name=lead_doc["name"],
-                target_id=lead_id,
+                target={"lead_id": lead_id},
             )
         except Exception:
             logger.exception("[leads] activity log dispatch failed")

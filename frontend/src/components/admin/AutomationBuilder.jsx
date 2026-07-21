@@ -335,7 +335,7 @@ function NewAutomationModal({ meta, onClose, onCreated }) {
                                 <select value={trigger} onChange={(e) => { setTrigger(e.target.value); setConditions([]); }} data-testid="automation-trigger-select"
                                         className="w-full bg-white/80 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand">
                                     {Object.entries(meta.triggers).map(([k, v]) => (
-                                        <option key={k} value={k}>{v.label} ({k})</option>
+                                        <option key={k} value={k}>{`${v.label} (${k})`}</option>
                                     ))}
                                 </select>
                                 <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mt-1">
@@ -379,7 +379,7 @@ function NewAutomationModal({ meta, onClose, onCreated }) {
                                         <select value={a.action} onChange={(e) => updateAction(i, { action: e.target.value, params: {} })}
                                                 data-testid={`action-select-${i}`}
                                                 className="flex-1 bg-white/80 border border-border rounded-lg px-2 py-2 text-sm">
-                                            {Object.entries(meta.actions).map(([k, v]) => <option key={k} value={k}>{v.label} ({k})</option>)}
+                                            {Object.entries(meta.actions).map(([k, v]) => <option key={k} value={k}>{`${v.label} (${k})`}</option>)}
                                         </select>
                                         {actions.length > 1 && (
                                             <button onClick={() => removeAction(i)} className="sa-icon-btn"><Trash2 className="w-3.5 h-3.5" /></button>
