@@ -12,6 +12,23 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 70 · Course companion PPTX resource — Feb 2026
+
+- **Goal**: Attach the user-supplied *"Prompt Engineering Mastery — ITHR Academy Course Deck.pptx"* (2.1 MB, 15-module course companion covering zero-shot, structured output, RAG, prompt-injection defence, DSPy, finance & healthcare patterns) as a downloadable learning resource on the matching course page.
+- **File storage**: saved to `/app/backend/static/course_resources/prompt-engineering-mastery-deck.pptx` (2,123,904 bytes verified). Directory constant `COURSE_RESOURCES_DIR` at the top of `catalog_router.py`.
+- **Backend** (`catalog_router.py`):
+  - New endpoint `GET /api/courses/{slug}/resources/{filename}` — reads the course doc, matches the resource by filename, gates access (`public` flag OR enrolled), then streams via `FileResponse` with the resource's declared mime_type + a friendly `download_name` header. `Cache-Control: private, max-age=300`.
+  - **Path-traversal guard**: `str(safe_path).startswith(str(COURSE_RESOURCES_DIR.resolve()) + '/')` — traversal attempts return 400 "Invalid filename".
+  - Error paths: no course → 404, filename not in course resources → 404, file missing on disk → 404, not enrolled + non-public → 403 (`"Enroll in this course to unlock its resources"`), anonymous → 401.
+- **Model**: `Course.resources: List[dict] = []` — every course model now advertises resources; only courses that declare any actually render the UI section.
+- **Persistence**: `seed_more_courses.build_prompt_engineering_course()` now includes the `resources=[...]` kwarg. Because the seed re-runs on every backend startup, the resource survives redeploys / DB rebuilds without manual patching.
+- **Frontend** (`pages/CourseDetail.jsx`):
+  - New `<ResourceRow>` component rendered inside a "COURSE MATERIALS" overline section immediately after Skills gained.
+  - Gradient icon (teal→blue) with lucide `<Presentation>` / `<FileText>` variants by kind, title, short description, "POWERPOINT DECK · 2.0 MB" metadata line, and a right-aligned `<Download>` button.
+  - **Locked state** for non-enrolled users: adds an "Enrolled only" badge + swaps CTA copy to "Locked"; click fires an info toast "Enrol in this course to unlock materials." (no fetch triggered).
+  - **Enrolled download**: `api.get('…', { responseType: "blob" })` → `URL.createObjectURL` → hidden anchor `.click()` → revoke. Downloads with the friendly filename `ITHR-Prompt-Engineering-Mastery-Deck.pptx`.
+- **Testing** — iteration_70 · **100% pass** (backend 9/9 pytest — resource contract, anon 401, non-enrolled 403, enrolled 200 download 2,123,904 bytes verified with PK\\x03\\x04 zip magic, path-traversal 400, unknown filename 404, unknown course 404, other courses have empty resources array, seed persistence survives restart; frontend 3/3 — locked card+toast for non-enrolled, real browser download captured via `page.expect_download()` for enrolled user with valid PPTX blob, other-course pages correctly omit the section).
+
 ### Iteration 69 · Starter automations seeded — Feb 2026
 
 - **Goal**: close the automation-builder loop end-to-end for every wired trigger without requiring the admin to manually create rules first.
