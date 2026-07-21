@@ -10,6 +10,7 @@ import {
 
 import QuoteHero from "./QuoteHero";
 import AvatarUploader from "./AvatarUploader";
+import DailyGoalCard from "./DailyGoalCard";
 import "@/styles/self-service.css";
 
 /* ==========================================================================
@@ -189,6 +190,11 @@ export default function SelfServicePortal() {
                     </Link>
                 </section>
             )}
+
+            {/* --- Daily learning goal ---------------------------------- */}
+            <section className="mt-8" data-testid="ss-daily-goal-section">
+                <DailyGoalCard />
+            </section>
 
             {/* --- Two-column: profile form + password ----------------- */}
             <section className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-6">

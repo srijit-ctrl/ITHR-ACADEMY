@@ -88,6 +88,19 @@ class InspireRequest(BaseModel):
     mood: Optional[str] = Field(default=None, max_length=40)
 
 
+class DailyGoalUpdate(BaseModel):
+    target_minutes: int = Field(..., ge=5, le=180)
+
+
+# Minutes credited per module_event kind — coarse but honest proxy for
+# time-on-task without instrumenting <video> timeupdate. Tune via the two
+# constants below; both are safe to bump if you later want a more generous
+# habit engine.
+MINUTES_PER_MODULE_STARTED = 2
+MINUTES_PER_MODULE_COMPLETED = 8
+DEFAULT_DAILY_GOAL_MINUTES = 15
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -307,3 +320,109 @@ async def inspire(payload: InspireRequest, user_id: str = Depends(get_current_us
             "Curiosity, then rigor, then output. In that order. Every day.",
         ]
         return {"quote": fallback_pool[hash(user_id) % len(fallback_pool)], "personalised": False}
+
+
+# ---------------------------------------------------------------------------
+# Daily learning goal — habit engine
+# ---------------------------------------------------------------------------
+def _date_str(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
+
+
+async def _minutes_by_day(user_id: str, days: int = 8) -> dict[str, int]:
+    """Aggregate module_events into estimated minutes-learned per UTC day.
+
+    Returns a dict keyed by `YYYY-MM-DD` covering the last `days` (inclusive
+    of today). Missing days default to 0 in the caller.
+    """
+    from_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    # Include today + previous (days-1) → total `days` buckets
+    from datetime import timedelta as _td
+    window_start = from_dt - _td(days=days - 1)
+
+    per_day: dict[str, int] = {}
+    async for evt in db.module_events.find(
+        {"user_id": user_id, "created_at": {"$gte": window_start.isoformat()}},
+        {"_id": 0, "kind": 1, "created_at": 1},
+    ):
+        try:
+            evt_dt = datetime.fromisoformat(evt["created_at"].replace("Z", "+00:00"))
+        except Exception:
+            continue
+        key = _date_str(evt_dt)
+        credit = MINUTES_PER_MODULE_COMPLETED if evt.get("kind") == "completed" else MINUTES_PER_MODULE_STARTED
+        per_day[key] = per_day.get(key, 0) + credit
+    return per_day
+
+
+def _streak_days(per_day: dict[str, int], target: int, today: datetime) -> int:
+    """Count consecutive days (ending today OR yesterday) where minutes ≥ target.
+
+    Yesterday is allowed as the tail so learners don't lose their streak the
+    moment they haven't opened the app today yet.
+    """
+    from datetime import timedelta as _td
+    streak = 0
+    today_utc = today.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    # Allow either today or yesterday to be the streak tail.
+    today_hit = per_day.get(_date_str(today_utc), 0) >= target
+    cursor = today_utc if today_hit else (today_utc - _td(days=1))
+    while True:
+        if per_day.get(_date_str(cursor), 0) >= target:
+            streak += 1
+            cursor -= _td(days=1)
+        else:
+            break
+    return streak
+
+
+@router.get("/daily-goal")
+async def get_daily_goal(user_id: str = Depends(get_current_user_id)):
+    """Today's minutes + 7-day heatmap + current streak."""
+    doc = await db.users.find_one({"id": user_id}, {"_id": 0, "daily_goal_minutes": 1}) or {}
+    target = int(doc.get("daily_goal_minutes") or DEFAULT_DAILY_GOAL_MINUTES)
+
+    now = datetime.now(timezone.utc)
+    per_day = await _minutes_by_day(user_id, days=8)
+
+    from datetime import timedelta as _td
+    week: list[dict] = []
+    for i in range(7, 0, -1):
+        d = now - _td(days=i - 1)
+        key = _date_str(d)
+        minutes = per_day.get(key, 0)
+        week.append({
+            "date": key,
+            "day_of_week": d.strftime("%a"),
+            "minutes": minutes,
+            "hit_goal": minutes >= target,
+        })
+
+    today = week[-1]
+    remaining = max(0, target - today["minutes"])
+    pct = min(100, round((today["minutes"] / max(target, 1)) * 100))
+    streak = _streak_days(per_day, target, now)
+
+    return {
+        "target_minutes": target,
+        "today": {
+            "date": today["date"],
+            "minutes": today["minutes"],
+            "remaining_minutes": remaining,
+            "pct": pct,
+            "hit_goal": today["hit_goal"],
+        },
+        "streak_days": streak,
+        "week": week,
+        "preset_targets": [5, 15, 30, 60],
+    }
+
+
+@router.patch("/daily-goal")
+async def update_daily_goal(payload: DailyGoalUpdate, user_id: str = Depends(get_current_user_id)):
+    """Update the caller's daily target (5-180 minutes)."""
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"daily_goal_minutes": payload.target_minutes, "daily_goal_updated_at": now_iso()}},
+    )
+    return await get_daily_goal(user_id=user_id)  # type: ignore[arg-type]

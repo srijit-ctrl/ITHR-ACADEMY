@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Award, BookOpen, TrendingUp, Flame, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy, GraduationCap, UserCog } from "lucide-react";
+import { Award, BookOpen, Sparkles, ExternalLink, Loader2, Building2, Compass, ArrowRight, Star, Copy } from "lucide-react";
 import { toast } from "sonner";
 import CredentialImpressions from "@/components/CredentialImpressions";
 import { ReferralPanel } from "@/components/ReferralPanel";
@@ -11,32 +11,19 @@ import SelfServicePortal from "@/components/profile/SelfServicePortal";
 
 export default function Dashboard() {
     const { user } = useAuth();
-    const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get("tab") === "profile" ? "profile" : "learning";
-    const [tab, setTab] = useState(initialTab);
-    const [stats, setStats] = useState(null);
     const [enrollments, setEnrollments] = useState([]);
     const [certificates, setCertificates] = useState([]);
     const [nextBest, setNextBest] = useState(null);
     const [recs, setRecs] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const switchTab = (t) => {
-        setTab(t);
-        const next = new URLSearchParams(searchParams);
-        if (t === "learning") next.delete("tab"); else next.set("tab", t);
-        setSearchParams(next, { replace: true });
-    };
-
     useEffect(() => {
         Promise.all([
-            api.get("/dashboard/stats"),
             api.get("/enrollments"),
             api.get("/certificates"),
             api.get("/recommendations").catch(() => ({ data: { recommendations: [] } })),
             api.get("/recommendations/next-best").catch(() => ({ data: { recommendation: null } })),
-        ]).then(([s, e, c, r, nb]) => {
-            setStats(s.data);
+        ]).then(([e, c, r, nb]) => {
             setEnrollments(e.data);
             setCertificates(c.data);
             setRecs(r.data.recommendations || []);
@@ -44,97 +31,65 @@ export default function Dashboard() {
         }).catch((err) => {
             console.error("dashboard load failed:", err);
         }).finally(() => setLoading(false));
-        // user is auth-context-derived; API endpoints resolve user from JWT — no need to react to
-        // user identity changing (a logout unmounts this page).
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     if (loading) return <div className="container-page py-24"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>;
 
     return (
         <div className="container-page py-12">
-            {/* Tab switcher */}
-            <div className="ss-tabs" data-testid="dashboard-tabs">
-                <button
-                    onClick={() => switchTab("learning")}
-                    data-testid="dashboard-tab-learning"
-                    className={`ss-tab ${tab === "learning" ? "active" : ""}`}
-                >
-                    <GraduationCap className="w-4 h-4" /> Learning
-                </button>
-                <button
-                    onClick={() => switchTab("profile")}
-                    data-testid="dashboard-tab-profile"
-                    className={`ss-tab ${tab === "profile" ? "active" : ""}`}
-                >
-                    <UserCog className="w-4 h-4" /> Profile
-                </button>
-            </div>
+            {/* Self-service portal (motivational quote + identity + stat rings + personal details + password) */}
+            <SelfServicePortal />
 
-            {tab === "profile" && <SelfServicePortal />}
-
-            {tab === "learning" && <>
-            {/* Header */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-12">
-                <div className="md:col-span-8">
-                    <div className="overline mb-4 fine-rule pl-4">Welcome back</div>
-                    <h1 className="font-serif text-5xl md:text-6xl tracking-tighter leading-none">
-                        {user?.full_name.split(" ")[0]}.
-                    </h1>
-                    <p className="mt-4 text-muted-foreground text-lg max-w-xl">
-                        {enrollments.length === 0
-                            ? "Your learning journey begins with a single enrollment. Explore the catalog."
-                            : "Pick up where you left off, or begin something new."}
-                    </p>
-                    {user?.founding_member_seq && (
-                        <FoundingMemberBadge
-                            seq={user.founding_member_seq}
-                            code={user.signup_discount_code}
-                            hasClaimedCourse={!!user.founding_course_id}
-                            certUsed={!!user.founding_cert_used}
-                        />
-                    )}
+            {/* Founding-member perk banner (unique — has code + claim CTA) */}
+            {user?.founding_member_seq && (
+                <div className="mt-8">
+                    <FoundingMemberBadge
+                        seq={user.founding_member_seq}
+                        code={user.signup_discount_code}
+                        hasClaimedCourse={!!user.founding_course_id}
+                        certUsed={!!user.founding_cert_used}
+                    />
                 </div>
-                <div className="md:col-span-4 grid grid-cols-2 gap-3">
-                    <StatCard icon={BookOpen} label="Enrollments" value={stats?.enrollments || 0} testId="stat-enrollments" />
-                    <StatCard icon={Award} label="Certificates" value={stats?.certificates || 0} testId="stat-certificates" />
-                    <StatCard icon={TrendingUp} label="XP" value={stats?.xp || 0} testId="stat-xp" />
-                    <StatCard icon={Flame} label="Day streak" value={stats?.streak_days || 0} testId="stat-streak" />
-                    <Link to="/enterprise/portal" data-testid="dashboard-enterprise-link" className="card-flat p-4 col-span-2 flex items-center justify-between hover:border-brand transition-colors">
-                        <div className="flex items-center gap-3">
-                            <Building2 className="w-4 h-4 text-brand" />
-                            <div>
-                                <div className="font-serif text-sm leading-none">Enterprise Portal</div>
-                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Team dashboard · Invites · Seats</div>
-                            </div>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                    </Link>
-                    <Link to="/mentor" data-testid="dashboard-mentor-link" className="card-flat p-4 col-span-2 flex items-center justify-between hover:border-brand transition-colors">
-                        <div className="flex items-center gap-3">
-                            <Compass className="w-4 h-4 text-brand" />
-                            <div>
-                                <div className="font-serif text-sm leading-none">Meet Solon · Career Mentor</div>
-                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Personalized credential roadmap</div>
-                            </div>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                    </Link>
-                    <Link to="/passport" data-testid="dashboard-passport-link" className="card-flat p-4 col-span-2 flex items-center justify-between hover:border-brand transition-colors">
-                        <div className="flex items-center gap-3">
-                            <Award className="w-4 h-4 text-brand" />
-                            <div>
-                                <div className="font-serif text-sm leading-none">AI Skills Passport</div>
-                                <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Portable · verifiable · shareable</div>
-                            </div>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                    </Link>
-                </div>
-            </div>
+            )}
 
-            <ReferralPanel />
-            <WhatsAppOptInPanel />
+            {/* Quick-links strip — Enterprise / Solon / Passport */}
+            <section className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="dashboard-quick-links">
+                <Link to="/enterprise/portal" data-testid="dashboard-enterprise-link" className="card-flat p-4 flex items-center justify-between hover:border-brand transition-colors">
+                    <div className="flex items-center gap-3">
+                        <Building2 className="w-4 h-4 text-brand" />
+                        <div>
+                            <div className="font-serif text-sm leading-none">Enterprise Portal</div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Team · Invites · Seats</div>
+                        </div>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                </Link>
+                <Link to="/mentor" data-testid="dashboard-mentor-link" className="card-flat p-4 flex items-center justify-between hover:border-brand transition-colors">
+                    <div className="flex items-center gap-3">
+                        <Compass className="w-4 h-4 text-brand" />
+                        <div>
+                            <div className="font-serif text-sm leading-none">Solon · Mentor</div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Credential roadmap</div>
+                        </div>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                </Link>
+                <Link to="/passport" data-testid="dashboard-passport-link" className="card-flat p-4 flex items-center justify-between hover:border-brand transition-colors">
+                    <div className="flex items-center gap-3">
+                        <Award className="w-4 h-4 text-brand" />
+                        <div>
+                            <div className="font-serif text-sm leading-none">Skills Passport</div>
+                            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">Verifiable · shareable</div>
+                        </div>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                </Link>
+            </section>
+
+            <div className="mt-10">
+                <ReferralPanel />
+                <WhatsAppOptInPanel />
+            </div>
 
             {/* Next-best recommendation banner */}
             {nextBest && (
@@ -277,17 +232,6 @@ export default function Dashboard() {
                     </div>
                 </section>
             )}
-            </>}
-        </div>
-    );
-}
-
-function StatCard({ icon: Icon, label, value, testId }) {
-    return (
-        <div className="card-flat p-4" data-testid={testId}>
-            <Icon className="w-4 h-4 text-brand mb-2" />
-            <div className="font-serif text-2xl leading-none">{value}</div>
-            <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mt-1">{label}</div>
         </div>
     );
 }
