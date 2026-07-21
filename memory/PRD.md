@@ -12,6 +12,18 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 68 · Code Review Remediation — Feb 2026
+
+- **Code review** run via `code_review_agent` on the full iteration 63-67 surface. Verdict: **READY WITH FIXES** (no CRITICAL/HIGH; 1 MEDIUM + 5 LOW). All 6 findings fixed:
+- **[MEDIUM] Alert-automation dedupe race** (`command_center_router.alerts_center()`) — original check-then-act (`find_one` → `insert_one`) allowed duplicate Slack/pod dispatches under concurrent polling. **Fix**: added unique index on `admin_alert_automation_fired.key` in `admin_automations_router.ensure_indexes()` + switched to insert-first-catch-DuplicateKeyError pattern. Now atomic even with 5 concurrent hits.
+- **[LOW] Wrong field name in `/me/summary` recent_events projection** (`me_router.py:161`) — projected `event_type` but `module_events` stores `kind`. Fixed the projection.
+- **[LOW] No rate limit on `/me/inspire`** — could spike Claude spend if scripted. **Fix**: added `_rate_ok(bucket_key, limit_per_hour)` helper backed by `me_rate` Mongo collection; `/inspire` capped at 20/hr per user, returns 429 with clear detail.
+- **[LOW] No rate limit on `/me/change-password`** — enables online guessing of the current password. **Fix**: capped at 8/hr per user.
+- **[LOW] `FoundingMemberBadge` unsafe clipboard write** — `navigator.clipboard.writeText(code)` where `code` might be undefined for founding users without a `signup_discount_code`. **Fix**: guarded the copy handler + branched the UI to show *"Discount code pending — refresh in a moment."* fallback instead of a literal "undefined" in the code chip.
+- **[LOW] `AdminCopilotPanel` SSE not aborted on unmount** — closing the drawer mid-stream left the fetch reader running and firing stale `setMessages`. **Fix**: appended a cleanup-only `useEffect` that calls `abortRef.current?.abort()` on component unmount.
+- **[LOW] Ruff hygiene** — 8 unused imports (`admin_automations_router.py`, `admin_copilot_router.py`, `me_router.py`) removed via `ruff --fix`. Renamed ambiguous single-letter `l` → `lesson` in `progress_tracker.py:235`. Full backend lint now clean.
+- **Testing** — iteration_68 · **100% pass** (backend 9/9 pytest — unique index verified, insert-first dedupe survives 5 concurrent /alerts-center hits with exactly 1 automation run, resolve→re-open re-fires, inspire 429 at 21st call, change-password 429 at 9th failed attempt, /me/summary now returns `kind`; frontend Playwright — FoundingMemberBadge fallback for missing code, AdminCopilotPanel unmount mid-stream leaves no console error, all iter-63-67 regression flows still green).
+
 ### Iteration 67 · Automation triggers wired end-to-end + UI polish — Feb 2026
 
 - **All 4 remaining automation triggers wired at their event sites** — completing the Automation Builder rules engine. Every trigger fire-and-forgets via `asyncio.create_task(run_automations_for_trigger(...))` so no user-facing latency is added.
