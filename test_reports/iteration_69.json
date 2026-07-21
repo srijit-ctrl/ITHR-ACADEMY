@@ -1,0 +1,40 @@
+{
+  "summary": "End-to-end verification of iter-69 STARTER_AUTOMATIONS — 5 idempotent starter rules (one per trigger) seeded on backend startup. Backend: 9/9 pytest cases pass (seed shape + restart idempotency + user_signup e2e + certificate_issued via /test + module_5_completed via /test + alert_high_severity full cycle + enterprise_lead_created e2e + CRUD regressions). Frontend: 5/5 starters render on /admin?tab=automations with ACTIVE pills + 1 action each; Play dry-run toast fires; toggle ACTIVE↔DISABLED works with 'Automation enabled/disabled' toast. Iter-68 regression suite also re-passed after minor test-assertion refresh (see notes).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration69_starter_automations.py",
+    "/app/test_reports/pytest/iter69_starter_automations.xml",
+    "/app/backend/tests/test_iteration68_review_fixes.py",
+    "/app/test_reports/pytest/iter68_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "VERIFIED — STARTER_AUTOMATIONS constant (5 entries) is well-organised, uses `{{...}}` placeholders that match the payload keys emitted by each trigger site (auth_router user_signup passes full_name/email/auth_provider/referral_seq; assessment_router certificate_issued passes course_title/certificate_id/score; catalog_router module_5_completed passes course_title/user_id; command_center_router alert_high_severity passes key/title/detail/category/severity; leads_router enterprise_lead_created passes company/bundle/seats/email). All placeholders resolve at run-time — audit-log `detail` strings contain zero '{{' residue.",
+    "VERIFIED — seed_starter_automations() is idempotent: (a) sparse-unique index on `seed_key`, (b) find_one before insert, (c) DuplicateKey caught silently for cross-worker race safety. Restart-under-test confirmed the count stays at exactly 5.",
+    "VERIFIED — sparse index on `seed_key` correctly does NOT block user-created rules (which lack the field). Existing user-authored rules coexist with starters in the same collection.",
+    "VERIFIED — no console errors on /admin?tab=automations (two benign 401s observed but unrelated to automations UI — they were from a background poll unrelated to the AutomationBuilder component). All 9 rules (5 starters + 4 pre-existing) render with correct trigger label, correct action count (1 each for starters), correct ACTIVE pill.",
+    "MINOR OBSERVATION (fixed in this iteration) — iter-68 concurrency test asserted `run_count <= 1` for alert_high_severity+reset-spike. With the new starter rule enabled, one dispatch now correctly fires against BOTH the pre-existing test rule and the new starter → 2 automation_runs rows per dispatch (still 1 marker, still 1 dispatch — dedupe is intact). I updated the iter-68 test to assert per-rule <=1 (proving marker dedupe still works) instead of a global <=1. This is a test-assertion refresh, not a product regression.",
+    "MINOR NOTE — leads_router.py L194 dispatches `enterprise_lead_created` synchronously via `await run_automations_for_trigger(...)` while all other sites use `asyncio.create_task(...)` fire-and-forget. Not a bug (leads endpoint already runs its own /side_effects task) but inconsistent style — may be worth harmonising for readability.",
+    "MINOR NOTE — placeholder resolution uses substring replace against payload keys. Non-string payload values (e.g. `score: 87.5`, `seats: 42`, `referral_seq: 7`) are converted with `str(val)` — verified in audit-log details. If a future action needs typed values, `_resolve()` will need enhancement.",
+    "REGRESSION verified — /alerts-center concurrency dedupe still works (marker=1, per-rule runs<=1). /me/inspire still 429s at 21st call. /me/change-password still 429s at 9th attempt. /me/summary recent_events still uses `kind`. Signup automation still fires. /admin/automations list still works. /me/daily-goal validation still enforces 5-180 minutes."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration69_starter_automations.py",
+    "/app/backend/tests/test_iteration68_review_fixes.py"
+  ],
+  "success_rate": {"backend": "100% (9/9 iter69 + 9/9 iter68 after test-assertion refresh)", "frontend": "100% (UI list + Play toast + toggle round-trip)"},
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (super_admin). Fresh test learners registered per-test with pattern test_it69_*@example.com (cleaned up post-run).",
+  "seed_data_creation": "Alert test seeds 15 password_reset_tokens with seed_source='iter69_test' (cleaned up in finally). All test users, leads, module_events cleaned up post-run. NOTE: audit-log entries created by the starter rules under test (automation.user_signup/certificate_issued/module_5_completed/alert_high_severity/enterprise_lead_created) are LEFT in the DB as evidence — they are not massive (small text detail + payload snapshot) and match the review request's expectation.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "STARTER_AUTOMATIONS are idempotent and safe. The 5 starter rules will be re-seeded on every backend restart if any are missing. Deleting a starter rule via DELETE /api/admin/automations/{id} will cause it to be re-seeded on the next backend restart (verified). The `seed_key` field lets you identify starters vs user-created rules with a `{seed_key: {$regex: '^starter\\.'}}` query. All iter-69 tests use synchronous pymongo (MongoClient) — required because backend pytest.ini uses xdist and Motor async helpers can't cross workers.",
+  "rca of the issue": "N/A — iter-69 feature works end-to-end. The single blip found (iter-68 assertion refresh) was a test-side over-constraint uncovered by the new starter rule increasing the enabled-rule count for the alert_high_severity trigger from 1 to 2. Root cause: iter-68 assumed run_count <= 1 globally; correct semantic is <=1 per rule per marker. Fixed by tightening the assertion to per-rule dedupe."
+}

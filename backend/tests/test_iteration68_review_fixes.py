@@ -170,14 +170,21 @@ class TestAlertAutomationDedupe:
             time.sleep(3)
 
             marker_count = mdb.admin_alert_automation_fired.count_documents({"key": ALERT_KEY})
-            run_count = mdb.admin_automation_runs.count_documents({
-                "trigger": "alert_high_severity", "payload.key": ALERT_KEY,
-            })
-
-            # Under dedupe: exactly 1 marker + at most 1 automation run (0 if
-            # no user rule for alert_high_severity is enabled).
+            # Under dedupe: exactly 1 marker (proves only ONE dispatch happened
+            # across all concurrent polls). Each enabled rule for this trigger
+            # will produce exactly one run per dispatch — assert per-rule
+            # dedupe rather than global (starter rule seeded in iter-69
+            # increased the enabled-rule count above 1).
             assert marker_count == 1, f"expected exactly 1 dedupe marker, got {marker_count}"
-            assert run_count <= 1, f"dedupe race — expected <=1 auto run, got {run_count}"
+            # Assert each enabled rule for this trigger produced at most 1 run.
+            enabled_rules = list(mdb.admin_automations.find(
+                {"trigger": "alert_high_severity", "enabled": True}, {"id": 1}))
+            for rule in enabled_rules:
+                per_rule = mdb.admin_automation_runs.count_documents({
+                    "trigger": "alert_high_severity", "payload.key": ALERT_KEY,
+                    "rule_id": rule["id"],
+                })
+                assert per_rule <= 1, f"dedupe race for rule {rule['id']} — got {per_rule} runs"
 
             # POST /resolve clears the marker
             r = requests.post(

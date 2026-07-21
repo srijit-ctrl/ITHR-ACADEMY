@@ -343,3 +343,119 @@ async def ensure_indexes():
     # Alert-automation dedupe marker — unique key so concurrent /alerts-center
     # polls can't both dispatch the same alert_high_severity event.
     await db.admin_alert_automation_fired.create_index("key", unique=True)
+    # Starter-rule idempotency guard — one rule per seed_key.
+    await db.admin_automations.create_index("seed_key", unique=True, sparse=True)
+
+
+# ---------------------------------------------------------------------------
+# Starter automations — one per trigger, idempotent, all use create_audit_entry
+# so they're safe to enable in production without side effects. Admins can
+# swap the action in the UI (e.g. to send_slack_message) once they're ready.
+# ---------------------------------------------------------------------------
+STARTER_AUTOMATIONS = [
+    {
+        "seed_key": "starter.user_signup.audit",
+        "name": "Log new signups to audit trail",
+        "description": "Writes an audit entry every time a new user signs up (email/password or Google). Swap the action to send_slack_message when you're ready to notify your team.",
+        "trigger": "user_signup",
+        "conditions": [],
+        "actions": [{
+            "action": "create_audit_entry",
+            "params": {
+                "action": "automation.user_signup",
+                "detail": "New signup: {{full_name}} · {{email}} · via {{auth_provider}}",
+            },
+        }],
+    },
+    {
+        "seed_key": "starter.certificate_issued.audit",
+        "name": "Log certificate issuance",
+        "description": "Writes an audit entry every time a learner earns a certificate. Extend with a Slack celebration or LinkedIn share prompt.",
+        "trigger": "certificate_issued",
+        "conditions": [],
+        "actions": [{
+            "action": "create_audit_entry",
+            "params": {
+                "action": "automation.certificate_issued",
+                "detail": "Certificate {{certificate_id}} issued for {{course_title}} · score {{score}}%",
+            },
+        }],
+    },
+    {
+        "seed_key": "starter.module_5_completed.audit",
+        "name": "Track module-5 milestones",
+        "description": "Fires when a learner clears module 5 of any course — the founding-cohort perk trigger. Great for cohort-milestone celebrations.",
+        "trigger": "module_5_completed",
+        "conditions": [],
+        "actions": [{
+            "action": "create_audit_entry",
+            "params": {
+                "action": "automation.module_5_completed",
+                "detail": "Learner {{user_id}} completed module 5 of {{course_title}}",
+            },
+        }],
+    },
+    {
+        "seed_key": "starter.alert_high_severity.audit",
+        "name": "Escalate high-severity alerts",
+        "description": "Writes an audit entry the moment a new high-severity platform alert opens. Swap to send_slack_message to page your ops channel.",
+        "trigger": "alert_high_severity",
+        "conditions": [],
+        "actions": [{
+            "action": "create_audit_entry",
+            "params": {
+                "action": "automation.alert_high_severity",
+                "detail": "HIGH severity · {{key}} · {{title}} · {{detail}}",
+            },
+        }],
+    },
+    {
+        "seed_key": "starter.enterprise_lead_created.audit",
+        "name": "Log new enterprise leads",
+        "description": "Writes an audit entry for every new enterprise lead submission. Extend with a Slack sales-channel ping + mark_lead_status auto-triage.",
+        "trigger": "enterprise_lead_created",
+        "conditions": [],
+        "actions": [{
+            "action": "create_audit_entry",
+            "params": {
+                "action": "automation.enterprise_lead_created",
+                "detail": "New lead · {{company}} · {{bundle}} · {{seats}} seats · {{email}}",
+            },
+        }],
+    },
+]
+
+
+async def seed_starter_automations() -> int:
+    """Idempotently insert the 5 starter rules. Returns the number newly seeded.
+
+    Each rule has a unique `seed_key` and is only inserted when missing so
+    subsequent restarts / redeploys don't duplicate. Rules are seeded
+    ENABLED — admins can flip off from the UI if they don't want them running.
+    """
+    seeded = 0
+    for tpl in STARTER_AUTOMATIONS:
+        existing = await db.admin_automations.find_one({"seed_key": tpl["seed_key"]})
+        if existing:
+            continue
+        row = {
+            "id": uuid.uuid4().hex,
+            "seed_key": tpl["seed_key"],
+            "name": tpl["name"],
+            "description": tpl["description"],
+            "trigger": tpl["trigger"],
+            "conditions": tpl["conditions"],
+            "actions": tpl["actions"],
+            "enabled": True,
+            "created_at": now_iso(),
+            "created_by": "system.starter",
+            "run_count": 0,
+            "last_run_at": None,
+        }
+        try:
+            await db.admin_automations.insert_one(row)
+            seeded += 1
+        except Exception:
+            # Duplicate-key race is fine — another worker seeded it.
+            pass
+    return seeded

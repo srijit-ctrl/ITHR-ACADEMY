@@ -407,12 +407,19 @@ async def on_startup():
         except Exception:
             logger.exception("PulseDesk tenant bootstrap failed (non-fatal)")
 
-        # Automation builder — index its trigger + run collections.
+        # Automation builder — index its trigger + run collections + seed the
+        # 5 starter rules (idempotent — only inserts on first ever startup).
         try:
-            from routers.admin_automations_router import ensure_indexes as _auto_idx
+            from routers.admin_automations_router import (
+                ensure_indexes as _auto_idx,
+                seed_starter_automations,
+            )
             await _auto_idx()
+            seeded = await seed_starter_automations()
+            if seeded:
+                logger.info(f"Automations: seeded {seeded} starter rule(s)")
         except Exception:
-            logger.exception("Automations index bootstrap failed (non-fatal)")
+            logger.exception("Automations index/seed bootstrap failed (non-fatal)")
 
     _asyncio.create_task(_background_seed())
     logger.info("Backend started; seeding scheduled in background.")
