@@ -12,6 +12,19 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 69 · Starter automations seeded — Feb 2026
+
+- **Goal**: close the automation-builder loop end-to-end for every wired trigger without requiring the admin to manually create rules first.
+- **Implementation** (`admin_automations_router.py`):
+  - New `STARTER_AUTOMATIONS` constant — 5 rules, one per trigger (`user_signup`, `certificate_issued`, `module_5_completed`, `alert_high_severity`, `enterprise_lead_created`).
+  - Every starter uses the safe `create_audit_entry` action so the loop fires end-to-end into `admin_audit_log` (visible in the Audit log tab + "Recent runs" sub-panel of each rule) with **zero external side effects**. Admins can extend each rule in the UI to swap in `send_slack_message`, `dispatch_pod`, or `mark_lead_status` when ready.
+  - Payload templates use `{{field}}` placeholders (e.g. `"New signup: {{full_name}} · {{email}} · via {{auth_provider}}"`) that resolve against the trigger payload — verified live end-to-end for all 5 triggers.
+  - New sparse-unique index on `admin_automations.seed_key` guarantees idempotency across restarts / redeploys.
+  - `seed_starter_automations()` bootstrap in `ensure_indexes()` chain — logs `Automations: seeded N starter rule(s)` on first insert, silent on subsequent restarts.
+  - Server startup (`server.py`) now calls both `_auto_idx` + `seed_starter_automations` on the background task.
+- **Behavior**: On first backend start after redeploy, exactly 5 rules appear in the Automations tab with the ACTIVE pill; sequential restarts don't duplicate; admins can Toggle / Play (dry-run) / Delete freely.
+- **Testing** — iteration_69 · **100% pass** (backend 9/9 pytest — seed shape + 2× restart idempotency + user_signup real POST end-to-end + certificate_issued via /test endpoint + module_5_completed via /test + alert_high_severity full open→dedupe→resolve→re-fire cycle + enterprise_lead_created via real POST + CRUD regression; frontend Playwright — 5 starters render with ACTIVE pill + 1 action each, Play toast fires, toggle round-trip works; iter-68 regression suite (9/9) also re-passed).
+
 ### Iteration 68 · Code Review Remediation — Feb 2026
 
 - **Code review** run via `code_review_agent` on the full iteration 63-67 surface. Verdict: **READY WITH FIXES** (no CRITICAL/HIGH; 1 MEDIUM + 5 LOW). All 6 findings fixed:
