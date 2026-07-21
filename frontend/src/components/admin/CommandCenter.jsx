@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 import {
     Users, TrendingUp, DollarSign, Award, GraduationCap, Bot, MessageCircle,
     Building2, ArrowDownRight, ArrowUpRight, Download, Loader2, RefreshCw, Send,
@@ -125,20 +126,27 @@ export default function CommandCenter({ onNavigate }) {
         setLoading(true);
         api.get(`/admin/command-center?days=${d}`)
             .then((r) => setData(r.data))
-            .catch(() => {})
+            .catch((e) => {
+                toast.error(e?.response?.data?.detail || "Failed to load Command Centre metrics");
+            })
             .finally(() => setLoading(false));
     };
-    useEffect(() => { load(days); }, [days]);
+    useEffect(() => { load(days); }, [days]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const exportCsv = () => {
         if (!data) return;
         const rows = [["KPI", "Value", "Previous period", "Delta %", "Definition"]];
         data.kpis.forEach((k) => rows.push([k.label, k.value, k.prev_value ?? "", k.delta_pct ?? "", k.definition]));
         const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+        const blobUrl = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+        a.href = blobUrl;
         a.download = `ithr-command-center-${days}d.csv`;
+        document.body.appendChild(a);
         a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+        toast.success("Command Centre CSV downloaded");
     };
 
     return (

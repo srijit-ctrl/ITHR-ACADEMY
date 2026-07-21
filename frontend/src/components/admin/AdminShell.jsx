@@ -61,7 +61,7 @@ export function AdminSidebar({ tab, setTab, orgsCount = 0, usersCount = 0 }) {
 
     return (
         <aside
-            className={`sa-sidebar ${collapsed ? "collapsed" : "expanded"} shrink-0 min-h-[calc(100vh-64px)] hidden lg:block sticky top-[64px] self-start flex flex-col`}
+            className={`sa-sidebar ${collapsed ? "collapsed" : "expanded"} shrink-0 min-h-[calc(100vh-64px)] hidden lg:flex lg:flex-col sticky top-[64px] self-start`}
             data-testid="sa-sidebar"
             data-collapsed={collapsed ? "true" : "false"}
         >

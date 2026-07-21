@@ -189,6 +189,14 @@ async def submit_enterprise_lead(payload: EnterpriseLeadPayload, request: Reques
             )
         except Exception:
             logger.exception("[leads] activity log dispatch failed")
+        try:
+            from routers.admin_automations_router import run_automations_for_trigger
+            await run_automations_for_trigger("enterprise_lead_created", {
+                "lead_id": lead_id, "email": lead_doc["email"], "company": lead_doc["company"],
+                "bundle": bundle, "seats": lead_doc.get("seats"),
+            })
+        except Exception:
+            logger.exception("[leads] automations dispatch failed")
 
     asyncio.create_task(_side_effects())
 

@@ -18,7 +18,7 @@ from routers import (
     pulsedesk_router,
     recommendation_router, share_router, trust_router, tutor_router, voice_router, podcast_router,
     admin_control_router, traffic_router, video_quiz_router, referral_router, security_router, command_center_router,
-    whatsapp_router,
+    whatsapp_router, admin_copilot_router, admin_automations_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
 
@@ -304,6 +304,8 @@ for r in (
     referral_router.router,
     security_router.router,
     command_center_router.router,
+    admin_copilot_router.router,
+    admin_automations_router.router,
 ):
     app.include_router(r)
 
@@ -403,6 +405,13 @@ async def on_startup():
             await ensure_ithr_tenant()
         except Exception:
             logger.exception("PulseDesk tenant bootstrap failed (non-fatal)")
+
+        # Automation builder — index its trigger + run collections.
+        try:
+            from routers.admin_automations_router import ensure_indexes as _auto_idx
+            await _auto_idx()
+        except Exception:
+            logger.exception("Automations index bootstrap failed (non-fatal)")
 
     _asyncio.create_task(_background_seed())
     logger.info("Backend started; seeding scheduled in background.")

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Building2, Plus, Copy, Trash2, Loader2, X, Mail, Send } from "lucide-react";
+import { Building2, Plus, Copy, Trash2, Loader2, X, Mail, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PlatformAnalyticsPanel } from "@/components/AnalyticsPanels";
 import ActivityFeedPanel from "@/components/admin/ActivityFeedPanel";
@@ -26,6 +26,9 @@ import EnterpriseLeadsPanel from "@/components/admin/EnterpriseLeadsPanel";
 import PulseDeskAdminPanel from "@/components/admin/PulseDeskAdminPanel";
 import AgentOSControlCenter from "@/components/admin/AgentOSControlCenter";
 import { AdminSidebar, AdminTopBar, NAV_ITEMS } from "@/components/admin/AdminShell";
+import AdminCopilotPanel from "@/components/admin/AdminCopilotPanel";
+import CommandPalette from "@/components/admin/CommandPalette";
+import AutomationBuilder from "@/components/admin/AutomationBuilder";
 import "@/styles/superadmin.css";
 
 const VALID_TABS = Object.keys(NAV_ITEMS);
@@ -53,6 +56,22 @@ export default function SuperAdminPortal() {
     const setTab = (t) => setSearchParams({ tab: t });
     const [openUserId, setOpenUserId] = useState(null);
     const [openOrgId, setOpenOrgId] = useState(null);
+    const [copilotOpen, setCopilotOpen] = useState(false);
+    const [paletteOpen, setPaletteOpen] = useState(false);
+
+    // Global Cmd/Ctrl+K to open the command palette
+    useEffect(() => {
+        const onKey = (e) => {
+            const isMac = navigator.platform.toLowerCase().includes("mac");
+            const modKey = isMac ? e.metaKey : e.ctrlKey;
+            if (modKey && (e.key === "k" || e.key === "K")) {
+                e.preventDefault();
+                setPaletteOpen((v) => !v);
+            }
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, []);
 
     const loadAll = useCallback(async () => {
         setBusy(true);
@@ -134,7 +153,7 @@ export default function SuperAdminPortal() {
                 {tab === "credentials" && <CredentialManagerPanel />}
                 {tab === "aiops" && <AiOpsPanel />}
                 {tab === "whatsapp" && <WhatsAppAdminPanel />}
-                {tab === "automations" && <AutomationsPlaceholder />}
+                {tab === "automations" && <AutomationBuilder />}
 
                 {tab === "analytics" && (
                     <div className="space-y-6">
@@ -212,6 +231,24 @@ export default function SuperAdminPortal() {
             )}
 
             {tempCreds && <TempCredsModal creds={tempCreds} onClose={() => setTempCreds(null)} />}
+
+            {/* Floating AI Copilot trigger */}
+            <button
+                onClick={() => setCopilotOpen(true)}
+                data-testid="copilot-trigger"
+                className="fixed bottom-24 right-6 lg:bottom-6 lg:right-6 z-[55] flex items-center gap-2 px-4 py-3 rounded-full text-white shadow-2xl hover:shadow-brand/40 transition-all hover:-translate-y-0.5"
+                style={{ background: "linear-gradient(135deg, #00A78B 0%, #2E7FC1 100%)", boxShadow: "0 20px 40px -12px rgba(0, 167, 139, 0.4)" }}
+                title="Ask Command Assist (AI)"
+            >
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-semibold">Command Assist</span>
+            </button>
+
+            {/* AI Copilot drawer */}
+            <AdminCopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} currentTab={tab} />
+
+            {/* Cmd-K command palette */}
+            <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onTabJump={setTab} />
         </div>
     );
 }
@@ -419,23 +456,6 @@ function FullScreenLoader() {
     return (
         <div className="min-h-screen flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-brand" />
-        </div>
-    );
-}
-
-function AutomationsPlaceholder() {
-    return (
-        <div className="sa-glass-hero p-10 text-center" data-testid="automations-placeholder">
-            <div className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-4 mx-auto"
-                 style={{ background: "linear-gradient(135deg, #00A78B 0%, #2E7FC1 100%)", color: "#fff" }}>
-                <span className="text-2xl">✨</span>
-            </div>
-            <div className="overline mb-2 sa-teal">Coming next</div>
-            <h2 className="font-serif text-3xl mb-2">Automation Builder</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Visual trigger → conditions → actions pipelines wired to Agent OS and lifecycle emails.
-                Landing in Phase 5 of this refresh.
-            </p>
         </div>
     );
 }

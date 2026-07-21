@@ -348,10 +348,14 @@ async def data_hygiene_purge(request: Request, admin_id: str = Depends(get_curre
 # --------- GLOBAL SEARCH ---------
 @router.get("/search")
 async def global_search(q: str, _admin_id: str = Depends(get_current_super_admin)):
-    """Unified search across users, orgs, courses. Top 5 of each type."""
+    """Unified search across users, orgs, courses, campaigns, agent runs, audit.
+
+    Top 5 hits per type — used by the top-bar search dropdown AND the
+    Cmd-K command palette (which relies on `types` to render category groups).
+    """
     q = (q or "").strip()
     if len(q) < 2:
-        return {"query": q, "users": [], "orgs": [], "courses": []}
+        return {"query": q, "users": [], "orgs": [], "courses": [], "campaigns": [], "agent_runs": [], "audit": [], "leads": []}
 
     users = await db.users.find(
         {"$or": [{"email": {"$regex": q, "$options": "i"}}, {"full_name": {"$regex": q, "$options": "i"}}]},
@@ -365,7 +369,27 @@ async def global_search(q: str, _admin_id: str = Depends(get_current_super_admin
         {"$or": [{"title": {"$regex": q, "$options": "i"}}, {"slug": {"$regex": q, "$options": "i"}}, {"category": {"$regex": q, "$options": "i"}}]},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "category": 1},
     ).limit(5).to_list(5)
-    return {"query": q, "users": users, "orgs": orgs, "courses": courses}
+    campaigns = await db.email_campaigns.find(
+        {"subject": {"$regex": q, "$options": "i"}},
+        {"_id": 0, "id": 1, "subject": 1, "filter": 1, "sent_at": 1, "total_recipients": 1},
+    ).sort("sent_at", -1).limit(5).to_list(5)
+    agent_runs = await db.agent_runs.find(
+        {"$or": [{"pod_id": {"$regex": q, "$options": "i"}}, {"id": {"$regex": q, "$options": "i"}}, {"triggered_by": {"$regex": q, "$options": "i"}}]},
+        {"_id": 0, "id": 1, "pod_id": 1, "status": 1, "triggered_by": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(5).to_list(5)
+    audit = await db.admin_audit_log.find(
+        {"$or": [{"action": {"$regex": q, "$options": "i"}}, {"detail": {"$regex": q, "$options": "i"}}]},
+        {"_id": 0, "id": 1, "action": 1, "target_type": 1, "target_id": 1, "detail": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(5).to_list(5)
+    leads = await db.enterprise_leads.find(
+        {"$or": [{"email": {"$regex": q, "$options": "i"}}, {"company": {"$regex": q, "$options": "i"}}, {"name": {"$regex": q, "$options": "i"}}]},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "company": 1, "bundle": 1, "status": 1},
+    ).sort("created_at", -1).limit(5).to_list(5)
+    return {
+        "query": q,
+        "users": users, "orgs": orgs, "courses": courses,
+        "campaigns": campaigns, "agent_runs": agent_runs, "audit": audit, "leads": leads,
+    }
 
 
 # --------- RECENT SESSIONS ---------

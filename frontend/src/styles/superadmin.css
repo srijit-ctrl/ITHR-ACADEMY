@@ -196,6 +196,7 @@
     border-right: 1px solid rgba(214, 220, 232, 0.7);
     transition: width .22s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-x: hidden;
+    max-height: calc(100vh - 64px);
 }
 .sa-sidebar.expanded { width: 232px; }
 .sa-sidebar.collapsed { width: 72px; }
