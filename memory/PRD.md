@@ -12,6 +12,34 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 65 · Learner Self-Service Portal — Feb 2026
+
+- **Purpose**: Give every learner a single peppy, ITHR-branded home for tracking their journey and managing their own profile without emailing support.
+- **Placement**: New "Profile" tab alongside "Learning" on `/dashboard`. URL-synced via `?tab=profile`. No breaking change to the existing dashboard.
+- **Backend `me_router.py`** — 5 self-scoped endpoints (all guarded by `get_current_user_id`, no cross-user reads):
+  - `GET /api/me` — hydrated profile snapshot + `can_change_password` flag derived from `auth_provider` + `password_hash` presence.
+  - `GET /api/me/summary` — KPI roll-up (`xp`, `streak_days`, `founding_member_seq`, `enrollments_total/completed/in_progress`, `certificates`, `avg_progress_pct`, most-recent unfinished course as `next_up`, last 5 `module_events`).
+  - `PATCH /api/me/profile` — partial update of `full_name / title / department / location / timezone / bio / avatar_url`. Avatar validation: only `data:image/(png|jpe?g|webp|gif);base64,…` or `https://` URLs; ≤400 KB decoded size (413 otherwise). Empty updates → 400.
+  - `POST /api/me/change-password` — current + new password required. Rejects Google-auth users (400 "signs in with Google"), rejects same-password reuse, invalid current → 401. Verified new-password login round-trip.
+  - `POST /api/me/inspire` — Claude Sonnet 4.5 via Emergent LLM key. System prompt is a fine-grained inspiration engine (agentic AI / craft / streak-aware). Injects learner context (name, xp, streak, active course, certs). Sanitises output ≤260 chars. Falls back to a 5-quote curated pool if the LLM call fails (never renders blank).
+- **Frontend components** (new dir `/app/frontend/src/components/profile/`):
+  - `SelfServicePortal.jsx` — main orchestrator. Parallel-loads `/me` + `/me/summary`, renders QuoteHero + AvatarUploader + identity strip (with streak flame chip, founding badge, title/location chips, hand-drawn teal underline under name) + 4-ring stats grid + "Pick up where you left off" hero card + PersonalDetailsCard + PasswordChangeCard. Fires CSS-only confetti (60 particles) on avatar-save & password-change.
+  - `QuoteHero.jsx` — soft mesh gradient hero (teal + blue + gold radial gradients over cream) with 140px display quote-mark, serif quote body with mount-time pop animation. "Personalise for me" primary CTA + "New quote" ghost secondary. Curated pool picks a fresh random quote on every mount.
+  - `AvatarUploader.jsx` — client-side crop-to-square via canvas at 256×256 JPEG q=0.85 (typical output 40-90 KB). PATCHes to `/me/profile`.
+  - `data/curatedQuotes.js` — 30 hand-picked motivational quotes themed on AI mastery, craft, learning, curiosity, agency.
+- **Styles** (`styles/self-service.css`) — dedicated stylesheet:
+  - Confetti dot mesh backdrop, hand-drawn SVG underline `::after`.
+  - `.ss-card` (pastel-tinted variants: mint/sky/cream/rose) with soft-shadow hover lift.
+  - `.ss-quote-hero` with layered radial gradients + `.quote-mark` decorative element.
+  - `.ss-ring` — pure-CSS conic-gradient radial progress with center donut.
+  - `.ss-flame` — orange→red pill with `ss-flicker` animation on the icon.
+  - `.ss-avatar-frame` — teal→blue gradient border + camera-icon edit affordance.
+  - `.ss-tabs` — pill tab strip on the dashboard.
+  - `.ss-btn-primary` — teal→blue rounded pill with hover lift + colored shadow.
+  - `@keyframes ss-pop / ss-fade-up / ss-flicker / ss-confetti-fall`.
+- **Design compliance**: ITHR palette (teal `#00A78B`, blue `#2E7FC1`, gold `#D4A836`, navy `#16335E`). Pastel tinted card variants avoid AI-slop purple gradients. Hand-drawn SVG accents give the peppy edge. All lucide-react icons (no emoji). All headings Playfair Display.
+- **Testing**: iteration_65.json — **100% pass** (backend 9/9 pytest, frontend Playwright login → tab switch → curated rotation → Claude personalisation with pill indicator → avatar upload + persistence across reload → personal-details save with dirty/all-saved toggle → password change round-trip with new-password login OK → Google-auth gate → Learning-tab regression preserved). Zero bugs surfaced; only cosmetic note: confetti animation is 2.2s TTL and timing-sensitive to Playwright but visually confirmed via screenshot.
+
 ### Iteration 63-64 · Superadmin Dashboard Revamp — Feb 2026
 - **Phase 1 · Structural shell (glassmorphism)** — `styles/superadmin.css` fully rewritten. Soft mesh gradient background (teal + blue + gold radial gradients over light paper), subtle grid overlay, `.sa-glass` glassmorphic cards (backdrop-blur 18-24px, saturate 1.05, translucent white base, layered box-shadows). Collapsible left sidebar (`AdminSidebar`) with expanded/collapsed states, per-item icons (lucide-react), group headers with dividers, active state = teal→blue gradient background + 3px accent bar, tooltip on hover when collapsed. Preference persisted in `localStorage.sa-sidebar-collapsed`. Sticky footer collapse toggle (`sa-sidebar-toggle`).
 - **Phase 1 · Top bar (`AdminTopBar`)** — brand mark (teal→blue gradient chip + ShieldCheck), live breadcrumb (`sa-breadcrumb`, `Group / Tab`), search pill in the middle, `NotificationBell` on the right that polls `/admin/alerts-center` every 60s and shows a floating dropdown of open alerts (severity dot + jump-to-tab click), `ProfileMenu` with avatar initials + super_admin tag + Sign out.
