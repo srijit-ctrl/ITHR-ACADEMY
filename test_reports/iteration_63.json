@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 63 — Super-admin dashboard Phase 1+2 revamp end-to-end verified on desktop (1920x1080). Login as superadmin@ithr.online redirects to /admin; /admin?tab=command renders the new Command Centre 2.0 hero ('Executive pulse across learners, revenue & AI operations.'), LIVE pulse chip, 6 quick-action chips (all 6 data-testids present: cc-quick-{campaigns,emails,agentos,aiops,leads,audit}). KPI grid renders 22 cards (spec required ≥20). Live Activity panel shows heading + Export CSV + Pause. cc-quick-emails navigates to Send email tab (tab-emails class flips to 'sa-sidebar-link active'). Date-range dropdown flips the header copy to 'comparing vs prior 7 days.'. CSV export downloads ithr-command-center-7d.csv. Refresh button re-fetches. New AdminSidebar renders with all 21 groups (Overview/Customers/Learning & AI/Operations/Governance), collapse toggle (sa-sidebar-toggle) flips data-collapsed=true↔false, tab-command title tooltip='Command Centre' when collapsed, and preference persists across reload via localStorage sa-sidebar-collapsed=1. AdminTopBar breadcrumb updates live ('Overview/Command Centre' → 'Overview/Alerts' → back). Global search (admin-search-input inside admin-global-search wrapper) returns real user hits. Notification bell opens sa-notif-dropdown, closes on outside click. Profile pill opens sa-profile-dropdown with sa-profile-signout button (not clicked). Regression: every one of 21 existing tabs (alertcenter, analytics, traffic, orgs, users, leads, pulsedesk, funnel, assessments, credentials, aiops, videoquiz, sessions, campaigns, emails, agentos, audit, security, flags, whatsapp, automations) loads with main mounted and correct sidebar 'active' state. Automations placeholder shows 'Coming next — Automation Builder … Landing in Phase 5 of this refresh.' PulseDesk widget bubble visible bottom-right, does not overlap the left sidebar. Zero React pageerrors; only console noise is 2× pre-auth 401 responses on the admin poll endpoint (expected before session cookie is set).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Command Centre hero", "issues": ["Minor: on desktop 1920×1080 the sa-sidebar-collapse-btn sits below the fold when the sidebar has 21 links — testers must scroll_into_view to reach it. Not a blocker (users can scroll the sidebar column) but consider making the collapse footer sticky (position: sticky; bottom: 0) inside .sa-sidebar so it is always reachable without scrolling."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(nit) Make .sa-sidebar-collapse footer position: sticky bottom:0 within the sidebar column so the collapse button is always reachable on shorter viewports without scrolling the sidebar list.",
+    "(nit) Consider adding data-testid=\"pulsedesk-widget-bubble\" on the Ask-Aletheia launcher so future tests can assert its position without relying on visual layout."
+  ],
+  "critical_code_review_comments": [
+    "AdminShell.jsx L64 uses `flex flex-col` alongside `hidden lg:block` on the same <aside> — the `flex` class is ignored when the display is block, but the intent (column layout with scroll region + footer) does work because the flex is inherited via the inner sa-sidebar CSS. Minor cleanup: drop the redundant `flex flex-col` from JSX or switch the container class to `lg:flex`.",
+    "CommandCenter.jsx L127 swallows the fetch error silently (`.catch(() => {})`). If /admin/command-center is 500, the UI stays on the loading spinner forever with no user-facing error. Consider a toast on failure with a retry.",
+    "SuperAdminPortal.jsx is 601 lines — right at the 700-line cap. When Phase 3 (AI Assistant panel) lands, split the tab-content switch into a routes map to stay under the limit.",
+    "CommandCenter.jsx CSV export builds a data URL and click()s an <a> that is never appended to document — works in Chrome/Firefox but is fragile in some browsers. Standardise on the ActivityFeedPanel pattern (append → click → remove → revokeObjectURL)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "n/a (frontend-only run per review request)",
+    "frontend": "100% — 13/13 planned scenarios green (hero, quick actions, KPI ≥20, live-activity panel, date-range flip, refresh, CSV download, sidebar existence + collapse + persistence, breadcrumb, global search, notif bell, profile menu, 21-tab regression + automations placeholder + widget position)"
+  },
+  "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (loaded from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — all reads.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Phase 1+2 UI is fully lit. When Phase 3 (AI Assistant panel) drops, expect a new tab-key added to AdminShell.NAV_ITEMS and a new right-rail drawer. Selectors already in play: sa-sidebar (data-collapsed toggles), sa-sidebar-toggle (footer of sidebar — scroll_into_view before clicking), sa-breadcrumb (Group/Label text), sa-notif-dropdown, sa-profile-dropdown, admin-search-input (input) inside admin-global-search (wrapper — do not fill on the wrapper). Command Centre selectors: cc-quick-{key}, cc-date-range (select 7/30/90), cc-refresh, cc-export, cc-kpi-grid, kpi-{key} (currently 22 keys: total_users, new_users, dau, mau, active_users, total_orgs, seats_purchased, seats_used, new_enrollments, completions, completion_rate, assessment_attempts, pass_rate, certificates_issued, total_certs, verifications, ai_sessions, ai_active_users, revenue, referral_signups, suspended_users, mfa_users).",
+  "rca of the issue": "N/A — no bugs surfaced during the Phase 1+2 revamp verification."
+}

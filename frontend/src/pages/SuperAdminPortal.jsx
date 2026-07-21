@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Shield, Building2, Users, Plus, Copy, Trash2, KeyRound, Loader2, X, BarChart3, Mail, Send, ScrollText } from "lucide-react";
+import { Building2, Plus, Copy, Trash2, Loader2, X, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 import { PlatformAnalyticsPanel } from "@/components/AnalyticsPanels";
 import ActivityFeedPanel from "@/components/admin/ActivityFeedPanel";
@@ -12,7 +12,6 @@ import AuditLogPanel from "@/components/admin/AuditLogPanel";
 import TrafficPanel from "@/components/admin/TrafficPanel";
 import AlertsPanel from "@/components/admin/AlertsPanel";
 import SessionsPanel from "@/components/admin/SessionsPanel";
-import GlobalSearchBar from "@/components/admin/GlobalSearchBar";
 import VideoQuizPanel from "@/components/admin/VideoQuizPanel";
 import DataHygienePanel from "@/components/admin/DataHygienePanel";
 import SecurityPanel from "@/components/admin/SecurityPanel";
@@ -26,22 +25,10 @@ import EmailCampaignsPanel from "@/components/admin/EmailCampaignsPanel";
 import EnterpriseLeadsPanel from "@/components/admin/EnterpriseLeadsPanel";
 import PulseDeskAdminPanel from "@/components/admin/PulseDeskAdminPanel";
 import AgentOSControlCenter from "@/components/admin/AgentOSControlCenter";
+import { AdminSidebar, AdminTopBar, NAV_ITEMS } from "@/components/admin/AdminShell";
 import "@/styles/superadmin.css";
 
-const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "leads", "pulsedesk", "agentos", "audit", "videoquiz", "security", "flags", "whatsapp"];
-
-const NAV = [
-    { group: "Overview", items: [
-        ["command", "Command Centre"], ["alertcenter", "Alerts"], ["analytics", "Analytics"], ["traffic", "Traffic"],
-    ]},
-    { group: "Customers", items: [["orgs", "Organizations"], ["users", "Users"], ["leads", "Enterprise leads"], ["pulsedesk", "Widget conversations"]] },
-    { group: "Learning & AI", items: [
-        ["funnel", "Learning funnel"], ["assessments", "Assessments"], ["credentials", "Credentials"],
-        ["aiops", "AI operations"], ["videoquiz", "Video quizzes"], ["sessions", "AI sessions"],
-    ]},
-    { group: "Operations", items: [["campaigns", "Email campaigns"], ["emails", "Send email"], ["agentos", "Agent OS"], ["audit", "Audit log"]] },
-    { group: "Governance", items: [["security", "Security"], ["flags", "Feature flags"]] },
-];
+const VALID_TABS = Object.keys(NAV_ITEMS);
 
 /**
  * Super-Admin console.
@@ -121,45 +108,18 @@ export default function SuperAdminPortal() {
     return (
         <div className="sa-shell">
             {/* Top header bar */}
-            <div className="sa-header border-b border-border px-5 py-3 flex items-center justify-between gap-4 sticky top-0 z-40">
-                <div className="flex items-center gap-3 min-w-0">
-                    <Shield className="w-4 h-4 sa-gold shrink-0" />
-                    <div className="min-w-0">
-                        <div className="font-serif text-lg leading-none truncate">ITHR Super Admin</div>
-                        <div className="text-[9px] font-mono uppercase tracking-[0.22em] text-muted-foreground mt-0.5">Enterprise command centre</div>
-                    </div>
-                </div>
-                <div className="flex-1 max-w-lg hidden md:block">
-                    <GlobalSearchBar onNavigateUser={() => setTab("users")} />
-                </div>
-                <div className="text-right text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground shrink-0">
-                    <div className="sa-gold">super_admin</div>
-                    <div className="mt-0.5">{user.email}</div>
-                </div>
-            </div>
+            <AdminTopBar tab={tab} setTab={setTab} />
 
             <div className="flex">
                 {/* Sidebar */}
-                <aside className="w-56 shrink-0 border-r border-border min-h-[calc(100vh-57px)] py-3 px-2 hidden lg:block sticky top-[57px] self-start" data-testid="sa-sidebar">
-                    {NAV.map((g) => (
-                        <div key={g.group}>
-                            <div className="sa-sidebar-group">{g.group}</div>
-                            {g.items.map(([key, label]) => (
-                                <button key={key} onClick={() => setTab(key)} data-testid={`tab-${key}`}
-                                    className={`sa-sidebar-link ${tab === key ? "active" : ""}`}>
-                                    {label}
-                                    {key === "orgs" && <span className="ml-auto text-[10px] font-mono text-muted-foreground">{orgs.length}</span>}
-                                    {key === "users" && <span className="ml-auto text-[10px] font-mono text-muted-foreground">{totalUsers}</span>}
-                                </button>
-                            ))}
-                        </div>
-                    ))}
-                </aside>
+                <AdminSidebar tab={tab} setTab={setTab} orgsCount={orgs.length} usersCount={totalUsers} />
 
                 {/* Mobile tab strip */}
-                <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border overflow-x-auto flex gap-1 px-2 py-2 bg-white">
-                    {NAV.flatMap((g) => g.items).map(([key, label]) => (
-                        <button key={key} onClick={() => setTab(key)} className={`sa-sidebar-link whitespace-nowrap w-auto ${tab === key ? "active" : ""}`}>{label}</button>
+                <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border overflow-x-auto flex gap-1 px-2 py-2 bg-white/95 backdrop-blur">
+                    {Object.entries(NAV_ITEMS).map(([key, meta]) => (
+                        <button key={key} onClick={() => setTab(key)} className={`sa-sidebar-link whitespace-nowrap w-auto ${tab === key ? "active" : ""}`}>
+                            <meta.icon className="icon" /> <span className="label text-xs">{meta.label}</span>
+                        </button>
                     ))}
                 </div>
 
@@ -174,6 +134,7 @@ export default function SuperAdminPortal() {
                 {tab === "credentials" && <CredentialManagerPanel />}
                 {tab === "aiops" && <AiOpsPanel />}
                 {tab === "whatsapp" && <WhatsAppAdminPanel />}
+                {tab === "automations" && <AutomationsPlaceholder />}
 
                 {tab === "analytics" && (
                     <div className="space-y-6">
@@ -458,6 +419,23 @@ function FullScreenLoader() {
     return (
         <div className="min-h-screen flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-brand" />
+        </div>
+    );
+}
+
+function AutomationsPlaceholder() {
+    return (
+        <div className="sa-glass-hero p-10 text-center" data-testid="automations-placeholder">
+            <div className="inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-4 mx-auto"
+                 style={{ background: "linear-gradient(135deg, #00A78B 0%, #2E7FC1 100%)", color: "#fff" }}>
+                <span className="text-2xl">✨</span>
+            </div>
+            <div className="overline mb-2 sa-teal">Coming next</div>
+            <h2 className="font-serif text-3xl mb-2">Automation Builder</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Visual trigger → conditions → actions pipelines wired to Agent OS and lifecycle emails.
+                Landing in Phase 5 of this refresh.
+            </p>
         </div>
     );
 }
