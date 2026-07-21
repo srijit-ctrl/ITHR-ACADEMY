@@ -88,7 +88,7 @@ async def command_center(days: int = 30, _sa: str = Depends(get_current_super_ad
     add("new_users", "New registrations", cur["new_users"], prev["new_users"], drill="users", definition=f"Accounts created in last {days}d vs prior {days}d")
     add("dau", "Daily active users", dau, drill="traffic", definition="Distinct users with a login in the last 24h")
     add("mau", "Monthly active users", mau, drill="traffic", definition="Distinct users with a login in the last 30d")
-    add("active_users", "Active users (period)", cur["active_users"], prev["active_users"], drill="traffic", definition=f"Distinct users logging in during the period")
+    add("active_users", "Active users (period)", cur["active_users"], prev["active_users"], drill="traffic", definition="Distinct users logging in during the period")
     add("total_orgs", "Enterprise organizations", total_orgs, drill="orgs", definition="Provisioned tenant organizations")
     add("seats_purchased", "Seats purchased", seat_row["purchased"], drill="orgs", definition="Sum of seat_count across orgs")
     add("seats_used", "Seats activated", seat_row["used"], drill="orgs", definition="Sum of seats_used across orgs")
@@ -182,20 +182,24 @@ async def alerts_center(_sa: str = Depends(get_current_super_admin)):
     out.sort(key=lambda x: order.get(x["severity"], 3))
 
     # Automation-builder trigger: alert_high_severity.
-    # Fires exactly once per (alert_key, open-cycle) — the marker is cleared
-    # when the alert is resolved, so a re-open fires again.
+    # Insert-first dedupe: rely on a unique index on `key` so two overlapping
+    # polls can't both dispatch. Duplicate-key means someone else already
+    # fired for this open-cycle and we skip. The marker is cleared in
+    # /resolve so a future re-open fires again.
     try:
+        from pymongo.errors import DuplicateKeyError
         from routers.admin_automations_router import run_automations_for_trigger
         import asyncio as _asyncio
         for a in out:
             if a.get("severity") != "high" or a.get("status") == "resolved":
                 continue
-            marker = await db.admin_alert_automation_fired.find_one({"key": a["key"]})
-            if marker:
-                continue
-            await db.admin_alert_automation_fired.insert_one({
-                "key": a["key"], "fired_at": now_iso(), "severity": a["severity"], "title": a.get("title"),
-            })
+            try:
+                await db.admin_alert_automation_fired.insert_one({
+                    "key": a["key"], "fired_at": now_iso(),
+                    "severity": a["severity"], "title": a.get("title"),
+                })
+            except DuplicateKeyError:
+                continue  # another worker already dispatched — skip
             _asyncio.create_task(run_automations_for_trigger("alert_high_severity", {
                 "key": a["key"], "title": a.get("title"), "detail": a.get("detail"),
                 "category": a.get("category"), "severity": a.get("severity"),

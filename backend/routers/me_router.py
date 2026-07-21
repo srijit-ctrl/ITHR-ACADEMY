@@ -13,10 +13,9 @@ Route inventory:
 """
 from __future__ import annotations
 
-import base64
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,6 +27,38 @@ from core import db, logger, now_iso
 from ai_service import _build_chat
 
 router = APIRouter(prefix="/api/me", tags=["self-service"])
+
+
+# ---------------------------------------------------------------------------
+# Simple per-user hourly rate limiter shared across a couple of endpoints.
+# Backing collection `me_rate` — one row per bucket key, resets on window roll.
+# ---------------------------------------------------------------------------
+async def _rate_ok(bucket_key: str, limit_per_hour: int) -> bool:
+    """Return True if the request is under the limit, False if throttled."""
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(hours=1)
+    doc = await db.me_rate.find_one({"key": bucket_key})
+    if not doc:
+        await db.me_rate.insert_one({
+            "key": bucket_key, "count": 1, "window_start": now.isoformat(),
+        })
+        return True
+    try:
+        ws = datetime.fromisoformat(doc["window_start"])
+        if ws.tzinfo is None:
+            ws = ws.replace(tzinfo=timezone.utc)
+    except Exception:
+        ws = window_start
+    if ws < window_start:
+        await db.me_rate.update_one(
+            {"key": bucket_key},
+            {"$set": {"count": 1, "window_start": now.isoformat()}},
+        )
+        return True
+    if doc.get("count", 0) >= limit_per_hour:
+        return False
+    await db.me_rate.update_one({"key": bucket_key}, {"$inc": {"count": 1}})
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +189,7 @@ async def me_summary(user_id: str = Depends(get_current_user_id)):
     # Last 5 activity events for the "recent activity" strip
     recent_events = []
     async for e in db.module_events.find(
-        {"user_id": user_id}, {"_id": 0, "event_type": 1, "course_id": 1, "module_id": 1, "created_at": 1}
+        {"user_id": user_id}, {"_id": 0, "kind": 1, "course_id": 1, "module_id": 1, "created_at": 1}
     ).sort("created_at", -1).limit(5):
         recent_events.append(e)
 
@@ -211,6 +242,8 @@ async def update_profile(payload: ProfileUpdate, user_id: str = Depends(get_curr
 @router.post("/change-password")
 async def change_password(payload: ChangePasswordRequest, user_id: str = Depends(get_current_user_id)):
     """Change the caller's password. Rejects Google-auth users."""
+    if not await _rate_ok(f"change-pw:{user_id}", limit_per_hour=8):
+        raise HTTPException(429, "Too many password-change attempts — please wait an hour")
     doc = await db.users.find_one({"id": user_id})
     if not doc:
         raise HTTPException(404, "User not found")
@@ -260,6 +293,8 @@ Output the sentence only — no preamble, no attribution, no line breaks."""
 @router.post("/inspire")
 async def inspire(payload: InspireRequest, user_id: str = Depends(get_current_user_id)):
     """AI-generated personalised motivational quote via Claude Sonnet 4.5."""
+    if not await _rate_ok(f"inspire:{user_id}", limit_per_hour=20):
+        raise HTTPException(429, "Too many inspiration requests — please wait a few minutes")
     doc = await db.users.find_one({"id": user_id}, {"_id": 0}) or {}
     first_name = (doc.get("full_name") or "there").split(" ")[0]
     xp = int(doc.get("xp") or 0)

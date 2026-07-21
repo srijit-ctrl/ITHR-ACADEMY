@@ -15,11 +15,8 @@ Sprint scope (Feb 2026):
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
-from typing import Callable, Awaitable
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -343,3 +340,6 @@ async def run_automations_for_trigger(trigger: str, payload: dict) -> list[dict]
 async def ensure_indexes():
     await db.admin_automations.create_index([("trigger", 1), ("enabled", 1)])
     await db.admin_automation_runs.create_index([("rule_id", 1), ("run_at", -1)])
+    # Alert-automation dedupe marker — unique key so concurrent /alerts-center
+    # polls can't both dispatch the same alert_high_severity event.
+    await db.admin_alert_automation_fired.create_index("key", unique=True)

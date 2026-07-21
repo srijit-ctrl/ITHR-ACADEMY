@@ -36,6 +36,9 @@ export default function AdminCopilotPanel({ open, onClose, currentTab }) {
         return () => document.removeEventListener("keydown", onKey);
     }, [open, onClose]);
 
+    // Abort any in-flight SSE stream when the panel unmounts.
+    useEffect(() => () => { abortRef.current?.abort(); }, []);
+
     const send = useCallback(async (text) => {
         const query = (text ?? input).trim();
         if (!query || busy) return;

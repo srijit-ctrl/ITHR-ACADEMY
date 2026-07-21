@@ -232,7 +232,7 @@ async def summarize_course_progress(user_id: str, course: dict, enrollment: dict
     total_completed_lessons = 0
     for idx, m in enumerate(course.get("modules", [])):
         lessons = m.get("lessons", []) or []
-        lc = sum(1 for l in lessons if l["id"] in completed_lessons)
+        lc = sum(1 for lesson in lessons if lesson["id"] in completed_lessons)
         total_lessons += len(lessons)
         total_completed_lessons += lc
         mid = m["id"]

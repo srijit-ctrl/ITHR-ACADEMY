@@ -238,6 +238,7 @@ export default function Dashboard() {
 
 function FoundingMemberBadge({ seq, code, hasClaimedCourse, certUsed }) {
     const copy = () => {
+        if (!code) return;
         navigator.clipboard.writeText(code);
         toast.success("Founding-member code copied");
     };
@@ -260,20 +261,28 @@ function FoundingMemberBadge({ seq, code, hasClaimedCourse, certUsed }) {
                     <div className="font-sans font-semibold text-lg leading-tight">Thanks for being early.</div>
                     <p className="text-sm text-muted-foreground mt-1">{statusLine}</p>
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
-                        <code
-                            className="font-mono text-sm bg-surface border border-border px-3 py-1.5 rounded-sm select-all"
-                            data-testid="founding-member-code"
-                        >
-                            {code}
-                        </code>
-                        <button
-                            onClick={copy}
-                            data-testid="founding-member-code-copy"
-                            className="p-1.5 hover:bg-surface-alt rounded-sm text-muted-foreground hover:text-brand"
-                            title="Copy code"
-                        >
-                            <Copy className="w-3.5 h-3.5" />
-                        </button>
+                        {code ? (
+                            <>
+                                <code
+                                    className="font-mono text-sm bg-surface border border-border px-3 py-1.5 rounded-sm select-all"
+                                    data-testid="founding-member-code"
+                                >
+                                    {code}
+                                </code>
+                                <button
+                                    onClick={copy}
+                                    data-testid="founding-member-code-copy"
+                                    className="p-1.5 hover:bg-surface-alt rounded-sm text-muted-foreground hover:text-brand"
+                                    title="Copy code"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                </button>
+                            </>
+                        ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                                Discount code pending — refresh in a moment.
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
