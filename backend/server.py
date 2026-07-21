@@ -286,6 +286,7 @@ for r in (
     enterprise_router.router,
     admin_router.router,
     admin_dashboard_router.router,
+    agent_os_router.public_router,
     campaigns_router.router,
     leads_router.router,
     leads_router.admin_router,

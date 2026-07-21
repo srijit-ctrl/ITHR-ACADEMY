@@ -25,9 +25,10 @@ import { WhatsAppAdminPanel } from "@/components/admin/WhatsAppAdminPanel";
 import EmailCampaignsPanel from "@/components/admin/EmailCampaignsPanel";
 import EnterpriseLeadsPanel from "@/components/admin/EnterpriseLeadsPanel";
 import PulseDeskAdminPanel from "@/components/admin/PulseDeskAdminPanel";
+import AgentOSControlCenter from "@/components/admin/AgentOSControlCenter";
 import "@/styles/superadmin.css";
 
-const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "leads", "pulsedesk", "audit", "videoquiz", "security", "flags", "whatsapp"];
+const VALID_TABS = ["command", "alertcenter", "analytics", "traffic", "orgs", "users", "funnel", "assessments", "credentials", "aiops", "sessions", "emails", "campaigns", "leads", "pulsedesk", "agentos", "audit", "videoquiz", "security", "flags", "whatsapp"];
 
 const NAV = [
     { group: "Overview", items: [
@@ -38,7 +39,7 @@ const NAV = [
         ["funnel", "Learning funnel"], ["assessments", "Assessments"], ["credentials", "Credentials"],
         ["aiops", "AI operations"], ["videoquiz", "Video quizzes"], ["sessions", "AI sessions"],
     ]},
-    { group: "Operations", items: [["campaigns", "Email campaigns"], ["emails", "Send email"], ["audit", "Audit log"]] },
+    { group: "Operations", items: [["campaigns", "Email campaigns"], ["emails", "Send email"], ["agentos", "Agent OS"], ["audit", "Audit log"]] },
     { group: "Governance", items: [["security", "Security"], ["flags", "Feature flags"]] },
 ];
 
@@ -223,6 +224,8 @@ export default function SuperAdminPortal() {
                 {tab === "leads" && <EnterpriseLeadsPanel />}
 
                 {tab === "pulsedesk" && <PulseDeskAdminPanel />}
+
+                {tab === "agentos" && <AgentOSControlCenter />}
 
                 {tab === "audit" && <AuditLogPanel />}
                 </main>

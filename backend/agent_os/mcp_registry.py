@@ -93,6 +93,19 @@ _CONNECTORS: dict[MCPConnector, StubConnector] = {
     # deliberate loud-fail so we notice unimplemented pod paths.
 }
 
+# ---- Sprint 2: swap HubspotStub for the real connector when configured ---
+#
+# We import at module-load time; the connector itself checks the token
+# on every call so a mid-run credential change picks up immediately.
+try:
+    from .hubspot_connector import HubspotConnector
+    _CONNECTORS["hubspot"] = HubspotConnector()
+except Exception:
+    # If the connector module fails to load for any reason we keep the
+    # stub — Agent OS must never fail to boot because one connector is
+    # broken.
+    pass
+
 
 async def check_scope(pod_id: PodId, connector: MCPConnector) -> None:
     """Reads the pod's declared MCP scope from the ``agent_pods``
