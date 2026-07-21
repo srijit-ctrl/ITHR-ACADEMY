@@ -1,8 +1,10 @@
 """Catalog + courses + enrollments + lessons."""
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 
 from auth import get_current_user_id
 from core import compute_freshness, db, logger, now_iso
@@ -11,6 +13,9 @@ from models import Course, CourseSummary, Enrollment, LessonCompleteRequest
 from seed_data import CATEGORIES, CERTIFICATION_PATHS, INDUSTRIES
 
 router = APIRouter(prefix="/api", tags=["catalog"])
+
+# Persistent directory for downloadable course materials (PDFs, PPTX, PDFs).
+COURSE_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "static" / "course_resources"
 
 
 # Marker present on every stub description created by the seed. Used as the
@@ -422,3 +427,44 @@ async def join_waitlist(slug: str, user_id: str = Depends(get_current_user_id)):
     }
     await db.course_waitlist.insert_one(entry)
     return {"already_joined": False, "joined_at": entry["joined_at"]}
+
+
+# --------------------------------------------------------------------------
+# Course resources (PDFs, PPTX decks, cheat sheets) — served via a dedicated
+# streamed download endpoint so the /api ingress prefix is preserved.
+# Access rule: any enrolled learner of the course can download.
+# --------------------------------------------------------------------------
+@router.get("/courses/{slug}/resources/{filename}")
+async def download_course_resource(
+    slug: str, filename: str, user_id: str = Depends(get_current_user_id),
+):
+    course = await db.courses.find_one({"slug": slug}, {"_id": 0, "id": 1, "resources": 1, "title": 1})
+    if not course:
+        raise HTTPException(404, "Course not found")
+
+    # Access gate: learner must be enrolled OR resource is marked public.
+    resource = next(
+        (r for r in (course.get("resources") or []) if r.get("filename") == filename),
+        None,
+    )
+    if not resource:
+        raise HTTPException(404, "Resource not found")
+
+    if not resource.get("public", False):
+        enrolled = await db.enrollments.find_one({"user_id": user_id, "course_id": course["id"]})
+        if not enrolled:
+            raise HTTPException(403, "Enroll in this course to unlock its resources")
+
+    # Path traversal guard — filename must exist inside COURSE_RESOURCES_DIR.
+    safe_path = (COURSE_RESOURCES_DIR / filename).resolve()
+    if not str(safe_path).startswith(str(COURSE_RESOURCES_DIR.resolve()) + "/"):
+        raise HTTPException(400, "Invalid filename")
+    if not safe_path.exists():
+        raise HTTPException(404, "Resource file missing on server — please contact support")
+
+    return FileResponse(
+        path=str(safe_path),
+        media_type=resource.get("mime_type") or "application/octet-stream",
+        filename=resource.get("download_name") or filename,
+        headers={"Cache-Control": "private, max-age=300"},
+    )

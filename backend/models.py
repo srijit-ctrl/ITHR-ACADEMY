@@ -143,6 +143,10 @@ class Course(BaseModel):
     last_reviewed_at: Optional[str] = None
     freshness_score: int = 100
     days_since_review: int = 0
+    # Downloadable learning materials (PPTX decks, PDFs, cheat sheets) —
+    # served via GET /api/courses/{slug}/resources/{filename}. Access gated
+    # per-resource by the `public` flag or by enrollment.
+    resources: List[dict] = []
 
 
 class CourseSummary(BaseModel):

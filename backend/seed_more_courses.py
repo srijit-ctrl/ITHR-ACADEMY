@@ -134,6 +134,18 @@ def build_prompt_engineering_course() -> Course:
         passing_score=65,
         enrolled_count=24310,
         rating=4.85,
+        resources=[{
+            "id": "pem-deck-v1",
+            "title": "Course companion deck — Prompt Engineering Mastery",
+            "description": "The full 15-module course companion — 45 lessons of enterprise-grade prompt engineering strategy, structured output, RAG, security, and domain applications.",
+            "kind": "presentation",
+            "filename": "prompt-engineering-mastery-deck.pptx",
+            "download_name": "ITHR-Prompt-Engineering-Mastery-Deck.pptx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "size_bytes": 2_100_000,
+            "public": False,
+            "added_at": "2026-02-21T00:00:00Z",
+        }],
     )
 
 

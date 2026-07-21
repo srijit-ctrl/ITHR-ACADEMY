@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 70 — Prompt Engineering Mastery course companion PPTX resource. Backend: 9/9 pytest cases pass covering resource contract, anon 401, non-enrolled 403, enrolled 200 download (2.12 MB, PK zip magic verified), path traversal 400, unknown filename 404, unknown course 404, other-courses have empty resources, and seed persistence after sudo supervisorctl restart backend. Frontend: verified single ResourceRow (data-testid=course-resource-pem-deck-v1) with 'Enrolled only' badge + 'Locked' button for non-enrolled user; click fires expected toast 'Enrol in this course to unlock materials.' — no download triggered. After enrollment, button shows 'Download' and page.expect_download() captured a real 2,123,904-byte pptx with PK\\x03\\x04 magic. /courses/agentic-ai-foundations correctly does NOT render the Course materials section. Regression sanity: courses catalog still returns expected slugs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iteration70_course_resources.py",
+    "/app/test_reports/pytest/iteration70.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "catalog_router.py L458-461: path-traversal guard uses `str(safe_path).startswith(str(COURSE_RESOURCES_DIR.resolve()) + '/')` — correct, but note that a filename containing '/' will resolve to a subdir outside; a URL-encoded traversal ('..%2F..%2Fetc%2Fpasswd') decodes into a path segment for FastAPI's `{filename}` — verified behaves correctly (returns 400 or 404). Consider also rejecting any filename containing `/` early with `if '/' in filename: raise HTTPException(400)` for defence-in-depth.",
+    "catalog_router.py L462: resource missing on disk returns 404 with generic message — fine, but logging the mismatch (resource in DB but file absent) would help ops.",
+    "CourseDetail.jsx ResourceRow uses `createObjectURL` blob approach — works reliably in Playwright expect_download() as verified. No changes needed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration70_course_resources.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (3/3 flows: locked card+toast, enrolled download, other-course-empty)"},
+  "test_credentials": "Fresh users registered dynamically via /api/auth/register with TestPass123!; no long-lived accounts required.",
+  "seed_data_creation": "None beyond ephemeral test users (e2e-lock-*, e2e-enrol-*, pem-*). Course seed handled by seed_more_courses.build_prompt_engineering_course() and re-applied on startup — persistence verified.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 70 fully green. Downloaded pptx verified at 2,123,904 bytes with PK\\x03\\x04 zip magic. Other courses (e.g. agentic-ai-foundations) correctly hide the Course materials section (course.resources defaults to []). Correct slug for foundations course is 'agentic-ai-foundations' NOT 'agentic-ai-fundamentals' — worth noting for future tests.",
+  "rca of the issue": "N/A — no defects found."
+}

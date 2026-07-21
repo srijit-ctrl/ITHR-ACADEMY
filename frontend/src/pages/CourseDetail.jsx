@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2, Bell, Check } from "lucide-react";
+import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2, Bell, Check, Download, FileText, Presentation } from "lucide-react";
 import { CourseIntroHero } from "@/components/CourseIntro";
 import CoursePreviewButton from "@/components/CoursePreviewButton";
 import { toast } from "sonner";
@@ -287,6 +287,22 @@ export default function CourseDetail() {
                             </div>
                         </>
                     )}
+
+                    {course.resources?.length > 0 && (
+                        <>
+                            <div className="overline mt-12 mb-3">Course materials</div>
+                            <div className="space-y-3" data-testid="course-resources">
+                                {course.resources.map((r) => (
+                                    <ResourceRow
+                                        key={r.id || r.filename}
+                                        resource={r}
+                                        courseSlug={course.slug}
+                                        enrolled={enrolled}
+                                    />
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <div className="lg:col-span-7">
@@ -340,3 +356,96 @@ export default function CourseDetail() {
         </div>
     );
 }
+
+/**
+ * ResourceRow — one downloadable course asset (PPTX / PDF / etc).
+ *
+ * Access rules mirror the backend:
+ *   - `public` resources → anyone can download (no auth check triggered).
+ *   - Non-public resources → learner must be enrolled OR the backend returns
+ *     403; we gate the download button client-side so the CTA is honest.
+ */
+function ResourceRow({ resource, courseSlug, enrolled }) {
+    const [busy, setBusy] = useState(false);
+    const locked = !resource.public && !enrolled;
+
+    const kindIcon =
+        resource.kind === "presentation" ? Presentation :
+        resource.kind === "pdf"          ? FileText     :
+        FileText;
+    const KindIcon = kindIcon;
+
+    const sizeLabel = resource.size_bytes
+        ? `${(resource.size_bytes / 1024 / 1024).toFixed(1)} MB`
+        : null;
+
+    const download = async () => {
+        if (locked) {
+            toast.info("Enrol in this course to unlock materials.");
+            return;
+        }
+        setBusy(true);
+        try {
+            const res = await api.get(
+                `/courses/${courseSlug}/resources/${encodeURIComponent(resource.filename)}`,
+                { responseType: "blob" },
+            );
+            const url = URL.createObjectURL(res.data);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = resource.download_name || resource.filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            toast.success("Downloaded — check your Downloads folder");
+        } catch (e) {
+            const status = e?.response?.status;
+            if (status === 403) toast.error("Enrol in this course to unlock materials.");
+            else if (status === 404) toast.error("Resource missing — please contact support.");
+            else toast.error(e?.response?.data?.detail || "Download failed");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div
+            className="card-flat p-4 flex items-center gap-4"
+            data-testid={`course-resource-${resource.id || resource.filename}`}
+        >
+            <div className="w-11 h-11 rounded-lg flex items-center justify-center shrink-0"
+                 style={{ background: "linear-gradient(135deg, #00A78B 0%, #2E7FC1 100%)", color: "#fff" }}>
+                <KindIcon className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                    <div className="font-serif text-base leading-tight truncate">{resource.title}</div>
+                    {locked && (
+                        <span className="badge-mono text-muted-foreground inline-flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> Enrolled only
+                        </span>
+                    )}
+                </div>
+                {resource.description && (
+                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{resource.description}</div>
+                )}
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mt-1.5">
+                    {resource.kind === "presentation" ? "PowerPoint deck" : resource.kind?.toUpperCase() || "File"}
+                    {sizeLabel && <span> · {sizeLabel}</span>}
+                </div>
+            </div>
+            <button
+                onClick={download}
+                disabled={busy}
+                data-testid={`course-resource-download-${resource.id || resource.filename}`}
+                className="btn-primary shrink-0 inline-flex items-center gap-2 disabled:opacity-60"
+                title={locked ? "Enrol to download" : "Download"}
+            >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <span className="hidden sm:inline">{locked ? "Locked" : "Download"}</span>
+            </button>
+        </div>
+    );
+}
+
