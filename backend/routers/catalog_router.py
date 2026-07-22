@@ -59,7 +59,34 @@ async def _cached_course_docs(query_key: str, query: dict) -> list[dict]:
 
 @router.get("/catalog/industries")
 async def get_industries():
-    return {"industries": INDUSTRIES}
+    """Only surface industries that actually have courses (drops empty ones
+    like Real Estate / Construction / Aviation). Preserves curated order."""
+    rows = await db.courses.aggregate(
+        [{"$unwind": "$industries"}, {"$group": {"_id": "$industries", "count": {"$sum": 1}}}]
+    ).to_list(500)
+    counts = {r["_id"]: r["count"] for r in rows if r.get("_id")}
+    ordered = [i for i in INDUSTRIES if counts.get(i)]
+    extras = sorted(i for i in counts if i not in INDUSTRIES)
+    return {"industries": ordered + extras, "counts": counts}
+
+
+DIFFICULTY_ORDER = [
+    "Fundamental", "Beginner", "Intermediate", "Advanced",
+    "Expert", "Architect", "Enterprise Leader", "CXO",
+]
+
+
+@router.get("/catalog/difficulties")
+async def get_difficulties():
+    """Only surface difficulty levels that actually have courses (drops empty
+    ones like Fundamental / Beginner / Expert / CXO)."""
+    rows = await db.courses.aggregate(
+        [{"$group": {"_id": "$difficulty", "count": {"$sum": 1}}}]
+    ).to_list(500)
+    counts = {r["_id"]: r["count"] for r in rows if r.get("_id")}
+    ordered = [d for d in DIFFICULTY_ORDER if counts.get(d)]
+    extras = sorted(d for d in counts if d not in DIFFICULTY_ORDER)
+    return {"difficulties": ordered + extras, "counts": counts}
 
 
 @router.get("/catalog/categories")

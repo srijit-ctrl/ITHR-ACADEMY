@@ -10,6 +10,9 @@ export default function CourseCatalog() {
     const [categories, setCategories] = useState([]);
     const [categoryCounts, setCategoryCounts] = useState({});
     const [industries, setIndustries] = useState([]);
+    const [industryCounts, setIndustryCounts] = useState({});
+    const [difficulties, setDifficulties] = useState([]);
+    const [difficultyCounts, setDifficultyCounts] = useState({});
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState(searchParams.get("q") || "");
     const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get("q") || "");
@@ -23,7 +26,14 @@ export default function CourseCatalog() {
             setCategories(r.data.categories);
             setCategoryCounts(r.data.counts || {});
         });
-        api.get("/catalog/industries").then((r) => setIndustries(r.data.industries));
+        api.get("/catalog/industries").then((r) => {
+            setIndustries(r.data.industries);
+            setIndustryCounts(r.data.counts || {});
+        });
+        api.get("/catalog/difficulties").then((r) => {
+            setDifficulties(r.data.difficulties);
+            setDifficultyCounts(r.data.counts || {});
+        });
     }, []);
 
     useEffect(() => {
@@ -49,7 +59,6 @@ export default function CourseCatalog() {
 
     const clearFilters = () => setSearchParams({});
 
-    const difficulties = ["Fundamental", "Beginner", "Intermediate", "Advanced", "Expert", "Architect", "Enterprise Leader", "CXO"];
     const activeCount = [currentCategory, currentIndustry, currentDifficulty].filter(Boolean).length;
 
     return (
@@ -85,8 +94,8 @@ export default function CourseCatalog() {
                     )}
 
                     <FilterGroup title="Category" values={categories} counts={categoryCounts} current={currentCategory} onChange={(v) => updateFilter("category", v)} testId="filter-category" />
-                    <FilterGroup title="Industry" values={industries} current={currentIndustry} onChange={(v) => updateFilter("industry", v)} testId="filter-industry" />
-                    <FilterGroup title="Difficulty" values={difficulties} current={currentDifficulty} onChange={(v) => updateFilter("difficulty", v)} testId="filter-difficulty" />
+                    <FilterGroup title="Industry" values={industries} counts={industryCounts} current={currentIndustry} onChange={(v) => updateFilter("industry", v)} testId="filter-industry" />
+                    <FilterGroup title="Difficulty" values={difficulties} counts={difficultyCounts} current={currentDifficulty} onChange={(v) => updateFilter("difficulty", v)} testId="filter-difficulty" />
                 </aside>
 
                 {/* Grid */}

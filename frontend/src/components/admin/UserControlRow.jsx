@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { KeyRound, Ban, CheckCircle2, Trash2, UserCog, Eye, Loader2 } from "lucide-react";
+import { KeyRound, Ban, CheckCircle2, Trash2, UserCog, Eye, Loader2, LineChart } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 /**
@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
  */
 const ROLES = ["learner", "instructor", "admin", "super_admin"];
 
-export default function UserControlRow({ u, onChanged }) {
+export default function UserControlRow({ u, onChanged, onOpen }) {
     const { user: self, beginImpersonation } = useAuth();
     const navigate = useNavigate();
     const [busy, setBusy] = useState(false);
@@ -91,12 +91,20 @@ export default function UserControlRow({ u, onChanged }) {
             data-testid={`user-row-${u.id}`}
         >
             <div className="col-span-3">
-                <div className="font-serif text-base leading-tight flex items-center gap-2">
-                    {u.full_name || "(no name)"}
-                    {isSelf && <span className="text-[9px] font-mono uppercase tracking-[0.15em] text-brand">you</span>}
-                    {isSuspended && <span className="text-[9px] font-mono uppercase tracking-[0.15em] text-destructive">suspended</span>}
-                </div>
-                <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                <button
+                    type="button"
+                    onClick={() => onOpen && onOpen(u.id)}
+                    data-testid={`user-progress-${u.id}`}
+                    className="text-left group"
+                    title="View learning progress (360°)"
+                >
+                    <div className="font-serif text-base leading-tight flex items-center gap-2 group-hover:text-brand transition-colors">
+                        {u.full_name || "(no name)"}
+                        {isSelf && <span className="text-[9px] font-mono uppercase tracking-[0.15em] text-brand">you</span>}
+                        {isSuspended && <span className="text-[9px] font-mono uppercase tracking-[0.15em] text-destructive">suspended</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate group-hover:text-brand/70 transition-colors">{u.email} · view progress</div>
+                </button>
             </div>
             <div className="col-span-2 text-xs relative">
                 <button
@@ -132,6 +140,7 @@ export default function UserControlRow({ u, onChanged }) {
                     <Loader2 className="w-4 h-4 animate-spin inline-block text-muted-foreground" data-testid={`user-busy-${u.id}`} />
                 ) : (
                     <div className="flex items-center justify-end gap-1">
+                        <IconBtn onClick={() => onOpen && onOpen(u.id)} title="View progress (360°)" testid={`view-360-${u.id}`}><LineChart className="w-3.5 h-3.5" /></IconBtn>
                         <IconBtn onClick={resetPw} disabled={isSelf} title="Reset password" testid={`reset-pw-${u.id}`}><KeyRound className="w-3.5 h-3.5" /></IconBtn>
                         <IconBtn onClick={toggleSuspend} disabled={isSelf} title={isSuspended ? "Reactivate" : "Suspend"} testid={`suspend-btn-${u.id}`}>
                             {isSuspended ? <CheckCircle2 className="w-3.5 h-3.5 text-success" /> : <Ban className="w-3.5 h-3.5" />}

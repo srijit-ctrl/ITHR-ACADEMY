@@ -194,7 +194,7 @@ export default function SuperAdminPortal() {
                 )}
 
                 {tab === "users" && (
-                    <UserTable users={users} totalUsers={totalUsers} onChanged={loadAll} />
+                    <UserTable users={users} totalUsers={totalUsers} onChanged={loadAll} onOpenUser={setOpenUserId} />
                 )}
 
                 {tab === "emails" && <EmailDispatchPanel />}
@@ -294,7 +294,7 @@ function OrgTable({ orgs, onDelete, busy, onOpen }) {
     );
 }
 
-function UserTable({ users, totalUsers, onChanged }) {
+function UserTable({ users, totalUsers, onChanged, onOpenUser }) {
     return (
         <div>
             <h2 className="font-serif text-2xl mb-4">All users <span className="text-xs font-mono text-muted-foreground">({users.length} of {totalUsers} shown)</span></h2>
@@ -307,7 +307,7 @@ function UserTable({ users, totalUsers, onChanged }) {
                     <div className="col-span-3 text-right">Actions</div>
                 </div>
                 {users.map((u) => (
-                    <UserControlRow key={u.id} u={u} onChanged={onChanged} />
+                    <UserControlRow key={u.id} u={u} onChanged={onChanged} onOpen={onOpenUser} />
                 ))}
             </div>
         </div>

@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 75 — SuperAdmin bug fixes verified end-to-end. (1) SINGLE-USER PROGRESS TRACKING: GET /api/admin/user360/{user_id} returns all 8 required keys (user, enrollments, certificates, assessment_attempts, ai_sessions, recent_logins, referrals_made, audit_trail) and correctly strips secrets (password_hash / mfa_secret / mfa_backup_codes). 404 on unknown user, 401/403 for non-super-admin. UI: in /admin?tab=users each row exposes BOTH the name button (data-testid=user-progress-<id>) AND the dedicated 360° icon (data-testid=view-360-<id>); clicking EITHER opens the Learner 360 drawer (data-testid=user360). Drawer renders Enrollments (with 0% progress bar), Credentials, Recent Logins, Admin Audit Trail, plus KPI tiles (Enrollments/Credentials/AI sessions/Referrals/XP/Streak). No 'Loading…' hang. (2) ENROLLMENT ANALYTICS ACCURACY: verified NO course has enrolled_count > total registered users (39 users on preview) — no seeded inflated counts. Double-POST /courses/prompt-engineering-mastery/enroll returned already_enrolled=false the first time and already_enrolled=true the second time; enrolled_count delta was ≤ 1 (never +2). (3) CATALOG FILTER CLEANUP (option b — hide empty): backend /api/catalog/industries and /api/catalog/difficulties both return non-empty values + a counts map. Frontend /courses sidebar contains ZERO banned testids for Real Estate/Construction/Aviation (industries) or Fundamental/Beginner/Expert/CXO (difficulties). Difficulty group shows ONLY Intermediate(9), Advanced(14), Architect(1), Enterprise Leader(4). Each remaining option renders a small course-count next to it. (4) REGRESSION - filters still work: Banking narrows 28→12; Advanced narrows to 14; catalog search q='prompt' narrows to 3 cards including Prompt Engineering Mastery. Backend pytest: 7/7 PASSED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration75_user360_and_analytics.py",
+    "/app/test_reports/pytest/iteration75.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "command_center_router.py /api/admin/user360/{user_id} (L266-292): correctly projects out password_hash / mfa_secret / mfa_backup_codes, returns rich per-user timeline. Only nit: `ai_sessions` is a COUNT (int) whereas the drawer label 'AI sessions' could mislead an operator expecting a list of sessions. Non-blocking — the KPI is exactly what the UI renders.",
+    "catalog_router.py enroll() (L267-314): idempotency is enforced by an existence check before the $inc; combined with the unique (user_id,course_id) index in content_fixups.reconcile_enrollments this is now double-safe against inflated enrolled_count. Verified via double-POST test — second call is a no-op on the counter.",
+    "catalog_router.py get_industries / get_difficulties (L60-89): both derive from live course aggregation and drop empties. Curated INDUSTRIES / DIFFICULTY_ORDER lists preserve display order, and 'extras' (any live category not in the curated list) are appended alphabetically — defensive and correct.",
+    "CourseCatalog.jsx FilterGroup (L125-146): count badge only rendered when counts[v] != null — clean fallback. testid generation uses toLowerCase + hyphens + &→'and' — deterministic across a rebuild.",
+    "Admin360Panels.jsx User360Drawer (L79-146): fetch has no error state — on network failure the drawer stays permanently in 'Loading…'. Consider adding a catch branch that renders an error message + retry. Not a blocker on preview (endpoint is healthy) but worth hardening.",
+    "SuperAdminPortal.jsx L215: <User360Drawer userId={openUserId}/> renders only when openUserId is truthy — correct, avoids fetching on mount. useEffect in Admin360Panels resets `data` to null on userId change so switching between rows re-fetches cleanly.",
+    "UserControlRow.jsx (L88-108, 143): both the name button (data-testid=user-progress-<id>) and the icon button (data-testid=view-360-<id>) call the SAME onOpen handler with u.id — no divergent code paths. Row also has data-testid=user-row-<id> which is what the playwright suite uses to enumerate rows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration75_user360_and_analytics.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 pytest)",
+    "frontend": "100% (single-user progress drawer opens from both buttons and renders all sections; catalog filter cleanup + count badges verified; filter narrowing + search regression pass)"
+  },
+  "test_credentials": "SuperAdmin: superadmin@ithr.online / Dubai_deram2026 (loaded from SUPER_ADMIN_PASSWORD env-var in conftest.py). Fresh learners: qa75-<hex>@example.com / TestPass123! (auto-purged).",
+  "seed_data_creation": "Only ephemeral test learners (qa75-*@example.com) registered via /api/auth/register.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both reported SuperAdmin bugs are FIXED on preview. Backend pytest file: /app/backend/tests/test_iteration75_user360_and_analytics.py (7 tests, ~3.6s). One optional UX hardening noted: Admin360Panels.jsx User360Drawer has no error branch on the /admin/user360 fetch — a network failure would leave the drawer stuck on 'Loading…' forever. Not a blocker (endpoint is healthy) but worth adding a retry/error state in a follow-up. Preview DB has 39 users and small realistic enrolled_counts (max 12 for Banking industry filter test), matching the review-request context that the '80 enrolments' was a production/stale-data artefact — the reconcile_enrollments() boot hook now self-corrects both environments.",
+  "rca of the issue": "N/A — both bugs verified fixed. Single-user progress: new /api/admin/user360 endpoint + wired drawer with two entry points (name button + 360 icon). Analytics inflation: content_fixups.reconcile_enrollments() dedupes enrollments and rebuilds each course's enrolled_count = COUNT(unique enrollments); the enroll endpoint is idempotent so double-clicks / retries never double count."
+}

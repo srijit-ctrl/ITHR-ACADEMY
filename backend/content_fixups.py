@@ -45,3 +45,58 @@ async def fix_dead_links() -> int:
     if updated:
         logger.info(f"[content-fixups] Repaired dead links in {updated} course(s).")
     return updated
+
+
+async def reconcile_enrollments() -> dict:
+    """Make enrollment analytics TRUTHFUL and prevent inflated counts.
+
+    Fixes the "a course shows 80 enrolments but only 36 users exist" class of
+    bug by:
+      1. De-duplicating enrollment docs (one per user+course, keep earliest).
+      2. (Re)creating the unique (user_id, course_id) index — safe now that
+         duplicates are gone, so it can't abort startup on production.
+      3. Recomputing every course's `enrolled_count` to the REAL number of
+         enrollment records (removes the seeded placeholder marketing numbers).
+    Idempotent; runs on every boot.
+    """
+    # 1) De-duplicate — keep the earliest enrollment per (user, course).
+    seen: set = set()
+    dupe_ids: list = []
+    async for e in db.enrollments.find(
+        {}, {"_id": 1, "user_id": 1, "course_id": 1}
+    ).sort("enrolled_at", 1):
+        key = (e.get("user_id"), e.get("course_id"))
+        if key in seen:
+            dupe_ids.append(e["_id"])
+        else:
+            seen.add(key)
+    removed = 0
+    if dupe_ids:
+        res = await db.enrollments.delete_many({"_id": {"$in": dupe_ids}})
+        removed = res.deleted_count
+
+    # 2) Unique index (now safe).
+    try:
+        await db.enrollments.create_index(
+            [("user_id", 1), ("course_id", 1)], unique=True
+        )
+    except Exception:
+        logger.exception("[reconcile] enrollment unique index creation failed")
+
+    # 3) Sync each course's enrolled_count to the real enrollment total.
+    counts: dict = {}
+    async for row in db.enrollments.aggregate(
+        [{"$group": {"_id": "$course_id", "n": {"$sum": 1}}}]
+    ):
+        counts[row["_id"]] = row["n"]
+    synced = 0
+    async for co in db.courses.find({}, {"_id": 0, "id": 1, "enrolled_count": 1}):
+        real = counts.get(co["id"], 0)
+        if co.get("enrolled_count") != real:
+            await db.courses.update_one({"id": co["id"]}, {"$set": {"enrolled_count": real}})
+            synced += 1
+    logger.info(
+        f"[reconcile] removed {removed} duplicate enrollment(s); "
+        f"synced enrolled_count on {synced} course(s)."
+    )
+    return {"duplicates_removed": removed, "courses_synced": synced}

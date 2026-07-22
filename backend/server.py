@@ -156,7 +156,8 @@ async def seed_database():
 
     await db.courses.create_index("slug", unique=True)
     await db.users.create_index("email", unique=True)
-    await db.enrollments.create_index([("user_id", 1), ("course_id", 1)], unique=True)
+    # Enrollment uniqueness is (re)created inside reconcile_enrollments() below,
+    # after de-duplication, so it can't abort startup on a DB with legacy dupes.
     await db.certificates.create_index("certificate_id", unique=True)
     await db.organizations.create_index("slug", unique=True)
     await db.organizations.create_index("invite_code", unique=True)
@@ -283,8 +284,11 @@ async def seed_database():
     # after every seed/hydration/override step above. Runs last so nothing can
     # re-introduce them; idempotent and safe on every boot (preview + prod).
     try:
-        from content_fixups import fix_dead_links
+        from content_fixups import fix_dead_links, reconcile_enrollments
         await fix_dead_links()
+        # Make enrollment analytics accurate: dedup + rebuild unique index +
+        # sync enrolled_count to real enrollment totals.
+        await reconcile_enrollments()
     except Exception:
         logger.exception("Content fix-ups failed (non-fatal)")
 
