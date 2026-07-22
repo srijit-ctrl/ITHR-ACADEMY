@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles, Radio, Zap } from "lucide-react";
 import CourseCard from "@/components/CourseCard";
 import TryALesson from "@/components/TryALesson";
 import InauguralFlasher from "@/components/InauguralFlasher";
+import { numberToWord, numberToWordCap } from "@/utils/numberToWord";
 
 const HERO_IMG = "https://images.unsplash.com/photo-1526314114033-349ef6f72220?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBhcmNoaXRlY3R1cmFsJTIwbGlicmFyeXxlbnwwfHx8fDE3ODMxNTI1NTV8MA&ixlib=rb-4.1.0&q=85";
 const ENTERPRISE_IMG = "https://images.pexels.com/photos/7698712/pexels-photo-7698712.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
@@ -15,16 +16,25 @@ const CERT_TIERS = [
     { title: "Foundation", tier: "I", desc: "For all professionals entering the agentic AI economy.", color: "color-card-blue" },
     { title: "Practitioner", tier: "II", desc: "Hands-on credential for those building production agents.", color: "color-card-teal" },
     { title: "Professional", tier: "III", desc: "Advanced credential with capstone project.", color: "color-card-purple" },
-    { title: "Architect", tier: "IV", desc: "System-design credential for senior technologists.", color: "color-card-orange" },
-    { title: "Enterprise Leader", tier: "V", desc: "For CXOs steering organization-wide transformation.", color: "color-card-gold" },
-    { title: "Chief AI Officer", tier: "VI", desc: "The definitive CAIO credential.", color: "color-card-navy" },
+    { title: "Specialist", tier: "IV", desc: "Domain-focused credential (banking, healthcare, and beyond).", color: "color-card-orange" },
+    { title: "Expert", tier: "V", desc: "Senior technical credential recognising deep production experience.", color: "color-card-gold" },
+    { title: "Architect", tier: "VI", desc: "System-design credential for senior technologists.", color: "color-card-navy" },
+    { title: "Enterprise Leader", tier: "VII", desc: "For CXOs steering organization-wide transformation.", color: "color-card-blue" },
+    { title: "Chief AI Officer", tier: "VIII", desc: "The definitive CAIO credential.", color: "color-card-purple" },
 ];
 
 export default function Landing() {
     const [featured, setFeatured] = useState([]);
+    const [industryCount, setIndustryCount] = useState(20);
 
     useEffect(() => {
         api.get("/courses").then((res) => setFeatured(res.data.slice(0, 6))).catch(() => { });
+        api.get("/catalog/industries")
+            .then((r) => {
+                const list = r.data?.industries || r.data || [];
+                if (Array.isArray(list) && list.length) setIndustryCount(list.length);
+            })
+            .catch(() => { /* keep the sensible default */ });
     }, []);
 
     return (
@@ -58,7 +68,7 @@ export default function Landing() {
                             Where the world&apos;s workforce learns to <span className="italic text-brand">command</span> AI.
                         </h1>
                         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10">
-                            The <span className="text-foreground font-semibold">ITHR Academy</span> is a credentialing platform for enterprise workforces &mdash; six tiers, twenty industries, one standard, refreshed continuously.
+                            The <span className="text-foreground font-semibold">ITHR Academy</span> is a credentialing platform for enterprise workforces &mdash; {numberToWord(CERT_TIERS.length)} tiers, {numberToWord(industryCount)} industries, one standard, refreshed continuously.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center mb-14">
                             <Link to="/courses" data-testid="hero-browse-catalog" className="btn-primary text-base">
@@ -179,7 +189,7 @@ export default function Landing() {
                         <div className="md:col-span-6">
                             <span className="section-kicker">The Certification Ladder</span>
                             <h2 className="font-serif text-4xl md:text-5xl tracking-tighter leading-none">
-                                Six tiers.<br />
+                                {numberToWordCap(CERT_TIERS.length)} tiers.<br />
                                 From analyst to <span className="italic text-brand">CAIO</span>.
                             </h2>
                         </div>

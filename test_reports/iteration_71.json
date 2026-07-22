@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only verification of the 'Six tiers' → 'Eight tiers' copy fix on Landing (/) and Certifications (/certifications). Both pages now render the corrected copy (H1/H2 headlines, paragraphs) and all 8 tier cards with roman numerals I–VIII. Grep confirms no remaining 'six tiers' string in src. BUT — one hardcoded '6' was missed: the stats-pip section on Landing (Landing.jsx L86) still hardcodes 6 for 'Credential tiers'. This is the exact same class of bug the user originally reported and directly contradicts the 'Eight tiers' hero copy shown 20px above it in the same viewport.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/catalog/industries", "issue": "Returns 23 industries, but the fix specification (and Landing.jsx fallback default) expects 20. Landing hero therefore reads 'twenty-three industries' — data/spec mismatch. Frontend is correctly dynamic; decide whether seed should be trimmed to 20 or the spec copy updated."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Landing.jsx hero stats-pip section (line 86)", "issue": "Still hardcodes numeric '6' for the 'Credential tiers' stat pip below the CTA. Displays '6 CREDENTIAL TIERS' 20px below the corrected 'eight tiers' hero copy — visually contradicts the fix and is the SAME class of bug as the original user report. Should be `{CERT_TIERS.length}` for consistency (and while at it the '24 Courses in catalog' hardcoded stat pip on the same row is worth reviewing too since backend now has 24+ courses that could drift).", "selector": "text=/^6$/ + text='Credential tiers'", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/landing_hero_v2.png",
+    "/app/test_reports/landing_ladder_v2.png",
+    "/app/test_reports/certifications_page.png",
+    "/app/test_reports/certifications_ladder.png"
+  ],
+  "action_items": [
+    "Landing.jsx line 86: replace hardcoded `<div>6</div>` with `<div>{CERT_TIERS.length}</div>` (or numberToWord if the design uses text). Consider doing the same for the '24 Courses in catalog' pip on line 90 by fetching /api/catalog/courses length to future-proof it.",
+    "Optional: decide whether backend industries seed should be 20 (per spec) or the Landing copy/fallback should say 'twenty-three'. Current UI is dynamic and functionally correct — this is a data/spec alignment call."
+  ],
+  "critical_code_review_comments": [
+    "The fix correctly introduced numberToWord/numberToWordCap helpers and wired CERT_TIERS.length into the hero paragraph and ladder H2. Good future-proofing.",
+    "But the stats-pip block (Landing.jsx L83-101) was NOT touched in the same pass — the very same '6' the user complained about still lives there. This is a classic 'fix one place, miss another' regression. Any tier-count copy audit must include this block.",
+    "CERT_TIERS on Landing is now duplicated data — the /certifications page fetches from /api/catalog/certification-paths while Landing hardcodes an 8-item CERT_TIERS array. Long-term this will drift again. Consider fetching CERT_TIERS from the same catalog endpoint on Landing too (with a hardcoded fallback), the way industryCount is already handled.",
+    "Minor: on Certifications.jsx the fallback 'Eight' before fetch resolves is fine, but note the paragraph reads 'structured across eight tiers' pre-fetch and could momentarily read something else if the backend one day returns a different count — the fallback assumption is baked into the copy."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only per request)", "frontend": "87% — 7 of 8 spec assertions pass; 1 hardcoded stat-pip regression missed"},
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The copy fix works everywhere EXCEPT the Landing hero stats-pip row (Landing.jsx ~L86) where a hardcoded '6' for 'Credential tiers' remains. After the main agent replaces it with {CERT_TIERS.length}, retest by loading / and evaluating: `document.body.innerText` should not contain a '6' adjacent to 'Credential tiers'. Also verify no regression on the '/certifications' page.",
+  "rca of the issue": "Root cause: the fix (Landing.jsx CERT_TIERS expansion + dynamic numberToWord in the hero paragraph and ladder H2) was correctly applied to the two prose locations that had textual 'Six tiers' copy, but the third location that also encodes tier count — the numeric stats-pip immediately under the CTA — was overlooked because it stores the count as a bare integer '6' rather than as the word 'six'. Reproduction: load / unauthenticated, look 200-300px below the primary CTA buttons — the row of 4 stat pips shows '6 CREDENTIAL TIERS' next to '24 COURSES IN CATALOG'. Mitigation: change Landing.jsx L86 `<div className=\"font-serif text-3xl leading-none\">6</div>` to `<div className=\"font-serif text-3xl leading-none\">{CERT_TIERS.length}</div>`. To prevent the same class of bug recurring, add a lint rule or a code-review checklist item that flags any bare integer inside marketing copy blocks."
+}
