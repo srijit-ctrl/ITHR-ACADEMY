@@ -12,6 +12,12 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 71 · Course completion + in-portal PPTX viewer validation — Jun 2026
+- **Course completion finished**: the last incomplete course `agentic-ai-learning-development` (stuck at 4/15 modules because the prior batch run was interrupted mid-generation) was regenerated 4→15 via `scripts.generate_course_content_append --slug agentic-ai-learning-development` (Claude Sonnet 4.5, Emergent LLM key). **ALL 28 courses now have exactly 15 modules**, each with non-empty lessons, `status=published`, `has_full_content=true`, plus 5 learning_objectives + 7 skills_gained.
+- **In-portal PPTX viewer full validation** (user-requested testing pass that was pending from the prior fork): `testing_agent` iteration_73 — **backend 8/8, frontend 3/3, 100% pass**. Verified: preview.pdf endpoint 401 anon / 403 non-enrolled / 200 `application/pdf` with `%PDF` magic when enrolled / 404 bad slug / 404 bad filename; frontend locked-state toast for non-enrolled; enrolled learner opens `resource-pdf-viewer` modal, PDF renders (64 pages), page nav advances 1/64→2/64, close dismisses; `/courses/agentic-ai-learning-development` renders 15 modules.
+- **Small hardening**: `resource_viewer_router.py` 502 path no longer leaks internal LibreOffice stderr into the client response (still logged server-side).
+- **⚠️ OPS DEPENDENCY (important)**: headless LibreOffice (`soffice`) is NOT installed in the forked/preview container and OS-level apt packages do NOT persist across forks/deploys. The current single deck (prompt-engineering-mastery) previews fine because its converted PDF is cached in `/app/backend/static/course_resources/.pdf_cache/` (which lives in `/app` and DOES persist). **Do NOT re-save/touch the source PPTX** in this container — that invalidates the mtime cache and would trigger a 502 until LibreOffice is available. Before adding ANY new PPTX resource, `libreoffice` must be installed (or the PDF pre-generated and cached). Report: `/app/test_reports/iteration_73.json`.
+
 ### Iteration 70 · Course companion PPTX resource — Feb 2026
 
 - **Goal**: Attach the user-supplied *"Prompt Engineering Mastery — ITHR Academy Course Deck.pptx"* (2.1 MB, 15-module course companion covering zero-shot, structured output, RAG, prompt-injection defence, DSPy, finance & healthcare patterns) as a downloadable learning resource on the matching course page.

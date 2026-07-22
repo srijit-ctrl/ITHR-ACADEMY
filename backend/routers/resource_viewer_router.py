@@ -145,7 +145,7 @@ async def preview_resource_as_pdf(
             await _convert_to_pdf(safe_source, pdf_path)
         except Exception as e:
             logger.exception(f"[resource-viewer] PDF conversion failed for {filename}")
-            raise HTTPException(502, f"Preview unavailable — please download the file instead. ({e})") from e
+            raise HTTPException(502, "Preview unavailable — please download the file instead.") from e
 
     return FileResponse(
         path=str(pdf_path),
