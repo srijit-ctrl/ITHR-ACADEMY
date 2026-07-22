@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, AlertTriangle, RotateCw } from "lucide-react";
 
 function Drawer({ title, subtitle, onClose, children, testId }) {
     return (
@@ -34,13 +34,31 @@ const Section = ({ title, children }) => (
     </div>
 );
 
+const DrawerError = ({ onRetry }) => (
+    <div className="flex flex-col items-start gap-3 py-6" data-testid="drawer360-error">
+        <div className="flex items-center gap-2 text-destructive text-sm">
+            <AlertTriangle className="w-4 h-4" /> Couldn&apos;t load this record.
+        </div>
+        <p className="text-xs text-muted-foreground">The request failed or timed out. Please try again.</p>
+        <button onClick={onRetry} data-testid="drawer360-retry" className="btn-outline text-xs px-3 py-1.5">
+            <RotateCw className="w-3.5 h-3.5" /> Retry
+        </button>
+    </div>
+);
+
 export function Org360Drawer({ orgId, onClose, onOpenUser }) {
     const [data, setData] = useState(null);
-    useEffect(() => {
+    const [error, setError] = useState(false);
+    const load = useCallback(() => {
+        setError(false);
         setData(null);
-        api.get(`/admin/org360/${orgId}`).then((r) => setData(r.data)).catch(() => {});
+        api.get(`/admin/org360/${orgId}`, { timeout: 20000 })
+            .then((r) => setData(r.data))
+            .catch(() => setError(true));
     }, [orgId]);
+    useEffect(() => { load(); }, [load]);
 
+    if (error) return <Drawer title="Unavailable" subtitle="Organization 360" onClose={onClose} testId="org360"><DrawerError onRetry={load} /></Drawer>;
     if (!data) return <Drawer title="Loading…" subtitle="Organization 360" onClose={onClose} testId="org360"><Loader2 className="w-5 h-5 animate-spin" /></Drawer>;
     const o = data.organization;
     return (
@@ -78,11 +96,17 @@ export function Org360Drawer({ orgId, onClose, onOpenUser }) {
 
 export function User360Drawer({ userId, onClose }) {
     const [data, setData] = useState(null);
-    useEffect(() => {
+    const [error, setError] = useState(false);
+    const load = useCallback(() => {
+        setError(false);
         setData(null);
-        api.get(`/admin/user360/${userId}`).then((r) => setData(r.data)).catch(() => {});
+        api.get(`/admin/user360/${userId}`, { timeout: 20000 })
+            .then((r) => setData(r.data))
+            .catch(() => setError(true));
     }, [userId]);
+    useEffect(() => { load(); }, [load]);
 
+    if (error) return <Drawer title="Unavailable" subtitle="Learner 360" onClose={onClose} testId="user360"><DrawerError onRetry={load} /></Drawer>;
     if (!data) return <Drawer title="Loading…" subtitle="Learner 360" onClose={onClose} testId="user360"><Loader2 className="w-5 h-5 animate-spin" /></Drawer>;
     const u = data.user;
     return (
