@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2, Bell, Check, Download, FileText, Presentation } from "lucide-react";
+import { Clock, BookOpen, Award, Lock, CheckCircle2, ArrowRight, Loader2, Bell, Check, Download, FileText, Presentation, Eye } from "lucide-react";
 import { CourseIntroHero } from "@/components/CourseIntro";
 import CoursePreviewButton from "@/components/CoursePreviewButton";
+import ResourcePdfViewer from "@/components/ResourcePdfViewer";
 import { toast } from "sonner";
 
 /** Human-readable tier structure derived from the course's own modules,
@@ -367,6 +368,7 @@ export default function CourseDetail() {
  */
 function ResourceRow({ resource, courseSlug, enrolled }) {
     const [busy, setBusy] = useState(false);
+    const [viewerOpen, setViewerOpen] = useState(false);
     const locked = !resource.public && !enrolled;
 
     const kindIcon =
@@ -375,9 +377,20 @@ function ResourceRow({ resource, courseSlug, enrolled }) {
         FileText;
     const KindIcon = kindIcon;
 
+    // PPTX / PDF / DOC decks can be previewed in-portal via the PDF preview endpoint.
+    const previewable = ["presentation", "pdf"].includes(resource.kind);
+
     const sizeLabel = resource.size_bytes
         ? `${(resource.size_bytes / 1024 / 1024).toFixed(1)} MB`
         : null;
+
+    const openViewer = () => {
+        if (locked) {
+            toast.info("Enrol in this course to open the deck inside the portal.");
+            return;
+        }
+        setViewerOpen(true);
+    };
 
     const download = async () => {
         if (locked) {
@@ -410,6 +423,7 @@ function ResourceRow({ resource, courseSlug, enrolled }) {
     };
 
     return (
+        <>
         <div
             className="card-flat p-4 flex items-center gap-4"
             data-testid={`course-resource-${resource.id || resource.filename}`}
@@ -435,17 +449,38 @@ function ResourceRow({ resource, courseSlug, enrolled }) {
                     {sizeLabel && <span> · {sizeLabel}</span>}
                 </div>
             </div>
-            <button
-                onClick={download}
-                disabled={busy}
-                data-testid={`course-resource-download-${resource.id || resource.filename}`}
-                className="btn-primary shrink-0 inline-flex items-center gap-2 disabled:opacity-60"
-                title={locked ? "Enrol to download" : "Download"}
-            >
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                <span className="hidden sm:inline">{locked ? "Locked" : "Download"}</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+                {previewable && (
+                    <button
+                        onClick={openViewer}
+                        data-testid={`course-resource-open-${resource.id || resource.filename}`}
+                        className="btn-primary inline-flex items-center gap-2 disabled:opacity-60"
+                        title={locked ? "Enrol to open" : "Open inside the portal"}
+                    >
+                        <Eye className="w-4 h-4" />
+                        <span className="hidden sm:inline">{locked ? "Locked" : "Open"}</span>
+                    </button>
+                )}
+                <button
+                    onClick={download}
+                    disabled={busy}
+                    data-testid={`course-resource-download-${resource.id || resource.filename}`}
+                    className="btn-outline inline-flex items-center gap-2 disabled:opacity-60"
+                    title={locked ? "Enrol to download" : "Download"}
+                >
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{previewable ? "" : (locked ? "Locked" : "Download")}</span>
+                </button>
+            </div>
         </div>
+        {viewerOpen && (
+            <ResourcePdfViewer
+                resource={resource}
+                courseSlug={courseSlug}
+                onClose={() => setViewerOpen(false)}
+            />
+        )}
+        </>
     );
 }
 

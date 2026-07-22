@@ -19,6 +19,7 @@ from routers import (
     recommendation_router, share_router, trust_router, tutor_router, voice_router, podcast_router,
     admin_control_router, traffic_router, video_quiz_router, referral_router, security_router, command_center_router,
     whatsapp_router, admin_copilot_router, admin_automations_router, me_router,
+    resource_viewer_router,
 )
 from seed_data import CATALOG_COURSES, build_full_course
 
@@ -79,8 +80,12 @@ async def seed_database():
         quiz_default = doc.pop("quiz", [])
         existing = await db.courses.find_one(
             {"slug": full.slug},
-            {"_id": 0, "has_full_content": 1, "quiz": 1, "modules": 1},
+            {"_id": 0, "id": 1, "has_full_content": 1, "quiz": 1, "modules": 1},
         )
+        # Preserve the existing course id across restarts so enrollments,
+        # certificates, and progress rows never orphan.
+        if existing and existing.get("id"):
+            doc["id"] = existing["id"]
         # Preserve module/lesson ids across restarts (by position) so
         # video_checkpoints / lesson_videos / enrollments never orphan.
         if existing and existing.get("modules"):
@@ -307,6 +312,7 @@ for r in (
     admin_copilot_router.router,
     admin_automations_router.router,
     me_router.router,
+    resource_viewer_router.router,
 ):
     app.include_router(r)
 
@@ -343,13 +349,15 @@ async def security_headers(request, call_next):
     response.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+        "worker-src 'self' blob: https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' data: https://fonts.gstatic.com; "
         "img-src 'self' data: blob: https:; "
         "connect-src 'self' https:; "
+        "frame-src 'self' blob:; "
         "frame-ancestors 'none'; "
-        "object-src 'none'; "
+        "object-src 'self' blob:; "
         "base-uri 'self'",
     )
     return response
