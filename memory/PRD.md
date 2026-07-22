@@ -12,6 +12,21 @@ Build a commercially deployable enterprise SaaS Learning & Certification Platfor
 
 ## What's Been Implemented
 
+### Iteration 74 · Launch-readiness bug list (11 items) — Jun 2026
+Verified by testing_agent (`/app/test_reports/iteration_74.json`): backend 12/12 pytest, frontend 8/8 flows, 100%.
+- **#1 Intelligence briefing no longer hangs** (`routers/intelligence_router.py`). The LLM regeneration genuinely takes >40s, so the endpoint now uses **stale-while-revalidate**: it serves the cached briefing instantly and refreshes in a background task (`_regenerate_in_background`, single-flight, 120s cap). No-cache / `force=true` paths generate synchronously bounded by `BRIEFING_TIMEOUT_SECONDS=40` → 504 on timeout. Frontend (`Intelligence.jsx`) has a 55s client timeout, an error state with Retry, and a clean stale label ("Cached · refresh to update"). Verified: endpoint responds in ~0.2s; background regen completes & refreshes cache to age 0.
+- **#2 Explorer free-plan CTA** (`Pricing.jsx`): was stuck in a permanent spinner because `processingId(null) === packageId(null)`. Fixed the predicate (`!!p.packageId && …`) and made "Start free" route anonymous users straight to `/register` (logged-in → `/courses`).
+- **#3 Solon mentor grounding** (`mentor_router.py`): new `_build_catalog_block()` injects the live `/api/courses` titles/slugs/categories into the system prompt with a hard "exact titles only, never invent" instruction. Verified Solon only returns verbatim catalog titles.
+- **#4 Legal pages** (`LegalDoc.jsx` + `public/legal/*.md`): placeholder regex fixed to `[A-Z0-9_]+` (previously digits in `SOC2_TARGET`/`ISO_42001_TARGET` broke replacement); entity → **ITHR Technologies Consulting LLC**; domain → **ithr.online**; emails → `@ithr.online`; DRAFT-not-reviewed line kept, placeholder mention removed.
+- **#5 Privacy Policy**: new `/privacy` route + `public/legal/privacy.md` (GDPR/UAE-PDPL rights) + footer link (`footer-privacy`).
+- **#6 Catalog search** (`CourseCatalog.jsx` + `catalog_router.py`): added 300ms debounce (fixes out-of-order responses) and broadened backend `q` search to slug/description/skills_gained.
+- **#7 404**: new `NotFound.jsx` + `*` catch-all route in `App.js`.
+- **#8 robots.txt + sitemap.xml**: real files added to `frontend/public/` (were falling back to the SPA shell); sitemap lists all 28 course URLs.
+- **#9 dead links (partial)**: the 2 confirmed dead links (Salesforce agentforce-2-announcement, anthropic.com/news/claude-2-1) fixed at source (`seed_data.py`, `assets/generated_courses/content_overrides.json`, `patch_content_citations_iter53b.py`) + a `content_fixups.fix_dead_links()` migration that runs LAST in startup seeding (idempotent, both envs). **NOTE: the broader model-name freshness pass across 27 courses was NOT done — it needs the external `ithr_audit_report_latest.md` which is not in the repo.**
+- **#10 broken thumbnail**: NOT reproducible — `photo-1642132652075` has 0 occurrences in preview code/DB (likely production-only/stale). Flagged to user.
+- **#11 mentor duplicate thread** (`mentor_router.py` + `Mentor.jsx`): `_persist_mentor_turn` is now a single idempotent upsert keyed by session id; client generates a stable session id on the first turn so rapid double-sends can't create two threads.
+- **Branding**: no `ithr.tech` / `FZ-LLC` / `learn.ithr.tech` remain in `frontend/src` or `frontend/public`; backend fallbacks (share/podcast/digest/seed_super_admin/email_service) updated to `ithr.online`.
+
 ### Iteration 72 · Catalogue fix — empty categories + 17 courses stuck "coming soon" — Jun 2026
 - **User escalation (4th time)**: "the course catalogue does not have the courses in each of its categories." Diagnosed TWO root causes:
   1. **17 of 28 courses rendered as "coming soon" 4-module stubs on PRODUCTION** (ithr.online). Root cause: LLM-generated course content lived ONLY in MongoDB, never in code, so it never deployed. Production got a fresh DB seeded from code = only the 11 hardcoded `full_builders` courses were complete; the other 17 stayed as stubs. (Preview had all 28 complete because the generation script wrote to the preview DB.) Additionally, in preview, 12 of those courses still showed `coming_soon` because their `description` retained the stub marker "Full curriculum in preparation" which `derive_status()` keys off.

@@ -43,3 +43,20 @@
   to stubs on the next deploy.
 - Category filter list is derived live from `courses` in `GET /api/catalog/categories` — do not
   re-hardcode it; empty categories must never be shown.
+
+## ⚠️ Builder-course content is enriched from assets AFTER seeding
+- The 11 `full_builders` courses get their lesson content OVERWRITTEN on every boot via
+  `server.py` "Asset hydration" from `backend/assets/generated_courses/content_overrides.json`
+  and the `lesson_content_overrides` DB collection. This runs AFTER the main seed.
+- Therefore, to change builder-course lesson content permanently you must edit
+  `content_overrides.json` (positional `"module:lesson"` keys) — editing only the builder
+  function or the DB will be reverted on the next restart.
+- `content_fixups.fix_dead_links()` runs LAST in `seed_database()` (after all hydration) as the
+  final authority for dead-link cleanup. Add new dead/stale-link replacements there AND in
+  `content_overrides.json`.
+
+## Intelligence briefing (/api/intelligence/briefing)
+- LLM regeneration takes >40s, so the endpoint uses **stale-while-revalidate**: serves the cached
+  briefing instantly and refreshes in a single-flight background task. It NEVER blocks on the LLM
+  except on a cold cache or explicit `?force=true` (bounded by `BRIEFING_TIMEOUT_SECONDS`).
+- Do not "fix" the perceived slowness by removing the cache — the cache IS the fast path.

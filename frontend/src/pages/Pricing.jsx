@@ -126,12 +126,14 @@ export default function Pricing() {
 
     const handleCheckout = async (packageId, quantity = 1) => {
         setError("");
-        if (!user) {
-            navigate("/login", { state: { from: "/pricing" } });
+        // Free (Explorer) tier — no payment. Anonymous users go straight to
+        // sign-up; already-authenticated users go to the catalog.
+        if (!packageId) {
+            navigate(user ? "/courses" : "/register");
             return;
         }
-        if (!packageId) {
-            navigate("/register");
+        if (!user) {
+            navigate("/login", { state: { from: "/pricing" } });
             return;
         }
         setProcessingId(packageId);

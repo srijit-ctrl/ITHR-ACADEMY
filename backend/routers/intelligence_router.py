@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 
 # Hard ceiling for the (LLM-backed) briefing generation so the endpoint can
 # never hang indefinitely — the frontend gets a fast, actionable error instead.
-BRIEFING_TIMEOUT_SECONDS = 18
+# Set generously enough that a normal regeneration completes, but bounded.
+BRIEFING_TIMEOUT_SECONDS = 40
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -18,28 +19,74 @@ router = APIRouter(prefix="/api", tags=["intelligence"])
 INTELLIGENCE_CACHE_KEY = "current_briefing"
 INTELLIGENCE_CACHE_HOURS = 6
 
+# Guards against multiple concurrent background regenerations.
+_regen_inflight = False
+
+
+def _stale_cache_response(cached: dict) -> dict:
+    """Return the last-good cached briefing, flagged stale, with its REAL age."""
+    try:
+        cached_at = datetime.fromisoformat(cached["cached_at"])
+        age_hours = round((datetime.now(timezone.utc) - cached_at).total_seconds() / 3600, 1)
+    except Exception:
+        age_hours = None
+    return {**cached["payload"], "cache_age_hours": age_hours, "from_cache": True, "stale": True}
+
+
+async def _generate_and_cache() -> dict:
+    """Generate a fresh briefing and persist it to the cache. Returns payload."""
+    course_docs = await db.courses.find({}, {"_id": 0, "slug": 1}).to_list(200)
+    slugs = [c["slug"] for c in course_docs]
+    raw = await generate_intelligence_briefing(slugs)
+    parsed = extract_json(raw)
+    payload = {**parsed, "generated_at": parsed.get("generated_at") or now_iso()}
+    await db.intelligence_cache.update_one(
+        {"key": INTELLIGENCE_CACHE_KEY},
+        {"$set": {"key": INTELLIGENCE_CACHE_KEY, "payload": payload, "cached_at": now_iso()}},
+        upsert=True,
+    )
+    return payload
+
+
+async def _regenerate_in_background():
+    """Fire-and-forget stale-while-revalidate refresh (only one at a time)."""
+    global _regen_inflight
+    if _regen_inflight:
+        return
+    _regen_inflight = True
+    try:
+        await asyncio.wait_for(_generate_and_cache(), timeout=120)
+        logger.info("Intelligence briefing regenerated in background.")
+    except Exception:
+        logger.exception("Background briefing regeneration failed (non-fatal)")
+    finally:
+        _regen_inflight = False
+
 
 @router.get("/intelligence/briefing")
 async def intelligence_briefing(force: bool = False):
     cached = await db.intelligence_cache.find_one({"key": INTELLIGENCE_CACHE_KEY}, {"_id": 0})
+
     if cached and not force:
         cached_at = datetime.fromisoformat(cached["cached_at"])
         age_hours = (datetime.now(timezone.utc) - cached_at).total_seconds() / 3600
         if age_hours < INTELLIGENCE_CACHE_HOURS:
             return {**cached["payload"], "cache_age_hours": round(age_hours, 1), "from_cache": True}
+        # Stale-while-revalidate: return the cached briefing INSTANTLY and kick
+        # off a background refresh so the next visitor gets fresh content. This
+        # is why the page never hangs on the (slow) LLM generation.
+        asyncio.create_task(_regenerate_in_background())
+        return {**cached["payload"], "cache_age_hours": round(age_hours, 1), "from_cache": True, "stale": True}
 
-    course_docs = await db.courses.find({}, {"_id": 0, "slug": 1}).to_list(200)
-    slugs = [c["slug"] for c in course_docs]
-
+    # No cache yet, OR the user explicitly forced a refresh — generate
+    # synchronously but bounded, so we can never hang indefinitely.
     try:
-        raw = await asyncio.wait_for(
-            generate_intelligence_briefing(slugs), timeout=BRIEFING_TIMEOUT_SECONDS
-        )
-        parsed = extract_json(raw)
+        payload = await asyncio.wait_for(_generate_and_cache(), timeout=BRIEFING_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         logger.warning("Intelligence generation timed out after %ss", BRIEFING_TIMEOUT_SECONDS)
         if cached:
-            return {**cached["payload"], "cache_age_hours": 999, "from_cache": True, "stale": True}
+            asyncio.create_task(_regenerate_in_background())
+            return _stale_cache_response(cached)
         raise HTTPException(
             status_code=504,
             detail="The live briefing is taking longer than usual to generate. Please retry in a moment.",
@@ -47,15 +94,9 @@ async def intelligence_briefing(force: bool = False):
     except Exception as e:
         logger.exception("Intelligence generation failed")
         if cached:
-            return {**cached["payload"], "cache_age_hours": 999, "from_cache": True, "stale": True}
+            return _stale_cache_response(cached)
         raise HTTPException(status_code=502, detail=f"Intelligence generation failed: {e}")
 
-    payload = {**parsed, "generated_at": parsed.get("generated_at") or now_iso()}
-    await db.intelligence_cache.update_one(
-        {"key": INTELLIGENCE_CACHE_KEY},
-        {"$set": {"key": INTELLIGENCE_CACHE_KEY, "payload": payload, "cached_at": now_iso()}},
-        upsert=True,
-    )
     return {**payload, "cache_age_hours": 0, "from_cache": False}
 
 

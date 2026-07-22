@@ -37,7 +37,7 @@ export default function Intelligence() {
         try {
             const res = await api.get("/intelligence/briefing", {
                 params: force ? { force: true } : {},
-                timeout: 30000,
+                timeout: 55000,
             });
             setBriefing(res.data);
         } catch (e) {
@@ -119,7 +119,11 @@ export default function Intelligence() {
                             </div>
                             <div className="md:col-span-4 md:text-right">
                                 <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-muted-foreground mb-2">
-                                    {briefing.from_cache ? `Cached · ${briefing.cache_age_hours}h ago` : "Fresh"}
+                                    {briefing.stale
+                                        ? "Cached · refresh to update"
+                                        : briefing.from_cache
+                                            ? `Cached · ${briefing.cache_age_hours}h ago`
+                                            : "Fresh"}
                                 </div>
                                 <button
                                     onClick={() => load(true)}
