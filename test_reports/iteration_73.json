@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 73 — In-portal PPTX/PDF viewer + course-completion validation for launch. Backend contract fully green (8/8 pytest: 28 courses each with module_count=15 and has_full_content=true; regenerated slug 'agentic-ai-learning-development' has 15 modules numbered 1..15 with non-empty lessons, 5 learning_objectives, 7 skills_gained; preview.pdf endpoint returns 401 anon / 403 non-enrolled / 200 application/pdf with %PDF magic when enrolled / 404 for bad slug / 404 for bad filename). Frontend fully green (3/3 flows): non-enrolled learner sees 'ENROLLED ONLY' badge + 'Locked' button and clicking it fires the info toast 'Enrol in this course to open the deck inside the portal.' without opening the modal; enrolled learner opens the modal (data-testid=resource-pdf-viewer), the PDF canvas wrap renders, page indicator shows '1 / 64', clicking next advances to '2 / 64', and viewer-close dismisses the modal. Regression check: /courses/agentic-ai-learning-development renders '15 modules', '15-module program', and all module-1 through module-15 testids are present. NOTE: iteration_71.json and iteration_72.json already existed for a different fix ('Eight tiers' copy), so this report is filed as iteration_73.json (the requested filename was already taken).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/courses/{slug}", "issue": "Detail endpoint does NOT surface 'has_full_content' — that flag is only exposed on the list endpoint /api/courses. Not a blocker (list endpoint has it), but worth documenting for the client if it ever needs to check completion state from the detail response."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration73_pdf_viewer.py",
+    "/app/test_reports/pytest/iteration73.xml",
+    "/app/test_reports/iter73_non_enrolled.png",
+    "/app/test_reports/iter73_pdf_rendered.png",
+    "/app/test_reports/iter73_regen_course.png"
+  ],
+  "action_items": [
+    "None blocking for launch. Optional: expose 'has_full_content' on the course detail endpoint for symmetry with the list endpoint.",
+    "Optional (ops): headless LibreOffice (soffice) is NOT installed in this forked container. The cached PDF at /app/backend/static/course_resources/.pdf_cache/prompt-engineering-mastery-deck.pdf is being served correctly because its mtime is newer than the source PPTX — but the cache is fragile: if anything touches/re-saves the PPTX in this container (or if a new PPTX resource is added), the endpoint will 502 until soffice is available. Bake `libreoffice` into the base image before rolling out additional PPTX resources.",
+    "Optional (viewer resilience): ResourcePdfViewer.jsx pins the pdf.js worker to jsdelivr CDN. If that CDN is down or blocked by corporate proxies, the viewer will fail with a generic 'Couldn't render this document' error. Consider self-hosting the worker under /public/pdf-worker.min.mjs."
+  ],
+  "critical_code_review_comments": [
+    "resource_viewer_router.py L110: enrollment check uses `db.enrollments.find_one({user_id, course_id})`. Contract matches catalog_router download endpoint — good. Same status-code taxonomy (401/403/404/415/502) — consistent.",
+    "resource_viewer_router.py L138-142: cache-validity check compares mtimes. Correct, but note this bypasses ANY change-detection on the PPTX content itself — if a re-save with unchanged mtime happens (e.g. some sync tools preserve mtime), the stale PDF is served. Low risk for launch; content-hash based cache key would be more robust long-term.",
+    "resource_viewer_router.py L143-148: when soffice is missing the exception message leaks the full stderr into the 502 response. Consider stripping the exception detail from the client-facing message (leave the exception in logs).",
+    "ResourcePdfViewer.jsx L44: fetches preview.pdf as arraybuffer via axios `api` client — auth header is attached automatically (verified: no explicit token propagation code needed). Good.",
+    "ResourcePdfViewer.jsx L114-117: `fileProp` state is derived from `pdfData` in a separate useEffect purely to memoise the `{data: pdfData}` object for react-pdf. This is a subtle but important pattern (without it every parent re-render would reload the doc). Well-implemented.",
+    "ResourcePdfViewer.jsx L25: worker pinned to `pdfjs.version` from the same react-pdf bundle — avoids the notorious API version mismatch. Solid.",
+    "CourseDetail.jsx ResourceRow: the Locked button (same testid `course-resource-open-<id>`) fires an info toast on click for non-enrolled users. Confirmed working; testid is stable regardless of enrolment state which is convenient for testing but means callers must inspect button text to know the state. Consider adding aria-disabled='true' + a distinct data-locked attribute if a11y tooling is used."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration73_pdf_viewer.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8 tests)", "frontend": "100% (3/3 flows: locked/toast, enrolled preview + next + close, regenerated course renders 15 modules)"},
+  "test_credentials": "Dynamic @example.com learners with TestPass123!. No long-lived accounts required. Super admin creds unused for this iteration.",
+  "seed_data_creation": "None beyond ephemeral test users (qa_iter73_*, qa_locked_*, qa_enrolled_*).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The report file was written to iteration_73.json (not iteration_71.json as requested) because iteration_71 and iteration_72 were already occupied by a prior 'Eight tiers' copy-fix review. Backend viewer contract green end-to-end. Frontend viewer renders the deck (64 pages) in the browser via react-pdf + jsdelivr worker CDN. Cached PDF path: /app/backend/static/course_resources/.pdf_cache/prompt-engineering-mastery-deck.pdf (3.36 MB). Source PPTX mtime is older than cache mtime so no reconversion is triggered — DO NOT touch the source PPTX in this container (soffice is not installed, so a cache invalidation would produce a 502). All 28 courses confirmed at 15 modules AND has_full_content=true. Regenerated 'agentic-ai-learning-development' verified with 15 modules, 5 objectives, 7 skills, published status. Frontend module-1..module-15 testids present on the accordion.",
+  "playwright_evidence": {
+    "non_enrolled_flow": "Registered qa_locked_*@example.com → /courses/prompt-engineering-mastery → 'ENROLLED ONLY' badge + 'Locked' button visible; click fires toast 'Enrol in this course to open the deck inside the portal.'; modal `resource-pdf-viewer` does NOT appear.",
+    "enrolled_happy_path": "Registered qa_enrolled_*@example.com → clicked enroll-button → auto-redirected to /learn/prompt-engineering-mastery/{module}/{lesson} → navigated back to /courses/prompt-engineering-mastery → open button state changed to 'Open' → click opened modal → viewer-pdf-canvas-wrap rendered → viewer-page-indicator shows '1 / 64' → viewer-next-page click advanced to '2 / 64' → viewer-close removed the modal from the DOM.",
+    "completed_course_regression": "/courses/agentic-ai-learning-development renders '15 modules' badge, '15-module program' heading, and all data-testid=module-1 through module-15 exist in the DOM."
+  },
+  "rca of the issue": "N/A — no defects found. Launch-ready for the in-portal viewer + course-completion scope."
+}
