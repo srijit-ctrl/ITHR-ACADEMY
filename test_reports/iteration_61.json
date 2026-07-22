@@ -21,7 +21,7 @@
   ],
   "success_rate": {"backend": "100% (8/8)", "frontend": "100% (all UI flows verified: 2 bug-fix pages, 4 spot-check pages, 3-tab admin panel, window selector, refresh, conversations drill-in, callbacks list)"},
   "test_credentials": "superadmin@ithr.online / Dubai_deram2026 (from /app/memory/test_credentials.md, sourced via SUPER_ADMIN_PASSWORD env)",
-  "seed_data_creation": "1 new callback row created via curl POST at end of test: id=92b3679c-1862-4ecb-9217-bd937c0cf016, phone=+9715012345678, visitor=v_it61_manual_ui. 1 new pulsedesk_messages row seeded via test_new_visitor_message_appears_in_bucket with visitor v_pytest_it61_*.",
+  "seed_data_creation": "1 new callback row created via curl POST at end of test: id=enterprise-agent-dev, phone=+9715012345678, visitor=v_it61_manual_ui. 1 new pulsedesk_messages row seeded via test_new_visitor_message_appears_in_bucket with visitor v_pytest_it61_*.",
   "retest_needed": false,
   "main_agent_can_self_test": true,
   "context_for_next_testing_agent": "PulseDesk admin panel at /admin?tab=pulsedesk fully wired. New endpoint GET /api/admin/pulsedesk/popular-questions?days=&top_n= returns {days, total_visitor_messages, top_intents:[{intent,count,unique_visitors,samples}]}, auth-guarded (401/403 without super-admin JWT), and clamps days∈[1,90] top_n∈[1,50]. Bug 'eight tiers' fully purged — grep -r 'eight tiers\\|8 tiers' /app/frontend/src /app/backend returns zero matches. Landing.jsx L61 intro + L182 h2 + Certifications.jsx L27 h1 + L31 paragraph all read 'six tiers'.",

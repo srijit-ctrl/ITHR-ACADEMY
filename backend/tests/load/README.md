@@ -22,7 +22,7 @@ to bound cost per run.
 pip install locust
 cd /app/backend/tests/load
 locust -f locustfile.py \
-       --host https://ithr-agentic-hub.preview.emergentagent.com \
+       --host https://enterprise-agent-dev.preview.emergentagent.com \
        --headless -u 25 -r 5 -t 2m
 ```
 
