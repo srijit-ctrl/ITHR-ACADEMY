@@ -1,10 +1,10 @@
 # Compliance Statement
 
 *DRAFT — describes design-alignment posture, not attested controls.
-Attestation status is tracked publicly on /trust. Placeholders in **{{ }}**.*
+Attestation status is tracked publicly on /trust.*
 
 **Effective date:** {{ EFFECTIVE_DATE }}
-**Governing entity:** ITHR Technologies FZ-LLC (Dubai, UAE)
+**Governing entity:** ITHR Technologies Consulting LLC (Dubai, UAE)
 
 ## 1. Framework Alignment
 The Academy is **designed to align** with the following external

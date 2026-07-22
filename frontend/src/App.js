@@ -16,6 +16,7 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import AuthCallback from "@/pages/AuthCallback";
 import CourseCatalog from "@/pages/CourseCatalog";
+import NotFound from "@/pages/NotFound";
 import CourseDetail from "@/pages/CourseDetail";
 import LessonViewer from "@/pages/LessonViewer";
 import Dashboard from "@/pages/Dashboard";
@@ -115,6 +116,9 @@ function AppShell() {
                     <Route path="/legal/terms" element={<LegalDoc docKey="terms" />} />
                     <Route path="/legal/security" element={<LegalDoc docKey="security" />} />
                     <Route path="/legal/compliance" element={<LegalDoc docKey="compliance" />} />
+                    <Route path="/privacy" element={<LegalDoc docKey="privacy" />} />
+
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
             </main>
             {!isLesson && !isAdmin && <Footer />}

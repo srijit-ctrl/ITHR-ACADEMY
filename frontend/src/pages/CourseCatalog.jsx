@@ -12,6 +12,7 @@ export default function CourseCatalog() {
     const [industries, setIndustries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState(searchParams.get("q") || "");
+    const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get("q") || "");
 
     const currentCategory = searchParams.get("category") || "";
     const currentIndustry = searchParams.get("industry") || "";
@@ -26,14 +27,19 @@ export default function CourseCatalog() {
     }, []);
 
     useEffect(() => {
+        const t = setTimeout(() => setDebouncedQuery(query), 300);
+        return () => clearTimeout(t);
+    }, [query]);
+
+    useEffect(() => {
         setLoading(true);
         const params = {};
         if (currentCategory) params.category = currentCategory;
         if (currentIndustry) params.industry = currentIndustry;
         if (currentDifficulty) params.difficulty = currentDifficulty;
-        if (query) params.q = query;
+        if (debouncedQuery) params.q = debouncedQuery;
         api.get("/courses", { params }).then((r) => { setCourses(r.data); setLoading(false); });
-    }, [currentCategory, currentIndustry, currentDifficulty, query]);
+    }, [currentCategory, currentIndustry, currentDifficulty, debouncedQuery]);
 
     const updateFilter = (key, value) => {
         const next = new URLSearchParams(searchParams);

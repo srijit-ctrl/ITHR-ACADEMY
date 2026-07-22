@@ -1,12 +1,12 @@
 # Terms of Service · Legal Binding
 
-*DRAFT — not yet reviewed by counsel. Placeholders in **{{ }}**.*
+*DRAFT — not yet reviewed by counsel.*
 
 **Effective date:** {{ EFFECTIVE_DATE }}
-**Governing entity:** ITHR Technologies FZ-LLC, licensed and registered
+**Governing entity:** ITHR Technologies Consulting LLC, licensed and registered
 in the United Arab Emirates ("ITHR", "we", "our").
 
-By creating an account or using **learn.ithr.tech** or any subdomain
+By creating an account or using **ithr.online** or any subdomain
 ("Academy"), you agree to the following. If you do not agree, please
 do not use the Academy.
 

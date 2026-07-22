@@ -15,12 +15,12 @@ import { ShieldCheck, FileText, Lock, ScrollText, Loader2 } from "lucide-react";
  */
 const PLACEHOLDERS = {
     EFFECTIVE_DATE: "5 February 2026",
-    CONTACT_EMAIL: "hello@ithr.tech",
-    LEGAL_EMAIL: "legal@ithr.tech",
-    BILLING_EMAIL: "billing@ithr.tech",
-    PRIVACY_EMAIL: "privacy@ithr.tech",
-    SECURITY_EMAIL: "security@ithr.tech",
-    ENTERPRISE_EMAIL: "enterprise@ithr.tech",
+    CONTACT_EMAIL: "hello@ithr.online",
+    LEGAL_EMAIL: "legal@ithr.online",
+    BILLING_EMAIL: "billing@ithr.online",
+    PRIVACY_EMAIL: "privacy@ithr.online",
+    SECURITY_EMAIL: "security@ithr.online",
+    ENTERPRISE_EMAIL: "enterprise@ithr.online",
     SOC2_TARGET: "Q4 2026",
     ISO_TARGET: "Q2 2027",
     ISO_42001_TARGET: "Q3 2027",
@@ -33,6 +33,7 @@ const DOC_URLS = {
     terms: "/legal/terms.md",
     security: "/legal/security.md",
     compliance: "/legal/compliance.md",
+    privacy: "/legal/privacy.md",
 };
 
 const DOCS = {
@@ -40,9 +41,11 @@ const DOCS = {
     terms: { title: "Terms of Service", icon: ScrollText, kicker: "Legal" },
     security: { title: "Cyber Security", icon: Lock, kicker: "Security" },
     compliance: { title: "Compliance", icon: ShieldCheck, kicker: "Compliance" },
+    privacy: { title: "Privacy Policy", icon: ShieldCheck, kicker: "Privacy" },
 };
 
 const NAV = [
+    { key: "privacy", path: "/privacy", label: "Privacy Policy" },
     { key: "disclaimer", path: "/legal/disclaimer", label: "Disclaimer" },
     { key: "terms", path: "/legal/terms", label: "Terms" },
     { key: "security", path: "/legal/security", label: "Cyber Security" },
@@ -50,7 +53,7 @@ const NAV = [
 ];
 
 function fillPlaceholders(raw) {
-    return raw.replace(/\{\{\s*([A-Z_]+)\s*\}\}/g, (m, k) => PLACEHOLDERS[k] ?? m);
+    return raw.replace(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g, (m, k) => PLACEHOLDERS[k] ?? m);
 }
 
 export default function LegalDoc({ docKey }) {

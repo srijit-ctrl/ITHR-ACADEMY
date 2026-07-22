@@ -57,6 +57,10 @@ export default function Mentor() {
     const send = async (text) => {
         const msg = (text || input).trim();
         if (!msg || streaming) return;
+        // Establish a stable session id on the very first turn so rapid double
+        // sends share one id (backend upserts) — prevents duplicate threads.
+        const sid = sessionId || (window.crypto?.randomUUID ? window.crypto.randomUUID() : `s-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        if (!sessionId) setSessionId(sid);
         setInput("");
         setMessages((m) => [...m, { id: `u-${Date.now()}-${m.length}`, role: "user", content: msg }, { id: `a-${Date.now()}-${m.length + 1}`, role: "assistant", content: "" }]);
         setStreaming(true);
@@ -67,7 +71,7 @@ export default function Mentor() {
 
         await streamMentor({
             message: msg,
-            sessionId,
+            sessionId: sid,
             context: Object.keys(ctx).length ? ctx : null,
             onDelta: (delta) => {
                 setMessages((m) => {
@@ -76,12 +80,9 @@ export default function Mentor() {
                     return copy;
                 });
             },
-            onDone: (p) => {
+            onDone: () => {
                 setStreaming(false);
-                if (p.session_id && !sessionId) {
-                    setSessionId(p.session_id);
-                    api.get("/mentor/sessions").then((r) => setSessions(r.data)).catch(() => {});
-                }
+                api.get("/mentor/sessions").then((r) => setSessions(r.data)).catch(() => {});
             },
             onError: (err) => {
                 setStreaming(false);

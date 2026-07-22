@@ -104,6 +104,9 @@ async def list_courses(
             {"title": {"$regex": q, "$options": "i"}},
             {"subtitle": {"$regex": q, "$options": "i"}},
             {"category": {"$regex": q, "$options": "i"}},
+            {"slug": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"skills_gained": {"$regex": q, "$options": "i"}},
         ]
     # Stable string key so the cache decorator can hash it
     import json as _json

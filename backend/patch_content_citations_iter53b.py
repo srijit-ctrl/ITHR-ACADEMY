@@ -119,7 +119,7 @@ CITATIONS: list[tuple[re.Pattern, str]] = [
     # Anthropic Claude Code / 3.5 Sonnet launch (cross-reference for lessons that reuse the fact)
     (
         re.compile(r"(Anthropic followed with Claude 3's 200k tokens)"),
-        r"\1 [Source: Anthropic — *Long-context prompting with Claude*](https://www.anthropic.com/news/claude-2-1).",
+        r"\1 [Source: Anthropic — *Long-context prompting tips*](https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips).",
     ),
 ]
 

@@ -30,7 +30,7 @@ def build_full_course() -> Course:
                    "[Claude Code launch post](https://www.anthropic.com/news/claude-3-5-sonnet-agentic-coding). "
                    "**Salesforce** claims **Agentforce** is on track to process **one billion agent "
                    "interactions annually** across the Customer 360 stack "
-                   "([Agentforce 2.0 launch, Dec 2024](https://www.salesforce.com/news/press-releases/2024/12/17/agentforce-2-announcement/)). "
+                   "([Salesforce Agentforce](https://www.salesforce.com/agentforce/)). "
                    "Numbers should be read as vendor-reported, not independently audited — treat them as "
                    "directional evidence of scale, not benchmarks for your own program."
                ),

@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /enterprise/portal
+Disallow: /enterprise/setup
+Disallow: /enterprise/join
+Disallow: /passport
+Disallow: /mentor
+Disallow: /patches
+Disallow: /api/
+
+Sitemap: https://ithr.online/sitemap.xml

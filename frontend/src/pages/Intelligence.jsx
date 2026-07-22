@@ -35,7 +35,10 @@ export default function Intelligence() {
         setError("");
         if (force) setRefreshing(true); else setLoading(true);
         try {
-            const res = await api.get("/intelligence/briefing", { params: force ? { force: true } : {} });
+            const res = await api.get("/intelligence/briefing", {
+                params: force ? { force: true } : {},
+                timeout: 30000,
+            });
             setBriefing(res.data);
         } catch (e) {
             console.error("intelligence briefing failed:", e);

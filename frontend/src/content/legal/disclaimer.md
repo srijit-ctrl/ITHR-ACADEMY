@@ -1,9 +1,9 @@
 # Website Disclaimer
 
-*DRAFT — not yet reviewed by counsel. Placeholders in **{{ }}**.*
+*DRAFT — not yet reviewed by counsel.*
 
 **Effective date:** {{ EFFECTIVE_DATE }}
-**Publisher:** ITHR Technologies FZ-LLC, Dubai, UAE.
+**Publisher:** ITHR Technologies Consulting LLC, Dubai, UAE.
 
 ## 1. Educational Purpose Only
 The Enterprise Agentic AI Academy ("Academy") is an **educational product**. All

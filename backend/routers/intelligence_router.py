@@ -1,6 +1,11 @@
 """Intelligence briefing + course refresh + NEW push-to-curriculum action."""
+import asyncio
 import uuid
 from datetime import datetime, timezone
+
+# Hard ceiling for the (LLM-backed) briefing generation so the endpoint can
+# never hang indefinitely — the frontend gets a fast, actionable error instead.
+BRIEFING_TIMEOUT_SECONDS = 18
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -27,8 +32,18 @@ async def intelligence_briefing(force: bool = False):
     slugs = [c["slug"] for c in course_docs]
 
     try:
-        raw = await generate_intelligence_briefing(slugs)
+        raw = await asyncio.wait_for(
+            generate_intelligence_briefing(slugs), timeout=BRIEFING_TIMEOUT_SECONDS
+        )
         parsed = extract_json(raw)
+    except asyncio.TimeoutError:
+        logger.warning("Intelligence generation timed out after %ss", BRIEFING_TIMEOUT_SECONDS)
+        if cached:
+            return {**cached["payload"], "cache_age_hours": 999, "from_cache": True, "stale": True}
+        raise HTTPException(
+            status_code=504,
+            detail="The live briefing is taking longer than usual to generate. Please retry in a moment.",
+        )
     except Exception as e:
         logger.exception("Intelligence generation failed")
         if cached:

@@ -66,8 +66,10 @@ def _emergent_key() -> str:
     return key
 
 
-def _build_chat(session_id: str, extra_context: Optional[str] = None) -> LlmChat:
+def _build_chat(session_id: str, extra_context: Optional[str] = None, catalog_block: Optional[str] = None) -> LlmChat:
     system = MENTOR_SYSTEM_PROMPT
+    if catalog_block:
+        system += catalog_block
     if extra_context:
         system += f"\n\nLearner profile snapshot:\n{extra_context}\n\nUse this context to personalize every response."
     return LlmChat(
@@ -75,6 +77,33 @@ def _build_chat(session_id: str, extra_context: Optional[str] = None) -> LlmChat
         session_id=session_id,
         system_message=system,
     ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+
+
+async def _build_catalog_block() -> Optional[str]:
+    """Inject the REAL, live course catalog so Solon never invents course titles.
+
+    The model is instructed to reference courses ONLY by their exact title from
+    this list. This grounds every recommendation in what actually exists.
+    """
+    courses = await db.courses.find(
+        {}, {"_id": 0, "title": 1, "slug": 1, "category": 1}
+    ).sort("title", 1).to_list(200)
+    lines = [
+        f'- "{c["title"]}" (slug: {c["slug"]}, category: {c.get("category", "")})'
+        for c in courses if c.get("title")
+    ]
+    if not lines:
+        return None
+    catalog = "\n".join(lines)
+    return (
+        "\n\n=== ITHR LIVE COURSE CATALOG (authoritative — the ONLY courses that exist) ===\n"
+        "You MUST reference courses using their EXACT title from this list, copied verbatim. "
+        "NEVER invent, rename, paraphrase, translate, or guess a course title. If a learner's "
+        "need has no exact match, say so plainly and recommend the closest real course(s) from "
+        "this list. Do not cite any course title that is not in this list.\n"
+        f"{catalog}\n"
+        "=== END CATALOG ===\n"
+    )
 
 
 async def _build_context_block(payload_context: Optional[dict], user_id: str) -> Optional[str]:
@@ -108,21 +137,23 @@ async def _persist_mentor_turn(
 ) -> None:
     user_msg = {"role": "user", "content": user_message, "timestamp": now_iso()}
     ai_msg = {"role": "assistant", "content": assistant_message, "timestamp": now_iso()}
-    if existing_session:
-        await db.mentor_sessions.update_one(
-            {"id": session_id},
-            {"$push": {"messages": {"$each": [user_msg, ai_msg]}},
-             "$set": {"updated_at": now_iso()}},
-        )
-    else:
-        await db.mentor_sessions.insert_one({
-            "id": session_id,
-            "user_id": user_id,
-            "title": user_message[:60],
-            "messages": [user_msg, ai_msg],
-            "created_at": now_iso(),
-            "updated_at": now_iso(),
-        })
+    # Single idempotent upsert keyed by session id. Prevents the double-write
+    # that produced duplicate threads in the "Past Conversations" sidebar when
+    # a brand-new session was saved concurrently.
+    await db.mentor_sessions.update_one(
+        {"id": session_id},
+        {
+            "$push": {"messages": {"$each": [user_msg, ai_msg]}},
+            "$set": {"updated_at": now_iso()},
+            "$setOnInsert": {
+                "id": session_id,
+                "user_id": user_id,
+                "title": user_message[:60],
+                "created_at": now_iso(),
+            },
+        },
+        upsert=True,
+    )
 
 
 @router.post("/mentor/chat")
@@ -133,7 +164,8 @@ async def mentor_chat(payload: MentorRequest, user_id: str = Depends(get_current
     )
     history = session.get("messages", []) if session else []
     context_block = await _build_context_block(payload.context, user_id)
-    chat = _build_chat(session_id, context_block)
+    catalog_block = await _build_catalog_block()
+    chat = _build_chat(session_id, context_block, catalog_block)
     prompt = _preamble_with_history(history, payload.message)
 
     async def event_generator():

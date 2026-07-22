@@ -1,14 +1,14 @@
 # Cyber Security Statement
 
 *DRAFT — reflects current-state controls. Attestation status is
-tracked publicly on /trust. Placeholders in **{{ }}**.*
+tracked publicly on /trust.*
 
 **Effective date:** {{ EFFECTIVE_DATE }}
 
 ## 1. Scope
 This statement describes the technical and organisational security
 controls in place for the Enterprise Agentic AI Academy platform,
-covering learner and enterprise data on **learn.ithr.tech**.
+covering learner and enterprise data on **ithr.online**.
 
 ## 2. Identity & Access
 - **Authentication:** JWT-based access tokens (15-minute lifetime,

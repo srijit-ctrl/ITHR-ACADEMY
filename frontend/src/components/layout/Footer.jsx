@@ -56,6 +56,7 @@ export default function Footer() {
                 <div>
                     <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-brand-teal mb-4">Legal</div>
                     <ul className="space-y-2 text-sm text-muted-foreground">
+                        <li><Link to="/privacy" className="hover:text-brand" data-testid="footer-privacy">Privacy Policy</Link></li>
                         <li><Link to="/legal/disclaimer" className="hover:text-brand" data-testid="footer-disclaimer">Disclaimer</Link></li>
                         <li><Link to="/legal/terms" className="hover:text-brand" data-testid="footer-terms">Terms of Service</Link></li>
                         <li><Link to="/legal/security" className="hover:text-brand" data-testid="footer-security">Cyber Security</Link></li>

@@ -279,6 +279,15 @@ async def seed_database():
         if content_applied:
             logger.info(f"Re-applied enriched lesson content on {content_applied} courses.")
 
+    # FINAL pass — repair known dead external links across ALL course content
+    # after every seed/hydration/override step above. Runs last so nothing can
+    # re-introduce them; idempotent and safe on every boot (preview + prod).
+    try:
+        from content_fixups import fix_dead_links
+        await fix_dead_links()
+    except Exception:
+        logger.exception("Content fix-ups failed (non-fatal)")
+
 
 # -------------------- Router mounting --------------------
 for r in (

@@ -210,11 +210,11 @@ export default function Pricing() {
 
                             <button
                                 onClick={() => handleCheckout(p.packageId)}
-                                disabled={processingId === p.packageId}
+                                disabled={!!p.packageId && processingId === p.packageId}
                                 data-testid={`${p.testId}-cta`}
                                 className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}
                             >
-                                {processingId === p.packageId ? (
+                                {p.packageId && processingId === p.packageId ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
                                     <>{p.cta} <ArrowRight className="w-4 h-4" /></>
@@ -288,7 +288,7 @@ export default function Pricing() {
                                 </ul>
 
                                 {p.contact ? (
-                                    <a href="mailto:enterprise@ithr.tech" data-testid={`${p.testId}-cta`} className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}>
+                                    <a href="mailto:enterprise@ithr.online" data-testid={`${p.testId}-cta`} className={p.featured ? "btn-primary w-full" : "btn-outline w-full"}>
                                         Contact ITHR <ArrowRight className="w-4 h-4" />
                                     </a>
                                 ) : (
