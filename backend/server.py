@@ -144,6 +144,16 @@ async def seed_database():
         }
         await db.courses.update_one({"slug": meta["slug"]}, {"$setOnInsert": catalog_doc}, upsert=True)
 
+    # Graduate the 17 LLM-generated catalogue courses from 4-module stubs to
+    # fully published 15-module courses using content baked into the repo
+    # (data/generated_courses.json). Idempotent; runs on every boot so
+    # production picks up the full content on redeploy.
+    try:
+        from seed_generated_courses import seed_generated_courses
+        await seed_generated_courses()
+    except Exception:
+        logger.exception("Generated-course seed failed (non-fatal)")
+
     await db.courses.create_index("slug", unique=True)
     await db.users.create_index("email", unique=True)
     await db.enrollments.create_index([("user_id", 1), ("course_id", 1)], unique=True)

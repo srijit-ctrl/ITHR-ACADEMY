@@ -64,7 +64,20 @@ async def get_industries():
 
 @router.get("/catalog/categories")
 async def get_categories():
-    return {"categories": CATEGORIES}
+    """Only surface categories that actually contain courses.
+
+    The curated `CATEGORIES` list is the canonical ordering, but any category
+    with zero courses (e.g. "AI Fundamentals", "Generative AI", "AI Agents")
+    is dropped so learners never click into an empty category. Also returns a
+    per-category count map so the UI can show how many courses each holds.
+    """
+    rows = await db.courses.aggregate(
+        [{"$group": {"_id": "$category", "count": {"$sum": 1}}}]
+    ).to_list(500)
+    counts = {r["_id"]: r["count"] for r in rows if r.get("_id")}
+    ordered = [c for c in CATEGORIES if counts.get(c)]
+    extras = sorted(c for c in counts if c not in CATEGORIES)
+    return {"categories": ordered + extras, "counts": counts}
 
 
 @router.get("/catalog/certification-paths")

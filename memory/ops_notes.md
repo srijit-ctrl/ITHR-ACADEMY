@@ -30,3 +30,16 @@
 ## Course content
 - All 28 courses have exactly 15 modules (verified Jun 2026). Generation script:
   `backend/scripts/generate_course_content_append.py` (idempotent; `--slug X` for one course, `--all` for batch).
+
+## ⚠️ CRITICAL: generated course content must be BAKED INTO CODE, not left in the DB
+- LLM-generated course content written directly to MongoDB does NOT deploy to production.
+  Production is a SEPARATE database that is seeded fresh from code on every deploy.
+- The 17 non-`full_builders` courses' content is baked into `backend/data/generated_courses.json`
+  (committed) and re-seeded on every startup via `backend/seed_generated_courses.py`
+  (wired into `server.py::seed_database()`). This is what makes them appear complete in production.
+- **If you ever regenerate or add course content via a script that writes to the DB, you MUST
+  re-export it into `data/generated_courses.json`** (see the export one-liner in git history /
+  iteration 72) so the change survives a production redeploy. Otherwise production will revert
+  to stubs on the next deploy.
+- Category filter list is derived live from `courses` in `GET /api/catalog/categories` — do not
+  re-hardcode it; empty categories must never be shown.

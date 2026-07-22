@@ -8,6 +8,7 @@ export default function CourseCatalog() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [courses, setCourses] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [categoryCounts, setCategoryCounts] = useState({});
     const [industries, setIndustries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState(searchParams.get("q") || "");
@@ -17,7 +18,10 @@ export default function CourseCatalog() {
     const currentDifficulty = searchParams.get("difficulty") || "";
 
     useEffect(() => {
-        api.get("/catalog/categories").then((r) => setCategories(r.data.categories));
+        api.get("/catalog/categories").then((r) => {
+            setCategories(r.data.categories);
+            setCategoryCounts(r.data.counts || {});
+        });
         api.get("/catalog/industries").then((r) => setIndustries(r.data.industries));
     }, []);
 
@@ -74,7 +78,7 @@ export default function CourseCatalog() {
                         </button>
                     )}
 
-                    <FilterGroup title="Category" values={categories} current={currentCategory} onChange={(v) => updateFilter("category", v)} testId="filter-category" />
+                    <FilterGroup title="Category" values={categories} counts={categoryCounts} current={currentCategory} onChange={(v) => updateFilter("category", v)} testId="filter-category" />
                     <FilterGroup title="Industry" values={industries} current={currentIndustry} onChange={(v) => updateFilter("industry", v)} testId="filter-industry" />
                     <FilterGroup title="Difficulty" values={difficulties} current={currentDifficulty} onChange={(v) => updateFilter("difficulty", v)} testId="filter-difficulty" />
                 </aside>
@@ -103,7 +107,7 @@ export default function CourseCatalog() {
     );
 }
 
-function FilterGroup({ title, values, current, onChange, testId }) {
+function FilterGroup({ title, values, counts, current, onChange, testId }) {
     return (
         <div>
             <div className="overline mb-3">{title}</div>
@@ -113,9 +117,12 @@ function FilterGroup({ title, values, current, onChange, testId }) {
                         key={v}
                         onClick={() => onChange(current === v ? "" : v)}
                         data-testid={`${testId}-${v.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and")}`}
-                        className={`text-left text-sm py-1 transition-colors ${current === v ? "text-brand font-medium" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`text-left text-sm py-1 flex items-center justify-between gap-2 transition-colors ${current === v ? "text-brand font-medium" : "text-muted-foreground hover:text-foreground"}`}
                     >
-                        {v}
+                        <span>{v}</span>
+                        {counts && counts[v] != null && (
+                            <span className="text-[10px] font-mono tabular-nums text-muted-foreground/70">{counts[v]}</span>
+                        )}
                     </button>
                 ))}
             </div>
