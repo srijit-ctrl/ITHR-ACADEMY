@@ -26,9 +26,16 @@ const CERT_TIERS = [
 export default function Landing() {
     const [featured, setFeatured] = useState([]);
     const [industryCount, setIndustryCount] = useState(20);
+    const [courseCount, setCourseCount] = useState(24);
 
     useEffect(() => {
-        api.get("/courses").then((res) => setFeatured(res.data.slice(0, 6))).catch(() => { });
+        api.get("/courses")
+            .then((res) => {
+                const arr = res.data || [];
+                setFeatured(arr.slice(0, 6));
+                if (Array.isArray(arr) && arr.length) setCourseCount(arr.length);
+            })
+            .catch(() => { });
         api.get("/catalog/industries")
             .then((r) => {
                 const list = r.data?.industries || r.data || [];
@@ -83,11 +90,11 @@ export default function Landing() {
                         {/* Structural stat pips — only claim what is factually verifiable */}
                         <div className="flex flex-wrap justify-center gap-x-14 gap-y-6 pt-8 border-t border-border">
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none">6</div>
+                                <div className="font-serif text-3xl leading-none" data-testid="stat-pip-tiers">{CERT_TIERS.length}</div>
                                 <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Credential tiers</div>
                             </div>
                             <div className="text-left">
-                                <div className="font-serif text-3xl leading-none">24</div>
+                                <div className="font-serif text-3xl leading-none" data-testid="stat-pip-courses">{courseCount}</div>
                                 <div className="text-xs text-muted-foreground mt-1.5 font-mono uppercase tracking-[0.15em]">Courses in catalog</div>
                             </div>
                             <div className="text-left">

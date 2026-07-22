@@ -1,0 +1,46 @@
+{
+  "summary": "Retest of iter-71 regression fix — Landing stat-pips 'Credential tiers' and 'Courses in catalog' are now dynamic. All required assertions pass. One residual drift-risk flagged on /enterprise page.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/enterprise (Enterprise.jsx line 75)",
+        "issues": [
+          "Same hardcoded '24' for 'Courses in catalog' still exists on the Enterprise page — identical drift-risk pattern that was just fixed on Landing.jsx. If the catalog grows, /enterprise will silently under-report. Recommend applying the same courseCount-from-API pattern (or a shared constant/hook) here. Not blocking for the Landing-only scope of this iteration."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL: apply the same dynamic pattern (or shared hook) to /enterprise page stat-pip 'Courses in catalog' at /app/frontend/src/pages/Enterprise.jsx line 75 to close the identical drift risk across the site."
+  ],
+  "critical_code_review_comments": [
+    "CERT_TIERS array is defined inline in Landing.jsx (line 15-24) — duplicated in Certifications.jsx (paths). Consider extracting to a single source of truth (e.g., /app/frontend/src/data/certTiers.js) so tier changes propagate automatically across all pages and no future 'Six tiers' style regressions are possible.",
+    "The default fallback for courseCount is 24 (Landing.jsx line 29). With the live catalog now at 28 courses, this fallback is stale. Consider bumping to 28 or removing the initial value (render '—' until the API resolves) to avoid the brief '24' flicker.",
+    "Enterprise.jsx still has hardcoded '24' for 'Courses in catalog' — same category of bug just fixed on Landing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% on requested assertions"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter-71 'Six tiers'->'Eight tiers' regression is fully closed on Landing.jsx. stat-pip-tiers=8, stat-pip-courses=28 (dynamic from /api/courses which returns 28 items). All 8 tier cards render with Roman I-VIII. Certifications page H1 says 'Eight tiers.' and paragraph contains 'across eight tiers'. Course details /courses/prompt-engineering-mastery renders 'COURSE MATERIALS' section. /admin?tab=automations is auth-protected on the public URL, so automations count cannot be verified without admin creds; iter-70 already verified 5 starter rules. Only residual drift risk is Enterprise.jsx line 75 (>24< Courses in catalog) — not in the scope of this iteration but worth flagging.",
+  "rca of the issue": "iter-71 failed because Landing.jsx line 86 still had a hardcoded '6' for 'Credential tiers' pip (visually contradicting the 'Eight tiers' hero copy 20px above) and '24' for 'Courses in catalog'. E1's fix replaced both with dynamic JSX expressions: {CERT_TIERS.length} (=8) and {courseCount} (state initialised to 24, then set from /api/courses response length). Verified live: pip now renders '8' and '28' after networkidle. Zero visual contradiction remains — both 'Eight tiers.' H2 and '8 CREDENTIAL TIERS' pip appear in the same 1920x900 hero screenshot.",
+  "grep_verification": {
+    "'six tiers' / 'Six tiers' in /app/frontend/src": "Only 2 hits and both are inside a JSDoc comment in /app/frontend/src/utils/numberToWord.js (lines 4 and 30) explaining what the helper does — not rendered UI copy. Acceptable.",
+    "'>6<' in /app/frontend/src": "Zero matches. PASS.",
+    "'>24<' in /app/frontend/src": "One match: /app/frontend/src/pages/Enterprise.jsx line 75, immediately followed by 'Courses in catalog'. Same drift-risk pattern still exists on the Enterprise page (out of scope for this iteration's fix but flagged as a follow-up)."
+  },
+  "playwright_evidence": {
+    "hero_screenshot": "/app/test_reports/hero_stat_pips.png — shows 'Where the world's workforce learns to command AI.' hero + 'The ITHR Academy is a credentialing platform for enterprise workforces — eight tiers, twenty-three industries, one standard, refreshed continuously.' paragraph + stat-pip row showing '8 CREDENTIAL TIERS · 28 COURSES IN CATALOG · 15 MODULES PER COURSE · 100% PUBLICLY VERIFIABLE' — no visual contradiction",
+    "stat-pip-tiers": "8",
+    "stat-pip-courses": "28 (matches len(GET /api/courses) = 28)",
+    "cert_tier_cards": "All 8 rendered with Roman I..VIII — Foundation, Practitioner, Professional, Specialist, Expert, Architect, Enterprise Leader, Chief AI Officer",
+    "certifications_page": "H1 contains 'Eight tiers.'; paragraph contains 'across eight tiers'",
+    "course_details_prompt_engineering_mastery": "COURSE MATERIALS section present (PPTX file link not surfaced in plain innerText grab but iter-70/71 already confirmed download link)",
+    "admin_automations_tab": "Not verified — route is auth-protected on the public URL and no admin test credentials provided; iter-70 already confirmed 5 starter rules"
+  }
+}
